@@ -1,0 +1,9 @@
+# Ignore everything
+*
+
+# Except the deep-learning skill
+!deep-learning/
+!deep-learning/**
+
+# And this gitignore
+!.gitignore
