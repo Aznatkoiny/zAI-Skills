@@ -6,6 +6,10 @@
 !.claude-plugin/**
 !skills/
 !skills/**
+!stock_predictor/
+!stock_predictor/**
+!tests/
+!tests/**
 !README.md
 !LICENSE
 
