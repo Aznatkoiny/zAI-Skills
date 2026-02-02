@@ -118,3 +118,29 @@ class TestPrepareData:
         # MinMaxScaler should put most values between 0 and 1
         assert X_train.min() >= -0.5  # Allow some slack
         assert X_train.max() <= 1.5
+
+
+class TestIntegration:
+    """Integration tests for full pipeline."""
+
+    @pytest.mark.slow
+    def test_full_pipeline(self):
+        """Test complete training pipeline with minimal epochs."""
+        from stock_predictor.data import prepare_data
+        from stock_predictor.model import create_model
+        from stock_predictor.train import train_model
+        from stock_predictor.evaluate import evaluate_model, naive_baseline
+
+        # Prepare data
+        data = prepare_data("SPY", lookback=60)
+
+        # Create and train model
+        model = create_model(lookback=60, n_features=10)
+        history = train_model(model, data, epochs=2)
+
+        # Evaluate
+        results = evaluate_model(model, data)
+
+        # Verify we get meaningful results
+        assert results["mae"] > 0
+        assert len(results["predictions"]) == len(data["y_test"])
