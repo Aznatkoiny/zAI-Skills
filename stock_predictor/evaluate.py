@@ -1,6 +1,7 @@
 """Evaluation utilities for stock predictor."""
 import numpy as np
 import keras
+import matplotlib.pyplot as plt
 
 
 def naive_baseline(y_true: np.ndarray) -> float:
@@ -45,3 +46,29 @@ def evaluate_model(model: keras.Model, data: dict) -> dict:
         "predictions": predictions,
         "y_test": y_test,
     }
+
+
+def plot_predictions(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    title: str = "Actual vs Predicted"
+) -> plt.Figure:
+    """Plot actual vs predicted values.
+
+    Args:
+        y_true: Array of actual values
+        y_pred: Array of predicted values
+        title: Plot title
+
+    Returns:
+        Matplotlib Figure object
+    """
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.plot(y_true, label="Actual", alpha=0.7)
+    ax.plot(y_pred, label="Predicted", alpha=0.7)
+    ax.set_xlabel("Time")
+    ax.set_ylabel("Price (normalized)")
+    ax.set_title(title)
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    return fig

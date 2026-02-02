@@ -67,3 +67,32 @@ class TestEvaluateModel:
         result = evaluate_model(trained_model, dummy_test_data)
         assert "predictions" in result
         assert len(result["predictions"]) == len(dummy_test_data["y_test"])
+
+
+import matplotlib
+matplotlib.use("Agg")  # Non-interactive backend for tests
+import matplotlib.pyplot as plt
+
+
+class TestPlotPredictions:
+    """Tests for plot_predictions function."""
+
+    def test_creates_figure(self):
+        """Should create a matplotlib figure."""
+        from stock_predictor.evaluate import plot_predictions
+        y_true = np.array([100, 102, 105, 103, 107])
+        y_pred = np.array([99, 101, 104, 104, 106])
+        fig = plot_predictions(y_true, y_pred)
+        assert isinstance(fig, plt.Figure)
+        plt.close(fig)
+
+    def test_has_legend(self):
+        """Figure should have a legend."""
+        from stock_predictor.evaluate import plot_predictions
+        y_true = np.array([100, 102, 105, 103, 107])
+        y_pred = np.array([99, 101, 104, 104, 106])
+        fig = plot_predictions(y_true, y_pred)
+        ax = fig.axes[0]
+        legend = ax.get_legend()
+        assert legend is not None
+        plt.close(fig)
