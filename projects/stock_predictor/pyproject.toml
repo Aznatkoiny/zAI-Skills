@@ -1,0 +1,33 @@
+[tool.poetry]
+name = "stock-predictor"
+version = "0.1.0"
+description = "LSTM-based stock price predictor using Keras 3"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = [{include = "stock_predictor", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+keras = "^3.0"
+tensorflow = "^2.16"
+yfinance = "^0.2"
+pandas = "^2.0"
+numpy = "^2.0"
+scikit-learn = "^1.3"
+matplotlib = "^3.7"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+
+[tool.poetry.scripts]
+stock-predictor = "stock_predictor.main:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')"
+]

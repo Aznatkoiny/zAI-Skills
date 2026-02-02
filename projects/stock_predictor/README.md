@@ -35,16 +35,26 @@ Dense (1) → Predicted Close Price
 ## Installation
 
 ```bash
+# Install with Poetry
+poetry install
+
+# Or with pip (legacy)
 pip install -r requirements.txt
 ```
-
-**Dependencies:** keras>=3.0.0, tensorflow>=2.16.0, yfinance, pandas, numpy, scikit-learn, matplotlib, pytest
 
 ## Usage
 
 ### Train and Evaluate
 
 ```bash
+# With Poetry
+poetry run stock-predictor --ticker SPY --epochs 100
+
+# Or activate the virtual environment first
+poetry shell
+stock-predictor --ticker SPY --epochs 100
+
+# Legacy (without Poetry)
 python -m stock_predictor.main --ticker SPY --epochs 100 --output-dir output
 ```
 
@@ -58,20 +68,24 @@ python -m stock_predictor.main --ticker SPY --epochs 100 --output-dir output
 ### Run Tests
 
 ```bash
-pytest tests/ -v
+poetry run pytest
 ```
 
 ## Project Structure
 
 ```
 stock_predictor/
-├── __init__.py
-├── requirements.txt
-├── data.py          # download_stock_data, add_technical_indicators, prepare_data
-├── model.py         # create_model (LSTM)
-├── train.py         # train_model with callbacks
-├── evaluate.py      # naive_baseline, evaluate_model, plot_predictions
-├── main.py          # CLI entry point
+├── pyproject.toml       # Poetry configuration
+├── requirements.txt     # Legacy pip requirements
+├── README.md
+├── src/
+│   └── stock_predictor/
+│       ├── __init__.py
+│       ├── data.py      # download_stock_data, add_technical_indicators, prepare_data
+│       ├── model.py     # create_model (LSTM)
+│       ├── train.py     # train_model with callbacks
+│       ├── evaluate.py  # naive_baseline, evaluate_model, plot_predictions
+│       └── main.py      # CLI entry point
 └── tests/
     ├── test_data.py     # 14 tests
     ├── test_model.py    # 5 tests
