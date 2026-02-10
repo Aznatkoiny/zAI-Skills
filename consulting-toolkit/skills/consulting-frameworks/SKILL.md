@@ -1,46 +1,38 @@
 ---
 name: consulting-frameworks
 description: >
-  Core consulting thinking frameworks. Use when structuring business
-  problems, analyzing strategy, or producing consulting-grade outputs.
-  Provides MECE decomposition, pyramid principle, hypothesis-driven
-  analysis, and standard consulting frameworks.
+  Core consulting thinking frameworks and methodologies for structuring
+  business problems, communicating findings, analyzing strategy, building
+  financial models, and designing operations. Use when any agent or command
+  needs to apply MECE decomposition, pyramid principle, hypothesis-driven
+  analysis, issue trees, SCR communication, Porter's Five Forces,
+  TAM/SAM/SOM market sizing, value chain analysis, NPV/IRR decision
+  criteria, build/buy/partner evaluation, RACI matrices, or any standard
+  consulting framework. This skill provides procedural guidance — not just
+  framework names, but how to apply them correctly.
 ---
 
 # Consulting Frameworks
 
-## Structuring Problems
-- **MECE**: Mutually Exclusive, Collectively Exhaustive decomposition
-- **Issue Tree**: Hierarchical breakdown of a question into sub-questions
-- **Hypothesis-Driven**: Start with the answer, then prove/disprove
+Select the reference file matching your task. Each contains procedural guidance, application steps, quality checks, and examples.
 
-## Communication
-- **Pyramid Principle** (Barbara Minto):
-  - Start with the answer (governing thought)
-  - Group supporting arguments (3-4 pillars)
-  - Support with evidence
-  - Action titles on every slide
+## Framework Selection Guide
 
-- **SCR** (Situation-Complication-Resolution):
-  - Situation: Current state
-  - Complication: What changed / what's at stake
-  - Resolution: Recommended action
+| Task | Reference File | Key Frameworks |
+|------|---------------|----------------|
+| Decompose a problem, build an issue tree, structure hypotheses | [references/structuring.md](references/structuring.md) | MECE, Issue Trees, Hypothesis-Driven |
+| Write executive summaries, build storylines, craft action titles | [references/communication.md](references/communication.md) | Pyramid Principle, SCR, Action Titles |
+| Analyze markets, competitive dynamics, or growth options | [references/strategy.md](references/strategy.md) | Porter's Five Forces, TAM/SAM/SOM, Value Chain, 3 Horizons, Ansoff |
+| Build business cases, evaluate investments, model costs | [references/financial.md](references/financial.md) | NPV/IRR, Build/Buy/Partner, Zero-Based Budgeting, Should-Cost |
+| Design accountability structures, operating models, processes | [references/operational.md](references/operational.md) | RACI, Operating Model Canvas, Spans & Layers, Lean/Six Sigma |
 
-## Strategy Frameworks
-- Porter's Five Forces: Industry attractiveness
-- TAM/SAM/SOM: Market sizing hierarchy
-- Value Chain Analysis: Where value is created/captured
-- 3 Horizons: Growth pipeline management
-- Ansoff Matrix: Growth strategy options
+## Cross-Framework Patterns
 
-## Financial Frameworks
-- NPV/IRR: Investment decision criteria
-- Build/Buy/Partner: Make-or-buy analysis
-- Zero-Based Budgeting: Cost optimization
-- Should-Cost Modeling: Procurement/pricing
+Most consulting deliverables combine multiple frameworks:
 
-## Operational Frameworks
-- RACI: Accountability mapping
-- Operating Model Canvas: How the org delivers value
-- Spans & Layers: Organizational design
-- Lean/Six Sigma: Process optimization
+- **Market sizing** = TAM/SAM/SOM (strategy) + MECE segmentation (structuring) + Pyramid Principle (communication)
+- **Due diligence** = Porter's Five Forces (strategy) + Issue Tree (structuring) + NPV/IRR (financial)
+- **Business case** = Build/Buy/Partner (financial) + RACI (operational) + SCR (communication)
+- **Transformation roadmap** = Operating Model (operational) + 3 Horizons (strategy) + Hypothesis-Driven (structuring)
+
+Read the primary reference file for your task, then pull from adjacent files as needed.
