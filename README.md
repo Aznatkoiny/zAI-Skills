@@ -1,28 +1,38 @@
 # zAI-Skills
 
-A Claude Code plugin providing skills for Deep Learning, Reinforcement Learning, Prompt Engineering, and Web3 Payments.
+A Claude Code plugin marketplace with two plugins:
 
-## General Installation via Vercel
+- **AI-Toolkit** — Skills for Deep Learning, Reinforcement Learning, Prompt Engineering, and Web3 Payments
+- **consulting-toolkit** — Multi-agent consulting system with 5 agents, 15 slash commands, strategy frameworks, and a Financial Intelligence MCP server
+
+## Installation
+
+### Via [skills.sh](https://skills.sh)
 
 ```bash
 npx skills add Aznatkoiny/zAI-Skills
 ```
 
-## Installation via Claude Code
+### Via Claude Code
 
 ```bash
 # Add the marketplace
 /plugin marketplace add Aznatkoiny/zAI-Skills
 
-# Install the plugin
+# Install either or both plugins
 /plugin install AI-Toolkit@zAI-Skills
+/plugin install consulting-toolkit@zAI-Skills
 ```
 
 Then restart Claude Code.
 
-## Skills Included
+---
 
-### deep-learning
+## AI-Toolkit
+
+### Skills
+
+#### deep-learning
 
 Comprehensive guide for Deep Learning with Keras 3 (Multi-Backend: JAX, TensorFlow, PyTorch). Use when:
 - Building neural networks (Sequential, Functional, Subclassing APIs)
@@ -44,7 +54,7 @@ Comprehensive guide for Deep Learning with Keras 3 (Multi-Backend: JAX, TensorFl
 - `quick_train.py` - Reusable training template
 - `visualize_filters.py` - Convnet filter visualization
 
-### reinforcement-learning
+#### reinforcement-learning
 
 Reinforcement Learning best practices for Python using modern libraries (Stable-Baselines3, RLlib, Gymnasium). Use when:
 - Implementing RL algorithms (PPO, SAC, DQN, TD3, A2C)
@@ -60,7 +70,7 @@ Reinforcement Learning best practices for Python using modern libraries (Stable-
 - Evaluation and benchmarking
 - Production deployment
 
-### cpp-reinforcement-learning
+#### cpp-reinforcement-learning
 
 C++ Reinforcement Learning using libtorch (PyTorch C++ frontend) and modern C++17/20. Use when:
 - Implementing RL algorithms in C++ for performance-critical applications
@@ -75,7 +85,7 @@ C++ Reinforcement Learning using libtorch (PyTorch C++ frontend) and modern C++1
 - Performance optimization
 - Testing strategies
 
-### prompt-optimizer
+#### prompt-optimizer
 
 Optimize prompts for Claude 4.x models using Anthropic's official best practices. Use when:
 - Improving or creating effective prompts for Claude
@@ -88,7 +98,7 @@ Optimize prompts for Claude 4.x models using Anthropic's official best practices
 - Agentic prompt design
 - Output formatting controls
 
-### x402-payments
+#### x402-payments
 
 Build applications using the x402 protocol — Coinbase's open standard for HTTP-native stablecoin payments using the HTTP 402 status code. Use when:
 - Creating APIs that require USDC payments per request (seller/server side)
@@ -105,13 +115,94 @@ Build applications using the x402 protocol — Coinbase's open standard for HTTP
 - Agentic patterns (AI agent payments, MCP server integration)
 - Deployment guide (testnet to mainnet migration)
 
-## Projects
+### Projects
 
 Example applications built using the deep-learning skill:
 
 | Project | Description |
 |---------|-------------|
 | [stock_predictor](projects/stock_predictor/) | LSTM-based stock price forecasting with technical indicators |
+
+---
+
+## consulting-toolkit
+
+Multi-agent consulting system with an Engagement Manager orchestrating Research, Finance, Deck, and Due Diligence agents. Includes 15 consulting slash commands, strategy frameworks, and a Financial Intelligence MCP server.
+
+### Agents
+
+| Agent | Role |
+|-------|------|
+| **Engagement Manager** | Orchestrator and quality gate — decomposes briefs into MECE workstreams, delegates to specialists, synthesizes outputs |
+| **Research Analyst** | Market research, competitive intelligence, company profiling with rigorous source tracking |
+| **Financial Modeler** | Builds Excel models (NPV/IRR/ROI) with 5-sheet architecture and sensitivity analysis |
+| **Deck Builder** | Converts analysis into Pyramid Principle storylines and client-ready PowerPoint decks |
+| **Due Diligence** | Systematic commercial, financial, and operational investigation with red flag detection |
+
+### Slash Commands
+
+**Research**
+
+| Command | Description |
+|---------|-------------|
+| `/market-size` | Structured market sizing with top-down and bottom-up approaches (TAM/SAM/SOM) |
+| `/competitive-landscape` | Competitive arena mapping with player profiles, positioning map, and Porter's Five Forces |
+| `/company-profile` | One-page company profile covering business model, competitive position, and key risks |
+
+**Structured Thinking**
+
+| Command | Description |
+|---------|-------------|
+| `/issue-tree` | MECE decomposition of a business problem into testable sub-questions |
+| `/hypothesis` | Generate 3-5 testable hypotheses with supporting/refuting evidence and kill criteria |
+| `/so-what` | Extract strategic implications from raw analysis (DATA → SO WHAT → NOW WHAT) |
+| `/size-the-prize` | Estimate the financial impact of an opportunity with risk adjustment and sensitivity |
+
+**Deliverables**
+
+| Command | Description |
+|---------|-------------|
+| `/storyline` | Create a Pyramid Principle slide storyline with governing thought and action titles |
+| `/exec-summary` | Write an SCR (Situation-Complication-Resolution) executive summary |
+| `/steerco-update` | Generate a steering committee status update with RAG rating and decisions needed |
+
+**Engagement Management**
+
+| Command | Description |
+|---------|-------------|
+| `/workplan` | Decompose an objective into MECE workstreams with owners, dependencies, and critical path |
+| `/business-case` | Full business case with strategic rationale, options analysis, financial model, and risks |
+| `/raci` | Generate a RACI matrix with validation (exactly one Accountable per activity) |
+| `/risk-log` | Create or update a risk register with likelihood × impact matrix and mitigation plans |
+| `/benchmark` | Benchmarking analysis with peer set rationale, gap analysis, and actionable insights |
+
+### Consulting Frameworks Skill
+
+Procedural guidance on applying standard consulting frameworks, organized by domain:
+
+- **Structuring** — MECE decomposition, Issue Trees, Hypothesis-Driven Analysis
+- **Communication** — Pyramid Principle, SCR Framework, Action Titles
+- **Strategy** — Porter's Five Forces, TAM/SAM/SOM, Value Chain Analysis, 3 Horizons, Ansoff Matrix
+- **Financial** — NPV/IRR, Build/Buy/Partner, Zero-Based Budgeting, Should-Cost Model
+- **Operational** — RACI Matrix, Operating Model Canvas, Spans & Layers, Lean/Six Sigma
+
+### Financial Intelligence MCP Server
+
+A TypeScript MCP server providing real-time financial data from SEC EDGAR, FRED, and Yahoo Finance.
+
+| Tool | Source | Purpose |
+|------|--------|---------|
+| `fin_get_company_financials` | SEC EDGAR | Revenue, EBITDA, margins, growth rates |
+| `fin_get_filing_text` | SEC EDGAR | Full 10-K, 10-Q, 8-K filing text |
+| `fin_get_stock_data` | Yahoo Finance | Price history, market cap, P/E, key stats |
+| `fin_get_macro_indicators` | FRED | GDP, CPI, interest rates, unemployment |
+| `fin_get_earnings_transcript` | SEC EDGAR | Earnings-related filings (8-K) |
+| `fin_compare_companies` | SEC EDGAR | Side-by-side comparison of 2-5 companies |
+| `fin_get_industry_benchmarks` | SEC EDGAR | Median/mean/quartile metrics by SIC code |
+
+Requires `FRED_API_KEY` and `EDGAR_USER_AGENT` environment variables.
+
+---
 
 ## Local Development
 
@@ -123,6 +214,7 @@ To test locally:
 
 # Install from local
 /plugin install AI-Toolkit@zAI-Skills
+/plugin install consulting-toolkit@zAI-Skills
 ```
 
 ## License
