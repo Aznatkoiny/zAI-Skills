@@ -1,6 +1,6 @@
 {
   "name": "zAI-Skills",
-  "description": "Development marketplace for ai-skills plugin",
+  "description": "Development marketplace for ai-skills and consulting-toolkit plugins",
   "owner": {
     "name": "Antony Zaki"
   },
@@ -10,6 +10,15 @@
       "description": "Deep Learning, Reinforcement Learning, Prompt Optimization, and x402 Web3 Payments skills",
       "version": "2.0.0",
       "source": "./",
+      "author": {
+        "name": "Antony Zaki"
+      }
+    },
+    {
+      "name": "consulting-toolkit",
+      "description": "Multi-agent consulting system with Engagement Manager orchestrating Research, Finance, Deck, and Due Diligence agents. 15 consulting slash commands and strategy frameworks.",
+      "version": "1.0.0",
+      "source": "./consulting-toolkit",
       "author": {
         "name": "Antony Zaki"
       }

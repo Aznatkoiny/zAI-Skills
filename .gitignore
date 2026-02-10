@@ -6,6 +6,8 @@
 !.claude-plugin/**
 !skills/
 !skills/**
+!consulting-toolkit/
+!consulting-toolkit/**
 !projects/
 !projects/**
 !docs/
