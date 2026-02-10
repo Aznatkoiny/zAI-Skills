@@ -1,6 +1,6 @@
 {
-  "name": "ai-skills",
-  "version": "2.0.0",
+  "name": "AI-Toolkit",
+  "version": "2.1.0",
   "description": "Skills for Deep Learning (Keras 3), Reinforcement Learning (Python & C++), Prompt Optimization (Claude 4.x), and x402 Web3 Payments.",
   "author": {
     "name": "Antony Zaki"

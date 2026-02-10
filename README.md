@@ -15,7 +15,7 @@ npx skills add Aznatkoiny/zAI-Skills
 /plugin marketplace add Aznatkoiny/zAI-Skills
 
 # Install the plugin
-/plugin install ai-skills@zAI-Skills
+/plugin install AI-Toolkit@zAI-Skills
 ```
 
 Then restart Claude Code.
@@ -122,7 +122,7 @@ To test locally:
 /plugin marketplace add /path/to/this/repo
 
 # Install from local
-/plugin install ai-skills@zAI-Skills
+/plugin install AI-Toolkit@zAI-Skills
 ```
 
 ## License

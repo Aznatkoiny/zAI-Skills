@@ -4,8 +4,9 @@
 # Except the plugin structure
 !.claude-plugin/
 !.claude-plugin/**
-!skills/
-!skills/**
+!AI-Toolkit/
+!AI-Toolkit/**
+!skills
 !consulting-toolkit/
 !consulting-toolkit/**
 !projects/
