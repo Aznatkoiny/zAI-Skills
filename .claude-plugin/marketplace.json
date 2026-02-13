@@ -1,13 +1,13 @@
 {
   "name": "zAI-Skills",
-  "description": "Development marketplace for ai-skills and consulting-toolkit plugins",
+  "description": "Development marketplace for AI-Toolkit and consulting-toolkit plugins",
   "owner": {
     "name": "Antony Zaki"
   },
   "plugins": [
     {
       "name": "AI-Toolkit",
-      "description": "Deep Learning, Reinforcement Learning, Prompt Optimization, and x402 Web3 Payments skills",
+      "description": "Deep Learning, Reinforcement Learning, Prompt Optimization, x402 Web3 Payments, Kubernetes Debugging, Legacy API Compatibility, and OpenClaw Setup skills",
       "version": "2.1.0",
       "source": "./",
       "author": {
