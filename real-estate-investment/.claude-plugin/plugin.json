@@ -1,0 +1,40 @@
+{
+  "name": "real-estate-investment",
+  "version": "1.0.0",
+  "description": "Comprehensive real estate investment analysis plugin with financial modeling, market data APIs, deal analysis agents, and tax-aware structuring. Covers all property types: residential, commercial, multifamily, short-term rentals, and land development.",
+  "author": {
+    "name": "Antony Zaki"
+  },
+  "license": "MIT",
+  "keywords": [
+    "real-estate",
+    "investment",
+    "financial-modeling",
+    "pro-forma",
+    "cap-rate",
+    "IRR",
+    "BRRRR",
+    "syndication",
+    "waterfall",
+    "monte-carlo",
+    "tax-strategy",
+    "1031-exchange",
+    "cost-segregation",
+    "market-analysis",
+    "STR",
+    "airbnb"
+  ],
+  "mcpServers": {
+    "real-estate-data": {
+      "command": "python3",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-servers/real-estate-data/server.py"],
+      "env": {
+        "MASHVISOR_API_KEY": "",
+        "AIRDNA_API_KEY": "",
+        "ATTOM_API_KEY": "",
+        "RENTCAST_API_KEY": "",
+        "CENSUS_API_KEY": ""
+      }
+    }
+  }
+}

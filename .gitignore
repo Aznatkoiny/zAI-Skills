@@ -8,6 +8,8 @@
 !AI-Toolkit/**
 !consulting-toolkit/
 !consulting-toolkit/**
+!real-estate-investment/
+!real-estate-investment/**
 
 # But ignore build artifacts within plugins
 __pycache__/

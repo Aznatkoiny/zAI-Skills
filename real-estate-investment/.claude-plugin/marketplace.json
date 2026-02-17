@@ -1,0 +1,18 @@
+{
+  "name": "real-estate-investment-dev",
+  "description": "Development marketplace for real estate investment plugin",
+  "owner": {
+    "name": "Antony Zaki"
+  },
+  "plugins": [
+    {
+      "name": "real-estate-investment",
+      "description": "Comprehensive real estate investment analysis with financial modeling, market data APIs, and tax-aware structuring",
+      "version": "1.0.0",
+      "source": "./",
+      "author": {
+        "name": "Antony Zaki"
+      }
+    }
+  ]
+}
