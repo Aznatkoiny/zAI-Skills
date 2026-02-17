@@ -1,6 +1,6 @@
 # zAI-Skills
 
-A Claude Code plugin marketplace with two plugins.
+A Claude Code plugin marketplace with three plugins.
 
 ## Installation
 
@@ -16,9 +16,10 @@ npx skills add Aznatkoiny/zAI-Skills
 # Add the marketplace
 /plugin marketplace add Aznatkoiny/zAI-Skills
 
-# Install either or both plugins
+# Install any or all plugins
 /plugin install AI-Toolkit@zAI-Skills
 /plugin install consulting-toolkit@zAI-Skills
+/plugin install real-estate-investment@zAI-Skills
 ```
 
 Then restart Claude Code.
@@ -51,6 +52,19 @@ Multi-agent consulting system replicating top-tier strategy engagement structure
 | **Skill** | Consulting frameworks — MECE, Pyramid Principle, Porter's Five Forces, TAM/SAM/SOM, and more |
 | **MCP Server** | Financial Intelligence — 7 tools for SEC EDGAR, FRED, and Yahoo Finance data |
 
+### [real-estate-investment](real-estate-investment/)
+
+End-to-end real estate investment analysis — from deal screening through financial modeling to investor-ready reports. Covers all property types with live data integrations.
+
+| Component | Details |
+|-----------|---------|
+| **Skill** | Core analysis hub with 5 reference files — financial metrics (12 metrics with Python/Excel), advanced analysis (Monte Carlo, sensitivity, waterfalls), property types (BRRRR, commercial, STR, land), market data (6 API integrations), tax strategy (depreciation, 1031, cost seg, 2025-2026 law) |
+| **Agents** | Deal Analyzer (autonomous pro forma + sensitivity), Market Researcher (API-driven market scoring), Tax Optimizer (depreciation, cost seg, 1031, entity structure), Portfolio Reviewer (multi-property assessment) |
+| **Commands** | `/analyze-deal` `/compare-markets` `/pro-forma` `/brrrr` `/waterfall` `/str-revenue` |
+| **MCP Server** | 11 tools across 6 APIs — Census Bureau, Redfin, Rentcast (free tier), Mashvisor, AirDNA, ATTOM |
+| **Output Styles** | Investor Report (formal memo), Quick Screen (rapid deal screening) |
+| **Hooks** | Tax disclaimer on write operations |
+
 ---
 
 ## Local Development
@@ -62,6 +76,7 @@ Multi-agent consulting system replicating top-tier strategy engagement structure
 # Install from local
 /plugin install AI-Toolkit@zAI-Skills
 /plugin install consulting-toolkit@zAI-Skills
+/plugin install real-estate-investment@zAI-Skills
 ```
 
 ## License

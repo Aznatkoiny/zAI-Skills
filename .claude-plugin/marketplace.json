@@ -1,6 +1,6 @@
 {
   "name": "zAI-Skills",
-  "description": "Development marketplace for AI-Toolkit and consulting-toolkit plugins",
+  "description": "Development marketplace for AI-Toolkit, consulting-toolkit, and real-estate-investment plugins",
   "owner": {
     "name": "Antony Zaki"
   },
@@ -19,6 +19,15 @@
       "description": "Multi-agent consulting system with Engagement Manager orchestrating Research, Finance, Deck, and Due Diligence agents. 15 consulting slash commands and strategy frameworks.",
       "version": "1.1.0",
       "source": "./consulting-toolkit",
+      "author": {
+        "name": "Antony Zaki"
+      }
+    },
+    {
+      "name": "real-estate-investment",
+      "description": "End-to-end real estate investment analysis with financial modeling, 4 agents, 6 commands, MCP server (11 tools across 6 APIs), and tax-aware structuring for all property types.",
+      "version": "1.0.0",
+      "source": "./real-estate-investment",
       "author": {
         "name": "Antony Zaki"
       }
