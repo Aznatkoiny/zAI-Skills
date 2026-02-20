@@ -1,0 +1,20 @@
+{
+  "name": "career-coach",
+  "version": "1.0.0",
+  "description": "Career coaching and job search plugin with AI-powered resume building, interview preparation, and multi-platform job discovery. Features a Career Director orchestrator, job search automation via MCP, industry-specific output styles, and LaTeX resume compilation.",
+  "author": {
+    "name": "Antony Zaki"
+  },
+  "homepage": "https://github.com/Aznatkoiny/zAI-Skills",
+  "repository": "https://github.com/Aznatkoiny/zAI-Skills",
+  "license": "MIT",
+  "keywords": [
+    "career",
+    "job-search",
+    "resume",
+    "interview-prep",
+    "career-coaching",
+    "linkedin",
+    "latex-resume"
+  ]
+}

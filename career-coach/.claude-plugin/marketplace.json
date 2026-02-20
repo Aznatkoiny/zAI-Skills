@@ -1,0 +1,9 @@
+{
+  "name": "career-coach-dev",
+  "plugins": [
+    {
+      "name": "career-coach",
+      "source": "./"
+    }
+  ]
+}
