@@ -1,0 +1,1 @@
+{"version":3,"file":"salary-data.d.ts","sourceRoot":"","sources":["../../src/tools/salary-data.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,CAAC,EAAE,MAAM,KAAK,CAAC;AACxB,OAAO,EAAE,gBAAgB,EAAE,MAAM,sBAAsB,CAAC;AAMxD,KAAK,eAAe,GAAG,CAAC,CAAC,KAAK,CAAC,OAAO,gBAAgB,CAAC,CAAC;AASxD,wBAAsB,gBAAgB,CAAC,KAAK,EAAE,eAAe,GAAG,OAAO,CAAC,MAAM,CAAC,CA+G9E"}

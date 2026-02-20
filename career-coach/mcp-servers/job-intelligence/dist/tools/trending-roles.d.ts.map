@@ -1,0 +1,1 @@
+{"version":3,"file":"trending-roles.d.ts","sourceRoot":"","sources":["../../src/tools/trending-roles.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,CAAC,EAAE,MAAM,KAAK,CAAC;AACxB,OAAO,EAAE,mBAAmB,EAAE,MAAM,sBAAsB,CAAC;AAI3D,KAAK,kBAAkB,GAAG,CAAC,CAAC,KAAK,CAAC,OAAO,mBAAmB,CAAC,CAAC;AAE9D,wBAAsB,mBAAmB,CAAC,KAAK,EAAE,kBAAkB,GAAG,OAAO,CAAC,MAAM,CAAC,CAkGpF"}
