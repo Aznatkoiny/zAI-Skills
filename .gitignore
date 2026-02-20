@@ -10,6 +10,8 @@
 !consulting-toolkit/**
 !real-estate-investment/
 !real-estate-investment/**
+!career-coach/
+!career-coach/**
 
 # But ignore build artifacts within plugins
 __pycache__/
