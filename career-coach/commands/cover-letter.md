@@ -41,4 +41,4 @@ Arguments should specify the target: a job URL, job description, company name, o
 
 Write to `resumes/cover-letter-{company}.md`. This will trigger the LaTeX compilation hook.
 
-After writing both files, verify each exists by reading their first 5 lines.
+After writing the file, verify it exists by reading its first 5 lines.

@@ -134,7 +134,7 @@ CONSTRAINTS: [Industry, location, salary range, or other filters from the profil
 ```
 
 A brief that would fail: "Search for some jobs in tech."
-A brief that would pass: "Search for Senior ML Engineer roles matching this profile: 5 years Python/PyTorch experience, targeting $180-220K base in SF/NYC/remote. Use search_jobs tool across Indeed, LinkedIn, and TrueUp. Return top 15 matches ranked by skill overlap, with salary data from get_salary_data for each company. Output as a markdown table with columns: Company, Role, Location, Salary Range, Skill Match %, Link."
+A brief that would pass: "Search for Senior ML Engineer roles matching this profile: 5 years Python/PyTorch experience, targeting $180-220K base in SF/NYC/remote. Use job_search_jobs tool across Indeed, LinkedIn, and TrueUp. Return top 15 matches ranked by skill overlap, with salary data from job_get_salary_data for each company. Output as a markdown table with columns: Company, Role, Location, Salary Range, Skill Match %, Link."
 
 ### 3. Review Agent Output
 

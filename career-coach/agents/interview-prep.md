@@ -54,8 +54,8 @@ Read `career-profile.json` at the start of every session. This is your source ma
 ### 1. Company-Specific Research
 
 When the user names a specific company:
-- Use **get_company_info** to pull company overview, culture, and values
-- Use **get_interview_experiences** to understand their specific interview process, rounds, question types, and difficulty
+- Use **job_get_company_info** to pull company overview, culture, and values
+- Use **job_get_interview_experiences** to understand their specific interview process, rounds, question types, and difficulty
 - Research the role requirements and map them to the user's experience gaps and strengths
 - Prepare a company brief: what they value, their interview structure, what to expect at each stage
 

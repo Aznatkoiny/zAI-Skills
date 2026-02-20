@@ -40,11 +40,11 @@ You have access to MCP tools for job market data. Use them proactively — your 
 ## MCP Tools Available
 
 Use these tools to gather real job market data:
-- **search_jobs**: Search job listings across Indeed, TrueUp, and LinkedIn. Always filter by the user's target criteria from career-profile.json.
-- **get_company_info**: Company overview, ratings, culture data, and interview process from Glassdoor and LinkedIn. Use when evaluating a specific company.
-- **get_salary_data**: Salary ranges by role, company, and location from Glassdoor and Levels.fyi. Always include this data when presenting job matches.
-- **get_interview_experiences**: Interview questions, process details, and difficulty ratings from Glassdoor. Pass this to the interview-prep agent or include when the user is evaluating a company.
-- **search_trending_roles**: Hiring velocity, trending roles, and market demand from TrueUp. Use for market landscape analysis.
+- **job_search_jobs**: Search job listings across Indeed, TrueUp, and LinkedIn. Always filter by the user's target criteria from career-profile.json.
+- **job_get_company_info**: Company overview, ratings, culture data, and interview process from Glassdoor and LinkedIn. Use when evaluating a specific company.
+- **job_get_salary_data**: Salary ranges by role, company, and location from Glassdoor and Levels.fyi. Always include this data when presenting job matches.
+- **job_get_interview_experiences**: Interview questions, process details, and difficulty ratings from Glassdoor. Pass this to the interview-prep agent or include when the user is evaluating a company.
+- **job_search_trending_roles**: Hiring velocity, trending roles, and market demand from TrueUp. Use for market landscape analysis.
 
 When multiple data sources can be queried independently, query them in parallel to minimize response time.
 </data_sources>
