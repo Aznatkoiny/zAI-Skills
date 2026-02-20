@@ -1,6 +1,6 @@
 # zAI-Skills
 
-A Claude Code plugin marketplace with three plugins.
+A Claude Code plugin marketplace with four plugins.
 
 ## Installation
 
@@ -20,6 +20,7 @@ npx skills add Aznatkoiny/zAI-Skills
 /plugin install AI-Toolkit@zAI-Skills
 /plugin install consulting-toolkit@zAI-Skills
 /plugin install real-estate-investment@zAI-Skills
+/plugin install career-coach@zAI-Skills
 ```
 
 Then restart Claude Code.
@@ -65,6 +66,20 @@ End-to-end real estate investment analysis — from deal screening through finan
 | **Output Styles** | Investor Report (formal memo), Quick Screen (rapid deal screening) |
 | **Hooks** | Tax disclaimer on write operations |
 
+### [career-coach](career-coach/)
+
+AI-powered career coaching and job search plugin with resume building, interview preparation, and multi-platform job discovery.
+
+| Component | Details |
+|-----------|---------|
+| **Agents** | Career Director (Opus orchestrator + coach), Job Search (multi-platform discovery), Interview Prep (mock interviews + coaching) |
+| **Skill** | Resume Updater — interactive interview that captures experience into `career-profile.json` with achievement quality gates |
+| **Commands** | `/resume-generator` (tailored resume from profile) `/cover-letter` (targeted cover letter with company research) |
+| **MCP Server** | Job Intelligence — 5 tools across Indeed, LinkedIn, TrueUp, Glassdoor, and Levels.fyi |
+| **Output Styles** | Software Engineering, AI/ML, Sales, Consulting (extensible — drop `.md` files to add more) |
+| **Templates** | 6 LaTeX resume templates (modern-professional, technical-clean, jakes-resume, deedy, altacv, awesome-cv) |
+| **Hooks** | Auto-compile LaTeX/Markdown resumes to PDF on write |
+
 ---
 
 ## Local Development
@@ -77,6 +92,7 @@ End-to-end real estate investment analysis — from deal screening through finan
 /plugin install AI-Toolkit@zAI-Skills
 /plugin install consulting-toolkit@zAI-Skills
 /plugin install real-estate-investment@zAI-Skills
+/plugin install career-coach@zAI-Skills
 ```
 
 ## License
