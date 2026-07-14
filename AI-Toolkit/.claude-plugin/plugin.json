@@ -1,7 +1,7 @@
 {
   "name": "AI-Toolkit",
-  "version": "2.1.0",
-  "description": "Skills for Deep Learning (Keras 3), Reinforcement Learning (Python & C++), Prompt Optimization (Claude 4.x), x402 Web3 Payments, and OpenClaw Setup.",
+  "version": "2.2.0",
+  "description": "Skills for Deep Learning (Keras 3), Reinforcement Learning (Python & C++), Prompt Optimization (Claude Opus 4.8), x402 Web3 Payments, and OpenClaw Setup.",
   "author": {
     "name": "Antony Zaki"
   },

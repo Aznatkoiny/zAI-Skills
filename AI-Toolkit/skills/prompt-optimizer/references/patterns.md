@@ -1,10 +1,24 @@
 # Prompt Patterns Reference
 
-Copy-paste ready prompt snippets for common optimization needs.
+Copy-paste-ready prompt snippets for common optimization needs. Use the snippet, then adapt scope/wording to the use case.
 
-## Tool Use Patterns
+## Contents
 
-### Proactive Action (Default to Implementing)
+- Taking action (proactive vs. conservative)
+- Tool triggering & dialing back over-prompting
+- Investigate before answering (anti-hallucination)
+- General-purpose solutions (anti-hardcoding)
+- Anti-overengineering
+- Clean up temporary files
+- Code-review harnesses (coverage vs. filter)
+- Structured research
+- Progress updates after tool use
+
+## Taking action (proactive vs. conservative)
+
+The latest models follow instructions literally: "suggest changes" yields suggestions, not edits. Be explicit about whether to act. "Change this function..." / "Make these edits..." trigger action; "Can you suggest..." does not.
+
+Proactive by default:
 
 ```text
 <default_to_action>
@@ -12,7 +26,7 @@ By default, implement changes rather than only suggesting them. If the user's in
 </default_to_action>
 ```
 
-### Conservative Action (Only Act When Requested)
+Conservative by default:
 
 ```text
 <do_not_act_before_instructions>
@@ -20,19 +34,15 @@ Do not jump into implementation or change files unless clearly instructed to mak
 </do_not_act_before_instructions>
 ```
 
-### Tool Triggering (Reduce Overtriggering)
+## Tool triggering & dialing back over-prompting
 
-Opus 4.5 is more responsive to system prompts. If previously you used aggressive language like "CRITICAL: You MUST use this tool when...", dial it back to normal phrasing: "Use this tool when..."
+The latest models are more responsive to the system prompt and **overtrigger** on aggressive language. If a tool or skill fires too often, dial back:
+- Replace `CRITICAL: You MUST use this tool when...` with `Use this tool when...`.
+- Replace `Default to using [tool]` / `If in doubt, use [tool]` with `Use [tool] when it would enhance your understanding of the problem.`
 
-## Code Exploration Patterns
+To *increase* tool use, prefer raising `effort` (see model-tuning.md); if prompting, describe exactly when and how to use the specific tool.
 
-### Force Code Reading Before Proposing Changes
-
-```text
-ALWAYS read and understand relevant files before proposing code edits. Do not speculate about code you have not inspected. If the user references a specific file/path, you MUST open and inspect it before explaining or proposing fixes. Be rigorous and persistent in searching code for key facts. Thoroughly review the style, conventions, and abstractions of the codebase before implementing new features or abstractions.
-```
-
-### Minimize Hallucinations
+## Investigate before answering (anti-hallucination)
 
 ```text
 <investigate_before_answering>
@@ -40,7 +50,9 @@ Never speculate about code you have not opened. If the user references a specifi
 </investigate_before_answering>
 ```
 
-### Avoid Hardcoding / Test-Focused Solutions
+## General-purpose solutions (anti-hardcoding)
+
+Use when the model games tests or builds workarounds instead of solving the problem.
 
 ```text
 Please write a high-quality, general-purpose solution using the standard tools available. Do not create helper scripts or workarounds to accomplish the task more efficiently. Implement a solution that works correctly for all valid inputs, not just the test cases. Do not hard-code values or create solutions that only work for specific test inputs. Instead, implement the actual logic that solves the problem generally.
@@ -50,86 +62,48 @@ Focus on understanding the problem requirements and implementing the correct alg
 If the task is unreasonable or infeasible, or if any of the tests are incorrect, please inform me rather than working around them. The solution should be robust, maintainable, and extendable.
 ```
 
-## Frontend Design Patterns
+## Anti-overengineering
 
-### Avoid "AI Slop" Aesthetics
-
-```text
-<frontend_aesthetics>
-You tend to converge toward generic, "on distribution" outputs. In frontend design, this creates what users call the "AI slop" aesthetic. Avoid this: make creative, distinctive frontends that surprise and delight.
-
-Focus on:
-- Typography: Choose fonts that are beautiful, unique, and interesting. Avoid generic fonts like Arial and Inter; opt instead for distinctive choices that elevate the frontend's aesthetics.
-- Color & Theme: Commit to a cohesive aesthetic. Use CSS variables for consistency. Dominant colors with sharp accents outperform timid, evenly-distributed palettes. Draw from IDE themes and cultural aesthetics for inspiration.
-- Motion: Use animations for effects and micro-interactions. Prioritize CSS-only solutions for HTML. Use Motion library for React when available. Focus on high-impact moments: one well-orchestrated page load with staggered reveals (animation-delay) creates more delight than scattered micro-interactions.
-- Backgrounds: Create atmosphere and depth rather than defaulting to solid colors. Layer CSS gradients, use geometric patterns, or add contextual effects that match the overall aesthetic.
-
-Avoid generic AI-generated aesthetics:
-- Overused font families (Inter, Roboto, Arial, system fonts)
-- Clichéd color schemes (particularly purple gradients on white backgrounds)
-- Predictable layouts and component patterns
-- Cookie-cutter design that lacks context-specific character
-
-Interpret creatively and make unexpected choices that feel genuinely designed for the context. Vary between light and dark themes, different fonts, different aesthetics. You still tend to converge on common choices (Space Grotesk, for example) across generations. Avoid this: it is critical that you think outside the box!
-</frontend_aesthetics>
-```
-
-## Overengineering Prevention
-
-### Minimize File Creation and Abstractions
+Use when the model adds unrequested files, abstractions, or flexibility.
 
 ```text
-Avoid over-engineering. Only make changes that are directly requested or clearly necessary. Keep solutions simple and focused.
+Avoid over-engineering. Only make changes that are directly requested or clearly necessary. Keep solutions simple and focused:
 
-Don't add features, refactor code, or make "improvements" beyond what was asked. A bug fix doesn't need surrounding code cleaned up. A simple feature doesn't need extra configurability.
+- Scope: Don't add features, refactor code, or make "improvements" beyond what was asked. A bug fix doesn't need surrounding code cleaned up. A simple feature doesn't need extra configurability.
 
-Don't add error handling, fallbacks, or validation for scenarios that can't happen. Trust internal code and framework guarantees. Only validate at system boundaries (user input, external APIs). Don't use backwards-compatibility shims when you can just change the code.
+- Documentation: Don't add docstrings, comments, or type annotations to code you didn't change. Only add comments where the logic isn't self-evident.
 
-Don't create helpers, utilities, or abstractions for one-time operations. Don't design for hypothetical future requirements. The right amount of complexity is the minimum needed for the current task. Reuse existing abstractions where possible and follow the DRY principle.
+- Defensive coding: Don't add error handling, fallbacks, or validation for scenarios that can't happen. Trust internal code and framework guarantees. Only validate at system boundaries (user input, external APIs).
+
+- Abstractions: Don't create helpers, utilities, or abstractions for one-time operations. Don't design for hypothetical future requirements. The right amount of complexity is the minimum needed for the current task.
 ```
 
-### Clean Up Temporary Files
+## Clean up temporary files
 
 ```text
 If you create any temporary new files, scripts, or helper files for iteration, clean up these files by removing them at the end of the task.
 ```
 
-## Research and Information Gathering
+## Code-review harnesses (coverage vs. filter)
 
-### Structured Research Approach
+The latest models find more bugs but **follow self-filtering instructions faithfully** — "only report high-severity" can lower measured recall even as bug-finding improves. Split finding from filtering. At the finding stage, prompt for coverage:
+
+```text
+Report every issue you find, including ones you are uncertain about or consider low-severity. Do not filter for importance or confidence at this stage - a separate verification step will do that. Your goal here is coverage: it is better to surface a finding that later gets filtered out than to silently drop a real bug. For each finding, include your confidence level and an estimated severity so a downstream filter can rank them.
+```
+
+If self-filtering in a single pass, make the bar concrete instead of qualitative ("important"): e.g., "report any bugs that could cause incorrect behavior, a test failure, or a misleading result; only omit nits like pure style or naming preferences." Validate recall/F1 against an eval subset.
+
+## Structured research
 
 ```text
 Search for this information in a structured way. As you gather data, develop several competing hypotheses. Track your confidence levels in your progress notes to improve calibration. Regularly self-critique your approach and plan. Update a hypothesis tree or research notes file to persist information and provide transparency. Break down this complex research task systematically.
 ```
 
-## Verbosity Control
+## Progress updates after tool use
 
-### Request Updates After Tool Use
+The latest models may skip verbal summaries and jump to the next action. To restore visibility:
 
 ```text
 After completing a task that involves tool use, provide a quick summary of the work you've done.
-```
-
-## Model Identity
-
-### Correct Self-Identification
-
-```text
-The assistant is Claude, created by Anthropic. The current model is Claude Sonnet 4.5.
-```
-
-### Model Strings for LLM-Powered Apps
-
-```text
-When an LLM is needed, please default to Claude Sonnet 4.5 unless the user requests otherwise. The exact model string for Claude Sonnet 4.5 is claude-sonnet-4-5-20250929.
-```
-
-## Thinking Word Sensitivity
-
-When extended thinking is disabled, Opus 4.5 is sensitive to "think" and variants. Replace with: "consider," "believe," "evaluate."
-
-## Interleaved Thinking Guidance
-
-```text
-After receiving tool results, carefully reflect on their quality and determine optimal next steps before proceeding. Use your thinking to plan and iterate based on this new information, and then take the best next action.
 ```
