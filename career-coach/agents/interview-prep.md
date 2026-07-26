@@ -28,7 +28,7 @@ description: >
   <commentary>Behavioral answer coaching using the user's actual experience.</commentary>
   </example>
 model: sonnet
-tools: Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch
+tools: Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch, mcp__job-intelligence__job_get_company_info, mcp__job-intelligence__job_get_interview_experiences
 color: amber
 ---
 
@@ -58,6 +58,8 @@ When the user names a specific company:
 - Use **job_get_interview_experiences** to understand their specific interview process, rounds, question types, and difficulty
 - Research the role requirements and map them to the user's experience gaps and strengths
 - Prepare a company brief: what they value, their interview structure, what to expect at each stage
+
+**Tool availability**: The two MCP tools above require the job-intelligence server to be running. If they are unavailable (server not built or not started), fall back to WebSearch and WebFetch for company and interview-process research — and state clearly in your output that results came from web search rather than the job-intelligence server.
 
 ### 2. Question Bank by Type
 

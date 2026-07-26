@@ -1,7 +1,7 @@
 {
   "financial-intelligence": {
     "command": "node",
-    "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-servers/financial-intelligence/dist/index.js"],
+    "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-servers/financial-intelligence/dist/index.cjs"],
     "env": {
       "FRED_API_KEY": "${FRED_API_KEY}",
       "EDGAR_USER_AGENT": "${EDGAR_USER_AGENT}"

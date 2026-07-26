@@ -1,10 +1,12 @@
 {
   "name": "real-estate-investment",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Comprehensive real estate investment analysis plugin with financial modeling, market data APIs, deal analysis agents, and tax-aware structuring. Covers all property types: residential, commercial, multifamily, short-term rentals, and land development.",
   "author": {
     "name": "Antony Zaki"
   },
+  "homepage": "https://github.com/Aznatkoiny/zAI-Skills",
+  "repository": "https://github.com/Aznatkoiny/zAI-Skills",
   "license": "MIT",
   "keywords": [
     "real-estate",
@@ -26,14 +28,16 @@
   ],
   "mcpServers": {
     "real-estate-data": {
-      "command": "python3",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-servers/real-estate-data/server.py"],
+      "command": "bash",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/mcp-servers/real-estate-data/run.sh"
+      ],
       "env": {
-        "MASHVISOR_API_KEY": "",
-        "AIRDNA_API_KEY": "",
-        "ATTOM_API_KEY": "",
-        "RENTCAST_API_KEY": "",
-        "CENSUS_API_KEY": ""
+        "MASHVISOR_API_KEY": "${MASHVISOR_API_KEY:-}",
+        "AIRDNA_API_KEY": "${AIRDNA_API_KEY:-}",
+        "ATTOM_API_KEY": "${ATTOM_API_KEY:-}",
+        "RENTCAST_API_KEY": "${RENTCAST_API_KEY:-}",
+        "CENSUS_API_KEY": "${CENSUS_API_KEY:-}"
       }
     }
   }

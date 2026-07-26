@@ -79,7 +79,8 @@ torch::optim::Adam optimizer(policy_net->parameters(), lr);
 
 // Compute loss
 auto q_values = policy_net->forward(states).gather(1, actions);
-auto next_q = target_net->forward(next_states).max(1).values.detach();
+// Tensor::max(dim) returns std::tuple<values, indices> in C++
+auto next_q = std::get<0>(target_net->forward(next_states).max(1)).detach();
 auto target = rewards + gamma * next_q * (1 - dones);
 auto loss = torch::mse_loss(q_values.squeeze(), target);
 

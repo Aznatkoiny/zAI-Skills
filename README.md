@@ -17,7 +17,7 @@ npx skills add Aznatkoiny/zAI-Skills
 /plugin marketplace add Aznatkoiny/zAI-Skills
 
 # Install any or all plugins
-/plugin install AI-Toolkit@zAI-Skills
+/plugin install ai-toolkit@zAI-Skills
 /plugin install consulting-toolkit@zAI-Skills
 /plugin install real-estate-investment@zAI-Skills
 /plugin install career-coach@zAI-Skills
@@ -38,7 +38,7 @@ Skills for building AI/ML systems and optimizing prompts.
 | **deep-learning** | Keras 3 (JAX/TF/PyTorch) — CNNs, RNNs, Transformers, GANs, custom training loops |
 | **reinforcement-learning** | Python RL with Stable-Baselines3, RLlib, Gymnasium (PPO, SAC, DQN, TD3, A2C) |
 | **cpp-reinforcement-learning** | C++ RL with libtorch and modern C++17/20 for performance-critical applications |
-| **prompt-optimizer** | Optimize prompts for Claude 4.x using Anthropic's official best practices |
+| **prompt-optimizer** | Optimize prompts for the Claude 5 family using Anthropic's official best practices |
 | **x402-payments** | Build x402 protocol apps — HTTP-native USDC payments on Base (EVM) and Solana (SVM) |
 | **openclaw-setup** | Set up and configure OpenClaw with Anthropic auth, messaging channels, and VPS deployment |
 
@@ -49,7 +49,7 @@ Multi-agent consulting system replicating top-tier strategy engagement structure
 | Component | Details |
 |-----------|---------|
 | **Agents** | Engagement Manager, Research Analyst, Financial Modeler, Deck Builder, Due Diligence |
-| **Commands** | 15 slash commands across Research, Structured Thinking, Deliverables, and Engagement Management |
+| **Commands** | 16 slash commands across Research, Structured Thinking, Deliverables, and Engagement Management |
 | **Skill** | Consulting frameworks — MECE, Pyramid Principle, Porter's Five Forces, TAM/SAM/SOM, and more |
 | **MCP Server** | Financial Intelligence — 7 tools for SEC EDGAR, FRED, and Yahoo Finance data |
 
@@ -89,7 +89,7 @@ AI-powered career coaching and job search plugin with resume building, interview
 /plugin marketplace add /path/to/this/repo
 
 # Install from local
-/plugin install AI-Toolkit@zAI-Skills
+/plugin install ai-toolkit@zAI-Skills
 /plugin install consulting-toolkit@zAI-Skills
 /plugin install real-estate-investment@zAI-Skills
 /plugin install career-coach@zAI-Skills

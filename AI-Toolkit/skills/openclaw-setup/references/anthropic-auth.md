@@ -65,12 +65,12 @@ Browser-based OAuth flow. Works well for local Mac setups.
 ```json5
 {
   agent: {
-    model: "anthropic/claude-opus-4-5"
+    model: "anthropic/claude-opus-5"
   }
 }
 ```
 
-**Claude Opus 4.5** is recommended as the primary model for:
+**Claude Opus 5** is recommended as the primary model for:
 - Strongest prompt-injection resistance
 - Best reasoning and complex task handling
 - Most capable tool use
@@ -80,9 +80,11 @@ Browser-based OAuth flow. Works well for local Mac setups.
 
 | Model | Best For | Input Cost | When to Use |
 |-------|----------|------------|-------------|
-| **Opus 4.5** | Critical decisions, complex reasoning, security-sensitive tasks | ~$15/1M tokens | Default for important work |
-| **Sonnet 4.5** | Writing, research, code generation, daily tasks | ~$3/1M tokens | Good balance of cost/capability |
-| **Haiku 4.5** | Simple commands, routine tasks, heartbeat | ~$0.25/1M tokens | 75% of typical interactions |
+| **Opus 5** (`claude-opus-5`) | Critical decisions, complex reasoning, security-sensitive tasks | ~$5/1M tokens | Default for important work |
+| **Sonnet 5** (`claude-sonnet-5`) | Writing, research, code generation, daily tasks | ~$3/1M tokens | Cost-efficient alternative for most work |
+| **Haiku 4.5** (`claude-haiku-4-5`) | Simple commands, routine tasks, heartbeat, lightweight channels | ~$1/1M tokens | 75% of typical interactions |
+
+Pricing current as of July 2026 — verify rates at https://docs.claude.com before budgeting. Opus 4.8 (`claude-opus-4-8`) and Sonnet 4.6 (`claude-sonnet-4-6`) remain active if you need to pin a prior generation.
 
 ⚠️ **Avoid Haiku for security-sensitive or tool-enabled agents** — smaller models are more susceptible to prompt injection.
 
@@ -111,8 +113,8 @@ Or use OpenRouter's auto model (`openrouter/openrouter/auto`) which automaticall
 
 ```bash
 /model claude-haiku-4-5     # Switch to Haiku
-/model claude-sonnet-4-5    # Switch to Sonnet
-/model claude-opus-4-5      # Switch to Opus
+/model claude-sonnet-5      # Switch to Sonnet
+/model claude-opus-5        # Switch to Opus
 ```
 
 ## Heartbeat Cost Warning
@@ -158,7 +160,7 @@ Configure fallback models so OpenClaw switches automatically if the primary is u
 {
   models: {
     fallback: [
-      "anthropic/claude-sonnet-4-5",
+      "anthropic/claude-sonnet-5",
       "anthropic/claude-haiku-4-5"
     ]
   }

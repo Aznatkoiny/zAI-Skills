@@ -4,14 +4,13 @@ description: >
   End-to-end real estate investment analysis skill. Use when users ask to analyze a property deal,
   run the numbers on a rental, evaluate real estate investments, build a pro forma, compare markets,
   calculate cap rate, cash-on-cash return, IRR, NOI, DSCR, equity multiple, or GRM. Also triggers on:
-  BRRRR analysis, house hack evaluation, short-term rental (STR/Airbnb) analysis, commercial underwriting,
-  multifamily deal analysis, syndication waterfall modeling, Monte Carlo simulation for real estate,
-  sensitivity analysis on a deal, 1031 exchange planning, cost segregation analysis, depreciation
-  calculations, real estate tax strategy, market comparison and scoring, rental property screening,
-  deal screening, investor report generation, real estate financial modeling, property type comparison,
-  rent-to-price analysis, development feasibility, land analysis, value-add underwriting,
-  API integration for real estate data (Zillow, Redfin, AirDNA, Mashvisor, ATTOM, Rentcast, Census),
-  or any real estate investment financial analysis task.
+  BRRRR analysis, house hack evaluation, short-term rental (STR/Airbnb) analysis, commercial
+  underwriting, multifamily deal analysis, syndication waterfall modeling, Monte Carlo simulation,
+  sensitivity analysis, 1031 exchange planning, cost segregation, depreciation, real estate tax
+  strategy, market comparison and scoring, rental property screening, deal screening, investor
+  report generation, real estate financial modeling, rent-to-price analysis, development
+  feasibility, value-add underwriting, API integration for real estate data (Census, Redfin,
+  Rentcast, Mashvisor, AirDNA, ATTOM), or any real estate investment financial analysis task.
 ---
 
 # Real Estate Investment Analysis

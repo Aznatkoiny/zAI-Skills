@@ -119,7 +119,8 @@ public:
         torch::Tensor next_q_values;
         {
             torch::NoGradGuard no_grad;
-            next_q_values = target_net_->forward(next_state_batch).max(1).values;
+            // Tensor::max(dim) returns std::tuple<values, indices> in C++
+            next_q_values = std::get<0>(target_net_->forward(next_state_batch).max(1));
         }
         auto target = reward_batch + gamma_ * next_q_values * (1 - done_batch);
 
@@ -499,13 +500,14 @@ public:
 
         // Update Q-functions
         torch::Tensor q1_loss, q2_loss;
+        torch::Tensor q_target;  // Declared outside so it survives the no-grad block
         {
             torch::NoGradGuard no_grad;
             auto [next_actions, next_log_probs] = policy_->sample(next_states);
             auto q1_next = q1_target_->forward(next_states, next_actions);
             auto q2_next = q2_target_->forward(next_states, next_actions);
             auto min_q_next = torch::min(q1_next, q2_next) - alpha_ * next_log_probs;
-            auto q_target = rewards + gamma_ * (1 - dones) * min_q_next;
+            q_target = rewards + gamma_ * (1 - dones) * min_q_next;
         }
 
         auto q1_pred = q1_->forward(states, actions);

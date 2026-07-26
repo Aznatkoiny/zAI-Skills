@@ -2,22 +2,35 @@
 set -euo pipefail
 
 # compile-latex.sh — PostToolUse hook for career-coach plugin
-# Reads tool input JSON from stdin, compiles .tex or converts .md resumes to PDF.
+# Reads tool payload JSON from stdin, compiles .tex or converts .md resumes to PDF.
 
 # Read stdin into a variable
 INPUT="$(cat)"
 
-# Extract file_path from tool_input using python3
-FILE_PATH="$(echo "$INPUT" | python3 -c "
+# Extract file_path from tool_input using python3. Skips the hook entirely when
+# the tool call itself failed (tool_response.success == false). Works for Write,
+# Edit and MultiEdit payloads alike — all carry tool_input.file_path.
+FILE_PATH="$(printf '%s' "$INPUT" | python3 -c "
 import sys, json
-data = json.load(sys.stdin)
-tool_input = data.get('tool_input', data.get('input', {}))
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+response = data.get('tool_response')
+if isinstance(response, dict) and response.get('success') is False:
+    sys.exit(0)
+tool_input = data.get('tool_input', data.get('input', {})) or {}
 print(tool_input.get('file_path', ''))
 " 2>/dev/null || true)"
 
 # Guard: must have a file path
 if [[ -z "$FILE_PATH" ]]; then
   exit 0
+fi
+
+# Guard: neutralize paths beginning with '-' so they can't be read as options
+if [[ "$FILE_PATH" == -* ]]; then
+  FILE_PATH="./$FILE_PATH"
 fi
 
 # Guard: must be under a /resumes/ path
@@ -32,31 +45,43 @@ if [[ "$EXT" != "md" && "$EXT" != "tex" ]]; then
 fi
 
 # Derive output PDF path (same dir, same basename)
-DIR="$(dirname "$FILE_PATH")"
-BASENAME="$(basename "$FILE_PATH" ".$EXT")"
+DIR="$(dirname -- "$FILE_PATH")"
+BASENAME="$(basename -- "$FILE_PATH" ".$EXT")"
 PDF_PATH="$DIR/$BASENAME.pdf"
 
+cleanup_aux() {
+  for EXT_CLEAN in aux log out fls fdb_latexmk xdv; do
+    rm -f -- "$DIR/$BASENAME.$EXT_CLEAN"
+  done
+}
+
 if [[ "$EXT" == "tex" ]]; then
-  # --- Compile .tex with xelatex ---
-  if command -v xelatex &>/dev/null; then
-    LATEX_BIN="xelatex"
-  elif command -v pdflatex &>/dev/null; then
-    LATEX_BIN="pdflatex"
+  # --- Compile .tex: prefer latexmk -xelatex (multi-pass), else single pass ---
+  if command -v latexmk &>/dev/null && command -v xelatex &>/dev/null; then
+    echo "[career-coach hook] Compiling $FILE_PATH with latexmk -xelatex ..." >&2
+    if ! latexmk -xelatex -interaction=nonstopmode -output-directory="$DIR" "$FILE_PATH" >&2; then
+      echo "[career-coach hook] LaTeX compilation failed for $FILE_PATH — see $DIR/$BASENAME.log, fix the source and save again to retry." >&2
+      exit 0
+    fi
   else
-    echo "[career-coach hook] xelatex/pdflatex not found. Install TeX Live or MiKTeX to auto-compile resumes." >&2
-    exit 0
+    if command -v xelatex &>/dev/null; then
+      LATEX_BIN="xelatex"
+    elif command -v pdflatex &>/dev/null; then
+      LATEX_BIN="pdflatex"
+    else
+      echo "[career-coach hook] xelatex/pdflatex not found. Install TeX Live or MiKTeX to auto-compile resumes." >&2
+      exit 0
+    fi
+
+    echo "[career-coach hook] Compiling $FILE_PATH with $LATEX_BIN ..." >&2
+    if ! "$LATEX_BIN" -interaction=nonstopmode -output-directory="$DIR" "$FILE_PATH" >&2; then
+      echo "[career-coach hook] LaTeX compilation failed for $FILE_PATH — see $DIR/$BASENAME.log, fix the source and save again to retry." >&2
+      exit 0
+    fi
   fi
 
-  echo "[career-coach hook] Compiling $FILE_PATH with $LATEX_BIN ..." >&2
-  "$LATEX_BIN" -interaction=nonstopmode -output-directory="$DIR" "$FILE_PATH" >&2
-
   # Clean up auxiliary files
-  for EXT_CLEAN in aux log out; do
-    CLEAN_FILE="$DIR/$BASENAME.$EXT_CLEAN"
-    if [[ -f "$CLEAN_FILE" ]]; then
-      rm -f "$CLEAN_FILE"
-    fi
-  done
+  cleanup_aux
 
   echo "[career-coach hook] PDF written to $PDF_PATH" >&2
 
@@ -77,11 +102,14 @@ elif [[ "$EXT" == "md" ]]; then
   fi
 
   echo "[career-coach hook] Converting $FILE_PATH to PDF with pandoc + $PDF_ENGINE ..." >&2
-  pandoc "$FILE_PATH" \
+  if ! pandoc "$FILE_PATH" \
     --pdf-engine="$PDF_ENGINE" \
     -V geometry:margin=0.75in \
     -V fontsize=11pt \
-    -o "$PDF_PATH" >&2
+    -o "$PDF_PATH" >&2; then
+    echo "[career-coach hook] PDF conversion failed for $FILE_PATH — fix the source and save again to retry." >&2
+    exit 0
+  fi
 
   echo "[career-coach hook] PDF written to $PDF_PATH" >&2
 fi

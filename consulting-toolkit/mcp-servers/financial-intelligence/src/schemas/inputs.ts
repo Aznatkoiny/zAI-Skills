@@ -1,10 +1,13 @@
 import { z } from "zod";
+import { METRIC_KEYS } from "../constants.js";
 
-export const companyFinancialsSchema = z.object({
+const metricEnum = z.enum(METRIC_KEYS);
+
+const companyFinancialsBase = z.object({
   ticker: z.string().optional().describe("Stock ticker symbol (e.g., AAPL, MSFT). Provide ticker or cik."),
   cik: z.string().optional().describe("SEC CIK number. Provide ticker or cik."),
   metrics: z
-    .array(z.string())
+    .array(metricEnum)
     .optional()
     .default(["revenue", "net_income", "total_assets", "stockholders_equity"])
     .describe(
@@ -25,7 +28,13 @@ export const companyFinancialsSchema = z.object({
     .describe("Number of periods to retrieve (default 5)"),
 });
 
-export const filingTextSchema = z.object({
+export const companyFinancialsShape = companyFinancialsBase.shape;
+export const companyFinancialsSchema = companyFinancialsBase.refine(
+  (d) => Boolean(d.ticker || d.cik),
+  { message: "Either ticker or cik must be provided." }
+);
+
+const filingTextBase = z.object({
   ticker: z.string().optional().describe("Stock ticker symbol. Provide ticker or cik."),
   cik: z.string().optional().describe("SEC CIK number. Provide ticker or cik."),
   filing_type: z
@@ -41,7 +50,13 @@ export const filingTextSchema = z.object({
     .describe("Number of most recent filings to retrieve (default 1)"),
 });
 
-export const stockDataSchema = z.object({
+export const filingTextShape = filingTextBase.shape;
+export const filingTextSchema = filingTextBase.refine(
+  (d) => Boolean(d.ticker || d.cik),
+  { message: "Either ticker or cik must be provided." }
+);
+
+const stockDataBase = z.object({
   ticker: z.string().describe("Stock ticker symbol (e.g., AAPL, MSFT)"),
   period: z
     .enum(["1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "max"])
@@ -55,7 +70,10 @@ export const stockDataSchema = z.object({
     .describe("Data interval (1d = daily, 1wk = weekly, 1mo = monthly)"),
 });
 
-export const macroIndicatorsSchema = z.object({
+export const stockDataShape = stockDataBase.shape;
+export const stockDataSchema = stockDataBase;
+
+const macroIndicatorsBase = z.object({
   series_id: z
     .string()
     .describe(
@@ -79,7 +97,10 @@ export const macroIndicatorsSchema = z.object({
     .describe("Number of observations to return (default 20, most recent first)"),
 });
 
-export const earningsTranscriptSchema = z.object({
+export const macroIndicatorsShape = macroIndicatorsBase.shape;
+export const macroIndicatorsSchema = macroIndicatorsBase;
+
+const earningsTranscriptBase = z.object({
   ticker: z.string().optional().describe("Stock ticker symbol. Provide ticker or cik."),
   cik: z.string().optional().describe("SEC CIK number. Provide ticker or cik."),
   limit: z
@@ -92,14 +113,20 @@ export const earningsTranscriptSchema = z.object({
     .describe("Number of most recent earnings-related 8-K filings (default 1)"),
 });
 
-export const compareCompaniesSchema = z.object({
+export const earningsTranscriptShape = earningsTranscriptBase.shape;
+export const earningsTranscriptSchema = earningsTranscriptBase.refine(
+  (d) => Boolean(d.ticker || d.cik),
+  { message: "Either ticker or cik must be provided." }
+);
+
+const compareCompaniesBase = z.object({
   tickers: z
     .array(z.string())
     .min(2)
     .max(5)
     .describe("Array of 2-5 stock ticker symbols to compare"),
   metrics: z
-    .array(z.string())
+    .array(metricEnum)
     .optional()
     .default(["revenue", "net_income", "total_assets"])
     .describe("Financial metrics to compare"),
@@ -110,9 +137,13 @@ export const compareCompaniesSchema = z.object({
     .describe("Reporting period type"),
 });
 
-export const industryBenchmarksSchema = z.object({
+export const compareCompaniesShape = compareCompaniesBase.shape;
+export const compareCompaniesSchema = compareCompaniesBase;
+
+const industryBenchmarksBase = z.object({
   sic_code: z
     .string()
+    .regex(/^\d{4}$/, "sic_code must be a 4-digit SIC code (e.g., 7372)")
     .optional()
     .describe("SIC industry code (e.g., 7372 for software). Provide sic_code or ticker."),
   ticker: z
@@ -120,8 +151,14 @@ export const industryBenchmarksSchema = z.object({
     .optional()
     .describe("Ticker to look up SIC code from. Provide sic_code or ticker."),
   metrics: z
-    .array(z.string())
+    .array(metricEnum)
     .optional()
     .default(["revenue", "net_income", "total_assets"])
     .describe("Financial metrics to benchmark"),
 });
+
+export const industryBenchmarksShape = industryBenchmarksBase.shape;
+export const industryBenchmarksSchema = industryBenchmarksBase.refine(
+  (d) => Boolean(d.sic_code || d.ticker),
+  { message: "Either sic_code or ticker must be provided." }
+);

@@ -6,9 +6,9 @@
   },
   "plugins": [
     {
-      "name": "AI-Toolkit",
+      "name": "ai-toolkit",
       "description": "Deep Learning, Reinforcement Learning, Prompt Optimization, x402 Web3 Payments, and OpenClaw Setup skills",
-      "version": "2.2.0",
+      "version": "2.3.0",
       "source": "./AI-Toolkit",
       "author": {
         "name": "Antony Zaki"
@@ -16,8 +16,8 @@
     },
     {
       "name": "consulting-toolkit",
-      "description": "Multi-agent consulting system with Engagement Manager orchestrating Research, Finance, Deck, and Due Diligence agents. 15 consulting slash commands and strategy frameworks.",
-      "version": "1.1.0",
+      "description": "Multi-agent consulting system with an /engagement orchestration command, Engagement Manager quality gate, and Research, Finance, Deck, and Due Diligence agents. 16 consulting slash commands and strategy frameworks.",
+      "version": "1.2.0",
       "source": "./consulting-toolkit",
       "author": {
         "name": "Antony Zaki"
@@ -26,7 +26,7 @@
     {
       "name": "real-estate-investment",
       "description": "End-to-end real estate investment analysis with financial modeling, 4 agents, 6 commands, MCP server (11 tools across 6 APIs), and tax-aware structuring for all property types.",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "source": "./real-estate-investment",
       "author": {
         "name": "Antony Zaki"
@@ -35,7 +35,7 @@
     {
       "name": "career-coach",
       "description": "AI-powered career coaching with job search automation, interview preparation, resume building, and multi-platform job discovery via MCP server.",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "source": "./career-coach",
       "author": {
         "name": "Antony Zaki"

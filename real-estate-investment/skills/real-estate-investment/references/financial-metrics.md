@@ -13,6 +13,8 @@
   - [Operating Expense Ratio (OER)](#8-operating-expense-ratio-oer)
   - [Break-even Occupancy Ratio](#9-break-even-occupancy-ratio)
   - [Price per Unit / SF](#10-price-per-unit--sf)
+  - [Rent-to-Price Ratio (1% Rule)](#11-rent-to-price-ratio-1-rule)
+  - [Debt Yield](#12-debt-yield)
 - [Pro Forma Construction](#pro-forma-construction)
 - [Python Implementation](#python-implementation)
 - [Excel Reference](#excel-reference)
@@ -420,6 +422,75 @@ Price/SF: =B2/D2
 
 ---
 
+### 11. Rent-to-Price Ratio (1% Rule)
+
+**Formula:**
+```
+Rent-to-Price Ratio = Gross Monthly Rent / Purchase Price
+```
+
+**What It Measures:** Fast screening ratio for rental yield; the inverse view of GRM.
+
+**Interpretation:**
+- **1% rule**: monthly rent ≥ 1% of price suggests strong cash flow potential
+- 0.7%-1.0% is common in appreciating metros; treat the rule as a screen, not a verdict
+- Always follow up with a full pro forma — the rule ignores taxes, OpEx, and financing
+
+**Python:**
+```python
+def calculate_rent_to_price(monthly_rent, purchase_price):
+    """Calculate Rent-to-Price Ratio"""
+    return monthly_rent / purchase_price
+
+def passes_one_percent_rule(monthly_rent, purchase_price):
+    """Screen against the 1% rule"""
+    return calculate_rent_to_price(monthly_rent, purchase_price) >= 0.01
+
+# Example
+ratio = calculate_rent_to_price(2200, 250000)
+print(f"Rent-to-Price: {ratio:.2%}")  # 0.88%
+print("Passes 1% rule" if passes_one_percent_rule(2200, 250000) else "Fails 1% rule")
+```
+
+**Excel:** `=B2/C2` where B2 = Monthly Rent, C2 = Purchase Price (format as %)
+
+---
+
+### 12. Debt Yield
+
+**Formula:**
+```
+Debt Yield = NOI / Loan Amount
+```
+
+**What It Measures:** Lender's unlevered return if forced to foreclose; a leverage cap independent of interest rates and amortization.
+
+**Typical Requirements:**
+- CMBS and institutional lenders: ≥ 8%-10% minimum
+- Unlike DSCR, debt yield cannot be engineered with longer amortization or lower rates
+
+**Python:**
+```python
+def calculate_debt_yield(noi, loan_amount):
+    """Calculate Debt Yield"""
+    return noi / loan_amount
+
+def max_loan_from_debt_yield(noi, min_debt_yield=0.10):
+    """Reverse: maximum loan a lender will size at a given debt yield floor"""
+    return noi / min_debt_yield
+
+# Example
+dy = calculate_debt_yield(300000, 3200000)
+print(f"Debt Yield: {dy:.2%}")  # 9.38%
+
+max_loan = max_loan_from_debt_yield(300000, 0.10)
+print(f"Max Loan @ 10% debt yield: ${max_loan:,.0f}")  # $3,000,000
+```
+
+**Excel:** `=B2/C2` where B2 = NOI, C2 = Loan Amount
+
+---
+
 ## Pro Forma Construction
 
 ### Standard Waterfall Structure
@@ -539,10 +610,16 @@ class RealEstateProForma:
         # Year 0: Acquisition
         self.df.loc[0, 'Equity Investment'] = -self.equity_investment
 
+        # Year-1 OpEx base: opex_ratio applies to Year-1 EGI only, then the
+        # base grows at expense_growth — independent of rent growth
+        base_rent = self.property_params['annual_rent_per_unit'] * self.property_params['units']
+        egi_year1 = (base_rent * (1 + self.property_params['other_income_pct'])
+                     * (1 - self.property_params['vacancy_rate']))
+        opex_base = egi_year1 * self.property_params['opex_ratio']
+
         # Years 1+: Operations
         for year in range(1, years + 1):
             # Revenue
-            base_rent = self.property_params['annual_rent_per_unit'] * self.property_params['units']
             growth_factor = (1 + self.assumptions['rent_growth']) ** (year - 1)
             gross_potential_rent = base_rent * growth_factor
 
@@ -552,8 +629,8 @@ class RealEstateProForma:
             vacancy = potential_gross_income * self.property_params['vacancy_rate']
             effective_gross_income = potential_gross_income - vacancy
 
-            # Expenses
-            operating_expenses = effective_gross_income * self.property_params['opex_ratio']
+            # Expenses: Year-1 base escalated at expense_growth
+            operating_expenses = opex_base * (1 + self.assumptions['expense_growth']) ** (year - 1)
 
             # NOI
             noi = effective_gross_income - operating_expenses
@@ -606,14 +683,16 @@ class RealEstateProForma:
 
     def calculate_loan_balance(self, year):
         """Calculate remaining loan balance"""
+        # npf.pmt returns a negative outflow — pass it to npf.fv as-is
+        annual_payment = npf.pmt(
+            self.loan_params['interest_rate'],
+            self.loan_params['amortization_years'],
+            self.loan_amount
+        )
         remaining_balance = -npf.fv(
             self.loan_params['interest_rate'],
             year,
-            -npf.pmt(
-                self.loan_params['interest_rate'],
-                self.loan_params['amortization_years'],
-                self.loan_amount
-            ),
+            annual_payment,
             self.loan_amount
         )
         return remaining_balance
@@ -782,7 +861,8 @@ npv = npf.npv(0.10, cash_flows)
 print(f"NPV @ 10%: ${npv:,.0f}")
 
 # 6. FV - Future value (remaining loan balance)
-remaining_balance = -npf.fv(0.05/12, 60, -monthly_payment, 200000)
+# monthly_payment from npf.pmt is already negative (an outflow) — pass as-is
+remaining_balance = -npf.fv(0.05/12, 60, monthly_payment, 200000)
 print(f"Balance after 5 years: ${remaining_balance:,.0f}")
 
 # 7. PV - Present value (loan amount from payment)
@@ -821,6 +901,8 @@ print(f"Loan Amount: ${loan_amount:,.0f}")
 | OER | `=B2/C2` (OpEx / EGI) |
 | Break-even Occupancy | `=(B2+C2)/D2` ((OpEx + Debt) / PGI) |
 | Price/Unit | `=B2/C2` (Price / Units) |
+| Rent-to-Price | `=B2/C2` (Monthly Rent / Price) |
+| Debt Yield | `=B2/C2` (NOI / Loan Amount) |
 
 ### Important Excel NPV Note
 
@@ -833,13 +915,17 @@ Correct:   =NPV(10%, B3:B12) + B2
 
 ### Amortization Schedule Template
 
+Sign convention: every column is a **positive** number. Excel's `PMT` returns a
+negative value, so negate it in column C — then `Principal = Payment - Interest`
+is sign-consistent.
+
 ```excel
 A: Period (1 to 360)
 B: Beginning Balance
    B2: =Loan_Amount
-   B3: =E2 (previous ending balance)
-C: Payment
-   C2: =PMT($Rate/12, $Term*12, $Loan_Amount)
+   B3: =F2 (previous ending balance)
+C: Payment (negated so it is positive)
+   C2: =-PMT($Rate/12, $Term*12, $Loan_Amount)
 D: Interest
    D2: =B2*$Rate/12
 E: Principal

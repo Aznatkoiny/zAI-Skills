@@ -22,10 +22,12 @@ AI-powered career coaching, job search, and resume building plugin for Claude Co
 
 Then restart Claude Code.
 
-### Build the MCP Server
+The Job Intelligence MCP server ships as a prebuilt bundle (`mcp-servers/job-intelligence/dist/index.cjs`) and works immediately after install — no build step required.
+
+To rebuild it from source (development only):
 
 ```bash
-cd ~/.claude/plugins/cache/zAI-Skills/career-coach/*/mcp-servers/job-intelligence
+cd career-coach/mcp-servers/job-intelligence
 npm install && npm run build
 ```
 

@@ -14,7 +14,7 @@ description: |
 
 ## Overview
 
-This skill provides comprehensive guidance for implementing reinforcement learning in Python using the modern ecosystem (2024-2025). Gymnasium has replaced OpenAI Gym as the standard environment interface. Stable-Baselines3 (SB3) is recommended for prototyping, RLlib for production/distributed training, and CleanRL for research.
+This skill provides comprehensive guidance for implementing reinforcement learning in Python using the modern ecosystem (Gymnasium >= 1.0, Stable-Baselines3 >= 2.x). Gymnasium has replaced OpenAI Gym as the standard environment interface. Stable-Baselines3 (SB3) is recommended for prototyping, RLlib for production/distributed training, and CleanRL for research.
 
 ## When to Use
 

@@ -107,17 +107,19 @@ export async function searchLinkedInJobs(
       allListings.push(...pageListings);
     }
   } catch (err) {
-    console.error("LinkedIn search error:", err instanceof Error ? err.message : String(err));
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("LinkedIn search error:", message);
     if (allListings.length === 0) {
       return [{
-        title: "[LinkedIn Search Error]",
+        title: "LinkedIn Search Error",
         company: "LinkedIn",
         location: "N/A",
         salary: null,
         url: "https://www.linkedin.com/jobs",
-        description: `Failed to fetch results from LinkedIn: ${err instanceof Error ? err.message : String(err)}. LinkedIn aggressively blocks automated requests.`,
+        description: `Failed to fetch results from LinkedIn: ${message}. LinkedIn aggressively blocks automated requests.`,
         posted_date: null,
         source: "linkedin",
+        error: `Failed to fetch results from LinkedIn: ${message}. LinkedIn aggressively blocks automated requests.`,
       }];
     }
   }

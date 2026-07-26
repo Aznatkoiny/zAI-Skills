@@ -25,7 +25,12 @@ x.dtype   # Data type (float32, int32, etc.)
 - **Video**: `(samples, frames, height, width, channels)` - 5D
 
 ### GradientTape for Automatic Differentiation
+
+> TensorFlow backend required: `tf.GradientTape` is TF-specific and needs `KERAS_BACKEND="tensorflow"`.
+
 ```python
+import tensorflow as tf
+
 x = tf.Variable(3.0)
 with tf.GradientTape() as tape:
     y = x ** 2
@@ -111,7 +116,7 @@ model = keras.Sequential([
 
 **3. Add weight regularization**:
 ```python
-from tensorflow.keras import regularizers
+from keras import regularizers
 
 layers.Dense(16,
     kernel_regularizer=regularizers.l2(0.002),

@@ -8,6 +8,9 @@ const limiter = new RateLimiter(RATE_LIMITS.indeed);
 
 const INDEED_BASE_URL = "https://www.indeed.com/jobs";
 
+// Indeed paginates with `start` offsets in increments of 10
+const INDEED_PAGE_SIZE = 10;
+
 function buildIndeedUrl(query: string, location?: string, remote?: boolean, start: number = 0): string {
   const params = new URLSearchParams();
   params.set("q", query);
@@ -76,14 +79,14 @@ export async function searchIndeedJobs(
   const allListings: JobListing[] = [];
 
   try {
-    // Indeed shows ~15 results per page, fetch up to 2 pages if needed
-    const pagesToFetch = Math.ceil(limit / 15);
+    // Fetch up to 2 pages if needed
+    const pagesToFetch = Math.ceil(limit / INDEED_PAGE_SIZE);
     const maxPages = Math.min(pagesToFetch, 2);
 
     for (let page = 0; page < maxPages; page++) {
       if (allListings.length >= limit) break;
 
-      const url = buildIndeedUrl(query, location, remote, page * 10);
+      const url = buildIndeedUrl(query, location, remote, page * INDEED_PAGE_SIZE);
       await limiter.acquire();
 
       const response = await axios.get(url, {
@@ -104,17 +107,19 @@ export async function searchIndeedJobs(
       allListings.push(...pageListings);
     }
   } catch (err) {
-    console.error("Indeed search error:", err instanceof Error ? err.message : String(err));
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("Indeed search error:", message);
     if (allListings.length === 0) {
       return [{
-        title: "[Indeed Search Error]",
+        title: "Indeed Search Error",
         company: "Indeed",
         location: "N/A",
         salary: null,
         url: "https://www.indeed.com",
-        description: `Failed to fetch results from Indeed: ${err instanceof Error ? err.message : String(err)}. The site may be blocking automated requests or the HTML structure may have changed.`,
+        description: `Failed to fetch results from Indeed: ${message}. The site may be blocking automated requests or the HTML structure may have changed.`,
         posted_date: null,
         source: "indeed",
+        error: `Failed to fetch results from Indeed: ${message}. The site may be blocking automated requests or the HTML structure may have changed.`,
       }];
     }
   }

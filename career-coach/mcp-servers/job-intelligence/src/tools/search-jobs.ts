@@ -8,15 +8,48 @@ import { CHARACTER_LIMIT } from "../constants.js";
 
 type SearchJobsInput = z.infer<typeof searchJobsSchema>;
 
+const HOURS_PER_YEAR = 2080; // 40 hours/week * 52 weeks
+
 /**
- * Deduplicate job listings by company+title (case-insensitive).
+ * Best-effort parse of a scraped salary string into an annualized USD maximum.
+ * Handles K/M suffixes ("$150K"), ranges ("$120K - $180K" -> 180000), and
+ * hourly rates ("$50 - $70 an hour" -> 70 * 2080). Returns null when no
+ * number can be extracted.
+ */
+function parseAnnualSalaryMax(salary: string): number | null {
+  let max: number | null = null;
+
+  for (const match of salary.matchAll(/\$?(\d[\d,]*(?:\.\d+)?)\s*([kKmM])?/g)) {
+    let value = parseFloat(match[1].replace(/,/g, ""));
+    if (isNaN(value)) continue;
+
+    const suffix = match[2]?.toLowerCase();
+    if (suffix === "k") value *= 1_000;
+    else if (suffix === "m") value *= 1_000_000;
+
+    if (max === null || value > max) max = value;
+  }
+
+  if (max === null) return null;
+
+  // Annualize hourly rates ("$50 an hour", "$35/hr", "hourly")
+  if (/hour|\bhr\b/i.test(salary)) {
+    max *= HOURS_PER_YEAR;
+  }
+
+  return max;
+}
+
+/**
+ * Deduplicate job listings by company+title+location (case-insensitive), so
+ * the same role in different cities is not collapsed.
  * Prefers listings with more data (salary, description).
  */
 function deduplicateListings(listings: JobListing[]): JobListing[] {
   const seen = new Map<string, JobListing>();
 
   for (const listing of listings) {
-    const key = `${listing.company.toLowerCase().trim()}|${listing.title.toLowerCase().trim()}`;
+    const key = `${listing.company.toLowerCase().trim()}|${listing.title.toLowerCase().trim()}|${listing.location.toLowerCase().trim()}`;
     const existing = seen.get(key);
 
     if (!existing) {
@@ -88,14 +121,14 @@ export async function handleSearchJobs(input: SearchJobsInput): Promise<string> 
     const result = results[i];
     if (result.status === "fulfilled") {
       const listings = result.value;
-      const errorListings = listings.filter((l) => l.title.startsWith("["));
-      const validListings = listings.filter((l) => !l.title.startsWith("["));
+      const errorListings = listings.filter((l) => l.error);
+      const validListings = listings.filter((l) => !l.error);
 
       if (validListings.length > 0) {
         allListings.push(...validListings);
         sourceStatus.push(`${sourceNames[i]}: ${validListings.length} results`);
       } else if (errorListings.length > 0) {
-        sourceStatus.push(`${sourceNames[i]}: error (see notes)`);
+        sourceStatus.push(`${sourceNames[i]}: error — ${errorListings[0].error}`);
       } else {
         sourceStatus.push(`${sourceNames[i]}: 0 results`);
       }
@@ -112,10 +145,9 @@ export async function handleSearchJobs(input: SearchJobsInput): Promise<string> 
   if (salary_min) {
     finalListings = finalListings.filter((listing) => {
       if (!listing.salary) return true; // Keep listings without salary info
-      const salaryMatch = listing.salary.match(/\$?([\d,]+)/);
-      if (!salaryMatch) return true;
-      const salaryNum = parseInt(salaryMatch[1].replace(/,/g, ""), 10);
-      return salaryNum >= salary_min;
+      const annualMax = parseAnnualSalaryMax(listing.salary);
+      if (annualMax === null) return true; // Keep unparseable salary strings
+      return annualMax >= salary_min;
     });
   }
 

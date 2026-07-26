@@ -31,6 +31,7 @@ interface YahooChartMeta {
   longName?: string;
   regularMarketPrice?: number;
   previousClose?: number;
+  regularMarketPreviousClose?: number;
   fiftyTwoWeekHigh?: number;
   fiftyTwoWeekLow?: number;
 }
@@ -77,25 +78,6 @@ export async function getStockData(
   const quotes = chartResult.indicators?.quote?.[0];
 
   const currentPrice = meta.regularMarketPrice || 0;
-  const prevClose = meta.previousClose || 0;
-  const change = currentPrice - prevClose;
-  const changePercent = prevClose !== 0 ? (change / prevClose) * 100 : 0;
-
-  const stockQuote: StockQuote = {
-    ticker: ticker.toUpperCase(),
-    name: meta.shortName || meta.longName || ticker,
-    price: currentPrice,
-    change,
-    changePercent,
-    marketCap: null, // Not available from chart endpoint
-    peRatio: null,
-    forwardPE: null,
-    dividendYield: null,
-    fiftyTwoWeekHigh: meta.fiftyTwoWeekHigh || 0,
-    fiftyTwoWeekLow: meta.fiftyTwoWeekLow || 0,
-    avgVolume: 0,
-    beta: null,
-  };
 
   const history: StockPricePoint[] = [];
   if (quotes) {
@@ -113,12 +95,35 @@ export async function getStockData(
     }
   }
 
-  // Compute avg volume from history if available
+  // Previous close: chart meta only carries it for short ranges, so fall back
+  // to the prior daily bar; report null (rendered N/A) when unavailable.
+  let prevClose: number | null =
+    meta.previousClose ?? meta.regularMarketPreviousClose ?? null;
+  if (!prevClose && mappedInterval === "1d" && history.length >= 2) {
+    prevClose = history[history.length - 2].close;
+  }
+  const change = prevClose ? currentPrice - prevClose : null;
+  const changePercent = prevClose ? ((currentPrice - prevClose) / prevClose) * 100 : null;
+
+  const stockQuote: StockQuote = {
+    ticker: ticker.toUpperCase(),
+    name: meta.shortName || meta.longName || ticker,
+    price: currentPrice,
+    change,
+    changePercent,
+    fiftyTwoWeekHigh: meta.fiftyTwoWeekHigh || 0,
+    fiftyTwoWeekLow: meta.fiftyTwoWeekLow || 0,
+    avgVolume: 0,
+    avgVolumeBars: 0,
+  };
+
+  // Compute avg volume over the most recent bars (up to 60) of the returned history
   if (history.length > 0) {
     const recentVols = history.slice(-60);
     stockQuote.avgVolume = Math.round(
       recentVols.reduce((sum, h) => sum + h.volume, 0) / recentVols.length
     );
+    stockQuote.avgVolumeBars = recentVols.length;
   }
 
   return {

@@ -1,5 +1,7 @@
 # Advanced Computer Vision
 
+> **TensorFlow backend required.** Code in this file uses `tf.*` APIs directly and only runs with `KERAS_BACKEND="tensorflow"`.
+
 ## Table of Contents
 - [Image Segmentation](#image-segmentation)
 - [Modern Architecture Patterns](#modern-architecture-patterns)
@@ -171,8 +173,8 @@ heatmap = np.maximum(heatmap, 0)
 heatmap /= np.max(heatmap)
 
 # 4. Overlay on image
-import matplotlib.cm as cm
-jet = cm.get_cmap("jet")
+import matplotlib
+jet = matplotlib.colormaps["jet"]  # cm.get_cmap() was removed in matplotlib 3.9
 jet_heatmap = jet(np.uint8(255 * heatmap))[:, :, :3]
 superimposed = jet_heatmap * 0.4 + original_img / 255.
 ```

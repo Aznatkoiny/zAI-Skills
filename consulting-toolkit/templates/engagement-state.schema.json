@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "engagement-state.schema.json",
+  "title": "Engagement State",
+  "description": "Single source of truth for a /engagement run, written to engagement-state.json in the working directory and updated by the orchestrating conversation as phases complete.",
+  "type": "object",
+  "required": ["engagement", "client", "question", "workstreams", "decisions", "open_risks"],
+  "additionalProperties": false,
+  "properties": {
+    "engagement": {
+      "type": "string",
+      "description": "Descriptive engagement name"
+    },
+    "client": {
+      "type": "string",
+      "description": "Client name or 'internal' for self-directed work"
+    },
+    "question": {
+      "type": "string",
+      "description": "The precise governing question this engagement answers"
+    },
+    "workstreams": {
+      "type": "array",
+      "description": "MECE workstreams the engagement is decomposed into",
+      "items": {
+        "type": "object",
+        "required": ["id", "owner", "status", "inputs", "deliverable", "findings_summary"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Workstream identifier, e.g. ws-1",
+            "pattern": "^ws-[0-9]+$"
+          },
+          "name": {
+            "type": "string",
+            "description": "Outcome-oriented workstream name, e.g. 'Market Sizing'"
+          },
+          "owner": {
+            "type": "string",
+            "description": "Specialist agent that owns this workstream",
+            "enum": ["research-analyst", "financial-modeler", "due-diligence", "deck-builder"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in_progress", "in_review", "revision_requested", "complete", "escalated"]
+          },
+          "inputs": {
+            "type": "array",
+            "description": "Files or upstream deliverable paths this workstream consumes",
+            "items": { "type": "string" }
+          },
+          "deliverable": {
+            "type": "string",
+            "description": "Path to this workstream's output file"
+          },
+          "findings_summary": {
+            "type": "string",
+            "description": "One-line summary of key findings; empty until the workstream is approved"
+          },
+          "dependencies": {
+            "type": "array",
+            "description": "Workstream ids that must complete before this one starts",
+            "items": { "type": "string" }
+          },
+          "iterations": {
+            "type": "integer",
+            "description": "Number of quality-gate revision cycles used (max 3 before escalation)",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "description": "Decisions requiring Consultant input, stated as questions with options",
+      "items": { "type": "string" }
+    },
+    "open_risks": {
+      "type": "array",
+      "description": "Unresolved risks surfaced by any workstream or the quality gate",
+      "items": { "type": "string" }
+    }
+  }
+}

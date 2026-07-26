@@ -2,13 +2,21 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
 import {
+  companyFinancialsShape,
   companyFinancialsSchema,
+  filingTextShape,
   filingTextSchema,
+  stockDataShape,
   stockDataSchema,
+  macroIndicatorsShape,
   macroIndicatorsSchema,
+  earningsTranscriptShape,
   earningsTranscriptSchema,
+  compareCompaniesShape,
   compareCompaniesSchema,
+  industryBenchmarksShape,
   industryBenchmarksSchema,
 } from "./schemas/inputs.js";
 import { handleCompanyFinancials } from "./tools/company-financials.js";
@@ -26,128 +34,118 @@ const server = new McpServer({
 
 // ── Tool Registration ──
 
-server.tool(
+function formatError(err: unknown): string {
+  if (err instanceof z.ZodError) {
+    return err.issues
+      .map((issue) => (issue.path.length ? `${issue.path.join(".")}: ${issue.message}` : issue.message))
+      .join("; ");
+  }
+  return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * Registers a tool with the shared parse/format/error boilerplate.
+ *
+ * The raw shape is advertised to clients as the tool's input schema; the full
+ * schema (which may carry cross-field refinements, e.g. "ticker or cik") is
+ * re-parsed in the handler so those refinements are enforced too.
+ */
+function registerFinTool<Schema extends z.ZodTypeAny>(
+  name: string,
+  description: string,
+  shape: z.ZodRawShape,
+  schema: Schema,
+  handler: (input: z.output<Schema>) => Promise<string>
+): void {
+  server.registerTool(name, { description, inputSchema: shape }, async (args: unknown) => {
+    try {
+      const input = schema.parse(args);
+      const text = await handler(input);
+      return { content: [{ type: "text" as const, text }] };
+    } catch (err) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${formatError(err)}` }],
+        isError: true,
+      };
+    }
+  });
+}
+
+registerFinTool(
   "fin_get_company_financials",
   "Retrieve financial metrics (revenue, EBITDA, margins, growth rates) for a public company from SEC EDGAR XBRL data. Supports annual and quarterly periods.",
-  companyFinancialsSchema.shape,
-  async (input) => {
-    try {
-      const text = await handleCompanyFinancials(input);
-      return { content: [{ type: "text" as const, text }] };
-    } catch (err) {
-      return {
-        content: [{ type: "text" as const, text: `Error: ${err instanceof Error ? err.message : String(err)}` }],
-        isError: true,
-      };
-    }
-  }
+  companyFinancialsShape,
+  companyFinancialsSchema,
+  handleCompanyFinancials
 );
 
-server.tool(
+registerFinTool(
   "fin_get_filing_text",
   "Retrieve the full text of SEC filings (10-K, 10-Q, 8-K) for qualitative analysis. Returns cleaned text from the primary filing document.",
-  filingTextSchema.shape,
-  async (input) => {
-    try {
-      const text = await handleFilingText(input);
-      return { content: [{ type: "text" as const, text }] };
-    } catch (err) {
-      return {
-        content: [{ type: "text" as const, text: `Error: ${err instanceof Error ? err.message : String(err)}` }],
-        isError: true,
-      };
-    }
-  }
+  filingTextShape,
+  filingTextSchema,
+  handleFilingText
 );
 
-server.tool(
+registerFinTool(
   "fin_get_stock_data",
-  "Get stock price history, current quote, market cap, P/E ratio, and key statistics from Yahoo Finance.",
-  stockDataSchema.shape,
-  async (input) => {
-    try {
-      const text = await handleStockData(input);
-      return { content: [{ type: "text" as const, text }] };
-    } catch (err) {
-      return {
-        content: [{ type: "text" as const, text: `Error: ${err instanceof Error ? err.message : String(err)}` }],
-        isError: true,
-      };
-    }
-  }
+  "Get stock price data from Yahoo Finance: current price, daily change, 52-week range, average volume, and OHLCV price history for a configurable period and interval.",
+  stockDataShape,
+  stockDataSchema,
+  handleStockData
 );
 
-server.tool(
+registerFinTool(
   "fin_get_macro_indicators",
   "Fetch macroeconomic indicators from FRED (Federal Reserve). Supports GDP, CPI, interest rates, unemployment, and thousands of other series.",
-  macroIndicatorsSchema.shape,
-  async (input) => {
-    try {
-      const text = await handleMacroIndicators(input);
-      return { content: [{ type: "text" as const, text }] };
-    } catch (err) {
-      return {
-        content: [{ type: "text" as const, text: `Error: ${err instanceof Error ? err.message : String(err)}` }],
-        isError: true,
-      };
-    }
-  }
+  macroIndicatorsShape,
+  macroIndicatorsSchema,
+  handleMacroIndicators
 );
 
-server.tool(
+registerFinTool(
   "fin_get_earnings_transcript",
   "Extract earnings-related 8-K filings (Item 2.02) as a proxy for earnings call transcripts. Best-effort from public SEC data.",
-  earningsTranscriptSchema.shape,
-  async (input) => {
-    try {
-      const text = await handleEarningsTranscript(input);
-      return { content: [{ type: "text" as const, text }] };
-    } catch (err) {
-      return {
-        content: [{ type: "text" as const, text: `Error: ${err instanceof Error ? err.message : String(err)}` }],
-        isError: true,
-      };
-    }
-  }
+  earningsTranscriptShape,
+  earningsTranscriptSchema,
+  handleEarningsTranscript
 );
 
-server.tool(
+registerFinTool(
   "fin_compare_companies",
   "Side-by-side financial comparison of 2-5 public companies with rankings. Uses SEC EDGAR data.",
-  compareCompaniesSchema.shape,
-  async (input) => {
-    try {
-      const text = await handleCompareCompanies(input);
-      return { content: [{ type: "text" as const, text }] };
-    } catch (err) {
-      return {
-        content: [{ type: "text" as const, text: `Error: ${err instanceof Error ? err.message : String(err)}` }],
-        isError: true,
-      };
-    }
-  }
+  compareCompaniesShape,
+  compareCompaniesSchema,
+  handleCompareCompanies
 );
 
-server.tool(
+registerFinTool(
   "fin_get_industry_benchmarks",
   "Compute industry benchmark statistics (median, mean, quartiles) by SIC code using SEC EDGAR data from peer companies.",
-  industryBenchmarksSchema.shape,
-  async (input) => {
-    try {
-      const text = await handleIndustryBenchmarks(input);
-      return { content: [{ type: "text" as const, text }] };
-    } catch (err) {
-      return {
-        content: [{ type: "text" as const, text: `Error: ${err instanceof Error ? err.message : String(err)}` }],
-        isError: true,
-      };
-    }
-  }
+  industryBenchmarksShape,
+  industryBenchmarksSchema,
+  handleIndustryBenchmarks
 );
 
 // ── Server Startup ──
 
 async function main(): Promise<void> {
+  if (!process.env.EDGAR_USER_AGENT) {
+    console.error(
+      [
+        "".padEnd(72, "="),
+        "WARNING: EDGAR_USER_AGENT is not set.",
+        "",
+        "The SEC's fair-access policy requires a real contact in the User-Agent",
+        "header of every EDGAR request. Set the EDGAR_USER_AGENT environment",
+        'variable to your name and email, e.g. "Jane Doe jane.doe@example.com".',
+        "Until then, requests fall back to a placeholder and may be blocked or",
+        "throttled by the SEC.",
+        "".padEnd(72, "="),
+      ].join("\n")
+    );
+  }
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("Financial Intelligence MCP Server started (stdio transport)");

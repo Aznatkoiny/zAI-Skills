@@ -156,6 +156,7 @@ print((sensitivity_table / 1000000).round(2))
 ```python
 import pandas as pd
 import numpy as np
+import numpy_financial as npf
 
 def dcf_model(purchase_price, noi_year1, rent_growth, exit_cap, hold_period=5):
     cash_flows = [-purchase_price]
@@ -171,7 +172,7 @@ def dcf_model(purchase_price, noi_year1, rent_growth, exit_cap, hold_period=5):
     cash_flows[-1] += terminal_value
 
     # Calculate metrics
-    irr = np.irr(cash_flows)
+    irr = npf.irr(cash_flows)
     npv = sum([cf / ((1 + 0.10) ** i) for i, cf in enumerate(cash_flows)])
 
     return {'IRR': irr, 'NPV': npv, 'Terminal Value': terminal_value}
@@ -297,6 +298,7 @@ print(f"Triangular: Min={min_growth:.2%}, Mode={mode_growth:.2%}, Max={max_growt
 
 ```python
 import numpy as np
+import numpy_financial as npf
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -343,8 +345,8 @@ for i in range(n_simulations):
     cash_flows[-1] += terminal_value
 
     # Calculate metrics
-    irr = np.irr(cash_flows)
-    npv = np.npv(0.10, cash_flows)
+    irr = npf.irr(cash_flows)
+    npv = npf.npv(0.10, cash_flows)
 
     irr_results.append(irr)
     npv_results.append(npv)
@@ -655,111 +657,96 @@ import numpy_financial as npf
 def calculate_waterfall_irr(
     lp_capital,
     gp_capital,
-    cash_flows,
-    pref_rate=0.08,
+    annual_cash_flows,
     hurdles=[0.08, 0.12, 0.18],
-    lp_splits=[0.80, 0.70, 0.60],
-    use_catchup=True
+    lp_splits=[1.00, 0.80, 0.70],
+    residual_lp_split=0.60,
 ):
     """
-    Calculate waterfall distributions with IRR hurdles.
+    European-style (whole-fund) distribution waterfall with IRR hurdles.
 
-    Returns: dict with distribution amounts for LP and GP
+    Assumptions:
+    - annual_cash_flows[t] is total distributable cash at the end of year t+1;
+      all equity is invested at time 0 (annual periods, end-of-year flows).
+    - Hurdles are investor IRR hurdles measured on the investor's dated cash
+      flows (compound, cumulative pref — the first hurdle IS the pref rate).
+    - GP co-investment (gp_capital), if any, is pari passu with LP capital:
+      it earns its pro-rata share of every investor dollar. The GP promote
+      (the 1 - split share of each tier) is on top of that.
+    - lp_splits[i] is the investor share of tier cash until investor IRR
+      reaches hurdles[i]; residual_lp_split applies above the last hurdle.
+      Default: 100% to investors until 8% IRR, then 80/20 to 12%, 70/30 to
+      18%, 60/40 thereafter.
+    - No GP catch-up tier (see simple_waterfall below for catch-up mechanics).
+
+    Returns: dict with dated LP/GP cash flows, totals, and IRRs
     """
-    total_capital = lp_capital + gp_capital
-    total_distributions = sum(cash_flows)
+    n_years = len(annual_cash_flows)
+    investor_capital = lp_capital + gp_capital
 
-    # Calculate project IRR
-    investment_cf = [-total_capital] + cash_flows
-    project_irr = npf.irr(investment_cf)
+    # Dated flows: index 0 = time-0 investment, 1..N = year-end distributions
+    investor_cf = np.zeros(n_years + 1)
+    investor_cf[0] = -investor_capital
+    promote_cf = np.zeros(n_years + 1)
 
-    lp_distributions = 0
-    gp_distributions = 0
-    remaining_cash = total_distributions
+    def cash_needed_to_reach(hurdle, year, flows):
+        """Distribution at end of `year` that lifts the IRR of `flows` to
+        exactly `hurdle`: the future value of the remaining shortfall,
+        compounded at the hurdle rate."""
+        fv = sum(flows[t] * (1 + hurdle) ** (year - t) for t in range(year + 1))
+        return max(0.0, -fv)
 
-    # Tier 1: Return of Capital
-    if remaining_cash >= total_capital:
-        lp_distributions += lp_capital
-        gp_distributions += gp_capital
-        remaining_cash -= total_capital
-        print(f"Tier 1 - Return of Capital:")
-        print(f"  LP: ${lp_capital:,.0f}, GP: ${gp_capital:,.0f}")
-        print(f"  Remaining: ${remaining_cash:,.0f}\n")
-    else:
-        # Pro-rata return
-        lp_distributions = remaining_cash * (lp_capital / total_capital)
-        gp_distributions = remaining_cash * (gp_capital / total_capital)
-        remaining_cash = 0
-        return {'lp_total': lp_distributions, 'gp_total': gp_distributions, 'project_irr': -1}
+    tier_hurdles = list(hurdles) + [None]          # None = uncapped residual
+    tier_splits = list(lp_splits) + [residual_lp_split]
 
-    # Tier 2: Preferred Return
-    pref_amount = lp_capital * pref_rate * len(cash_flows)  # Simplified cumulative
-    if remaining_cash >= pref_amount:
-        lp_distributions += pref_amount
-        remaining_cash -= pref_amount
-        print(f"Tier 2 - Preferred Return ({pref_rate:.0%}):")
-        print(f"  LP: ${pref_amount:,.0f}")
-        print(f"  Remaining: ${remaining_cash:,.0f}\n")
-    else:
-        lp_distributions += remaining_cash
-        remaining_cash = 0
-        return {'lp_total': lp_distributions, 'gp_total': gp_distributions, 'project_irr': project_irr}
+    for year in range(1, n_years + 1):
+        remaining = annual_cash_flows[year - 1]
+        for hurdle, inv_share in zip(tier_hurdles, tier_splits):
+            if remaining <= 0:
+                break
+            if hurdle is None:
+                tier_cash = remaining              # residual tier takes the rest
+            else:
+                inv_needed = cash_needed_to_reach(hurdle, year, investor_cf)
+                if inv_needed <= 0:
+                    continue                        # hurdle already met
+                # Investors receive inv_share of each tier dollar
+                tier_cash = min(remaining, inv_needed / inv_share)
+            investor_cf[year] += tier_cash * inv_share
+            promote_cf[year] += tier_cash * (1 - inv_share)
+            remaining -= tier_cash
 
-    # Tier 3: GP Catch-Up
-    if use_catchup and remaining_cash > 0:
-        first_promote = 1 - lp_splits[0]
-        total_tier_1_2 = total_capital + pref_amount
-        catchup_target = total_tier_1_2 * first_promote / (1 - first_promote)
-        catchup_amount = min(catchup_target, remaining_cash)
+    # Attribute investor flows pro-rata; GP = co-invest share + 100% of promote
+    lp_share = lp_capital / investor_capital
+    lp_cf = investor_cf * lp_share
+    gp_cf = investor_cf * (1 - lp_share) + promote_cf
+    gp_cf[0] = -gp_capital
 
-        gp_distributions += catchup_amount
-        remaining_cash -= catchup_amount
-        print(f"Tier 3 - GP Catch-Up:")
-        print(f"  GP: ${catchup_amount:,.0f}")
-        print(f"  Remaining: ${remaining_cash:,.0f}\n")
-
-    # Tier 4+: Promote Tiers
-    tier_num = 4
-    for i, hurdle in enumerate(hurdles):
-        if project_irr >= hurdle and remaining_cash > 0:
-            lp_split = lp_splits[i]
-            gp_split = 1 - lp_split
-
-            tier_lp = remaining_cash * lp_split
-            tier_gp = remaining_cash * gp_split
-
-            lp_distributions += tier_lp
-            gp_distributions += tier_gp
-            remaining_cash -= (tier_lp + tier_gp)
-
-            print(f"Tier {tier_num} - {hurdle:.0%} IRR Hurdle (LP:{lp_split:.0%}, GP:{gp_split:.0%}):")
-            print(f"  LP: ${tier_lp:,.0f}, GP: ${tier_gp:,.0f}\n")
-            tier_num += 1
-            break
-
-    # Calculate IRRs
-    lp_irr = npf.irr([-lp_capital, lp_distributions])
-    gp_irr = npf.irr([-gp_capital, gp_distributions]) if gp_capital > 0 else 0
+    project_cf = np.concatenate([[-investor_capital], annual_cash_flows])
+    total_distributions = float(np.sum(annual_cash_flows))
+    lp_total = float(np.sum(lp_cf[1:]))
+    gp_total = float(np.sum(gp_cf[1:]))
 
     return {
-        'project_irr': project_irr,
-        'lp_total': lp_distributions,
-        'gp_total': gp_distributions,
-        'lp_irr': lp_irr,
-        'gp_irr': gp_irr,
-        'lp_percent': lp_distributions / total_distributions,
-        'gp_percent': gp_distributions / total_distributions
+        'project_irr': npf.irr(project_cf),
+        'lp_cash_flows': lp_cf,
+        'gp_cash_flows': gp_cf,
+        'lp_total': lp_total,
+        'gp_total': gp_total,
+        'lp_irr': npf.irr(lp_cf),
+        'gp_irr': npf.irr(gp_cf) if gp_capital > 0 else None,
+        'lp_percent': lp_total / total_distributions,
+        'gp_percent': gp_total / total_distributions
     }
 
-# Example usage
+# Example usage: $10M LP, 5-year hold, single $15M distribution at exit
 results = calculate_waterfall_irr(
     lp_capital=10000000,
     gp_capital=0,
-    cash_flows=[0, 0, 0, 0, 15000000],
-    pref_rate=0.08,
+    annual_cash_flows=[0, 0, 0, 0, 15000000],
     hurdles=[0.08, 0.12, 0.18],
-    lp_splits=[0.80, 0.70, 0.60],
-    use_catchup=True
+    lp_splits=[1.00, 0.80, 0.70],
+    residual_lp_split=0.60
 )
 
 print("=" * 50)
@@ -767,8 +754,17 @@ print("WATERFALL SUMMARY")
 print("=" * 50)
 print(f"Project IRR: {results['project_irr']:.2%}")
 print(f"LP: ${results['lp_total']:,.0f} ({results['lp_percent']:.1%}), IRR: {results['lp_irr']:.2%}")
-print(f"GP: ${results['gp_total']:,.0f} ({results['gp_percent']:.1%}), IRR: {results['gp_irr']:.2%}")
+gp_irr = f"{results['gp_irr']:.2%}" if results['gp_irr'] is not None else "n/a (no GP capital)"
+print(f"GP: ${results['gp_total']:,.0f} ({results['gp_percent']:.1%}), IRR: {gp_irr}")
 ```
+
+**How the tier math works:** at each distribution date, the cash required to
+bring the investor IRR exactly to a hurdle equals the future value of the
+investor's cash flows to date, compounded at that hurdle rate (the amount that
+makes NPV at the hurdle rate zero). That amount of investor cash — grossed up
+by the tier's investor share — is allocated at the tier's split before moving
+to the next tier, so residual cash above a hurdle is split at the *next* tier's
+promote, never at the lowest tier's split.
 
 ### Python: Simplified Waterfall
 

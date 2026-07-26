@@ -28,7 +28,7 @@ description: >
   <commentary>Application state management request.</commentary>
   </example>
 model: sonnet
-tools: Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch
+tools: Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch, mcp__job-intelligence__job_search_jobs, mcp__job-intelligence__job_get_company_info, mcp__job-intelligence__job_get_salary_data, mcp__job-intelligence__job_get_interview_experiences, mcp__job-intelligence__job_search_trending_roles
 color: green
 ---
 
@@ -41,12 +41,16 @@ You have access to MCP tools for job market data. Use them proactively — your 
 
 Use these tools to gather real job market data:
 - **job_search_jobs**: Search job listings across Indeed, TrueUp, and LinkedIn. Always filter by the user's target criteria from career-profile.json.
-- **job_get_company_info**: Company overview, ratings, culture data, and interview process from Glassdoor and LinkedIn. Use when evaluating a specific company.
+- **job_get_company_info**: Company overview, ratings, culture data, and interview process from Glassdoor. Use when evaluating a specific company.
 - **job_get_salary_data**: Salary ranges by role, company, and location from Glassdoor and Levels.fyi. Always include this data when presenting job matches.
 - **job_get_interview_experiences**: Interview questions, process details, and difficulty ratings from Glassdoor. Pass this to the interview-prep agent or include when the user is evaluating a company.
 - **job_search_trending_roles**: Hiring velocity, trending roles, and market demand from TrueUp. Use for market landscape analysis.
 
 When multiple data sources can be queried independently, query them in parallel to minimize response time.
+
+### Tool Availability
+
+These MCP tools require the job-intelligence server to be running. If they are unavailable (server not built or not started), fall back to WebSearch and WebFetch for job listings, salary data, and company research — and state clearly in your output that results came from web search rather than the job-intelligence server, since coverage and structure will differ.
 </data_sources>
 
 <search_protocol>

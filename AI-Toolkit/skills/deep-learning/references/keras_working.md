@@ -198,15 +198,21 @@ for epoch in range(epochs):
 Override `train_step` to customize while keeping `fit()` benefits:
 
 ```python
+# Keras 3 pattern: compiled_loss/compiled_metrics were removed.
+# Use self.compute_loss() and update each metric explicitly.
 class CustomModel(keras.Model):
     def train_step(self, data):
         inputs, targets = data
         with tf.GradientTape() as tape:
             predictions = self(inputs, training=True)
-            loss = self.compiled_loss(targets, predictions)
+            loss = self.compute_loss(y=targets, y_pred=predictions)
         gradients = tape.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(gradients, self.trainable_weights))
-        self.compiled_metrics.update_state(targets, predictions)
+        for metric in self.metrics:
+            if metric.name == "loss":
+                metric.update_state(loss)
+            else:
+                metric.update_state(targets, predictions)
         return {m.name: m.result() for m in self.metrics}
 
 # Use like normal model

@@ -5,7 +5,7 @@ description: >
   company profiling, industry analysis, and data gathering. Invoke
   when the task requires synthesizing information from multiple
   public sources into structured research outputs.
-model: opus
+model: sonnet
 tools: Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch
 color: cyan
 ---

@@ -32,12 +32,14 @@ def comprehensive_evaluation(model, env, n_episodes=100):
     episode_rewards = []
     episode_lengths = []
     success_count = 0
+    success_defined = False
 
     for _ in range(n_episodes):
         obs, _ = env.reset()
         episode_reward = 0
         episode_length = 0
         done = False
+        info = {}
 
         while not done:
             action, _ = model.predict(obs, deterministic=True)
@@ -46,8 +48,10 @@ def comprehensive_evaluation(model, env, n_episodes=100):
             episode_length += 1
             done = terminated or truncated
 
-            # Track success if defined
-            if 'is_success' in info and info['is_success']:
+        # Success flag comes from the terminal step's info (one per episode)
+        if 'is_success' in info:
+            success_defined = True
+            if info['is_success']:
                 success_count += 1
 
         episode_rewards.append(episode_reward)
@@ -64,7 +68,7 @@ def comprehensive_evaluation(model, env, n_episodes=100):
         "median_reward": np.median(rewards),
         "mean_length": np.mean(lengths),
         "std_length": np.std(lengths),
-        "success_rate": success_count / n_episodes if 'is_success' in info else None,
+        "success_rate": success_count / n_episodes if success_defined else None,
         "n_episodes": n_episodes
     }
 
@@ -347,8 +351,12 @@ print(f"Std across seeds: {np.std(list(results.values())):.2f}")
 
 ```python
 import json
-import torch
+import sys
+
+import gymnasium as gym
+import numpy as np
 import stable_baselines3
+import torch
 
 def save_experiment_config(filepath, model, env, seed, hyperparams):
     """Save complete experiment configuration."""

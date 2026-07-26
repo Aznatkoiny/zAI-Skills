@@ -1,33 +1,31 @@
+/**
+ * FIFO promise-queue rate limiter.
+ *
+ * Each acquire() synchronously reserves the next available time slot
+ * (spaced 1/requestsPerSecond apart) before awaiting, so concurrent
+ * callers get distinct slots in call order and the rate is actually
+ * enforced. An idle limiter always allows the first request immediately,
+ * including for fractional rates (e.g. 0.2 req/s).
+ */
 export class RateLimiter {
-  private tokens: number;
-  private lastRefill: number;
-  private readonly maxTokens: number;
-  private readonly refillRate: number; // tokens per second
+  private readonly intervalMs: number;
+  private lastScheduled = 0;
 
   constructor(requestsPerSecond: number) {
-    this.maxTokens = requestsPerSecond;
-    this.refillRate = requestsPerSecond;
-    this.tokens = requestsPerSecond;
-    this.lastRefill = Date.now();
-  }
-
-  private refill(): void {
-    const now = Date.now();
-    const elapsed = (now - this.lastRefill) / 1000;
-    this.tokens = Math.min(this.maxTokens, this.tokens + elapsed * this.refillRate);
-    this.lastRefill = now;
+    if (requestsPerSecond <= 0) {
+      throw new Error(`requestsPerSecond must be positive, got ${requestsPerSecond}`);
+    }
+    this.intervalMs = 1000 / requestsPerSecond;
   }
 
   async acquire(): Promise<void> {
-    this.refill();
-    if (this.tokens >= 1) {
-      this.tokens -= 1;
-      return;
+    const now = Date.now();
+    const next = Math.max(now, this.lastScheduled + this.intervalMs);
+    this.lastScheduled = next;
+
+    const waitMs = next - now;
+    if (waitMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
     }
-    // Wait until a token is available
-    const waitMs = ((1 - this.tokens) / this.refillRate) * 1000;
-    await new Promise((resolve) => setTimeout(resolve, Math.ceil(waitMs)));
-    this.refill();
-    this.tokens -= 1;
   }
 }

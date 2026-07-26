@@ -139,6 +139,7 @@ with torch.no_grad():
 ### Batched Inference
 
 ```python
+import time
 import numpy as np
 import torch
 from collections import deque
@@ -517,6 +518,11 @@ class SafePolicy:
 ### Fallback Policies
 
 ```python
+import logging
+
+import numpy as np
+from stable_baselines3 import PPO
+
 class FallbackPolicy:
     """Primary policy with fallback on failure."""
 
@@ -606,8 +612,11 @@ class HumanOverridablePolicy:
 ### Continuous Learning
 
 ```python
+import logging
 from collections import deque
+
 import numpy as np
+from stable_baselines3 import PPO
 
 class OnlineLearningPolicy:
     """Policy that continues learning in production."""

@@ -40,7 +40,7 @@ This task involves multi-step reasoning. Think carefully through the problem bef
 
 ## Adaptive thinking
 
-On **Opus 4.8, thinking is off** unless you set `thinking: {type: "adaptive"}`. Opus 4.6 and Sonnet 4.6 use adaptive thinking, where Claude decides when and how much to think based on `effort` and query complexity. In internal evals, adaptive thinking outperforms manual extended thinking. Use it for agentic behavior, multi-step tool use, complex coding, and long-horizon loops.
+Defaults differ by generation — verify against current docs (https://docs.claude.com). On the **Claude 5 family (Opus 5, Sonnet 5, Fable 5), thinking is on by default** — omitting `thinking` runs adaptive, and Fable 5 rejects an explicit `disabled`. On **Opus 4.8 (still active), thinking is off** unless you set `thinking: {type: "adaptive"}`. Opus 4.6 and Sonnet 4.6 use adaptive thinking, where Claude decides when and how much to think based on `effort` and query complexity. In internal evals, adaptive thinking outperforms manual extended thinking. Use it for agentic behavior, multi-step tool use, complex coding, and long-horizon loops.
 
 Adaptive triggering is steerable. If the model thinks more often than wanted (common with large/complex system prompts), steer it:
 
@@ -60,7 +60,7 @@ When thinking is **off**, you can still elicit reasoning with `<thinking>`/`<ans
 
 ## Migrating from extended thinking (`budget_tokens`)
 
-`budget_tokens` is deprecated (still functional on 4.6/Sonnet 4.6). Move depth control to `effort`.
+`budget_tokens` is removed on the Claude 5 family and Opus 4.8/4.7 (requests 400); deprecated but still functional on Opus 4.6 / Sonnet 4.6. Move depth control to `effort`.
 
 Before (older models):
 
@@ -77,9 +77,9 @@ After (adaptive thinking):
 
 ```python
 client.messages.create(
-    model="claude-opus-4-8",
+    model="claude-opus-5",
     max_tokens=64000,
-    thinking={"type": "adaptive"},
+    thinking={"type": "adaptive"},  # optional on Claude 5 — adaptive is the default
     output_config={"effort": "high"},  # or "max", "xhigh", "medium", "low"
     messages=[{"role": "user", "content": "..."}],
 )
@@ -122,22 +122,35 @@ Use a warm, collaborative tone. Acknowledge the user's framing before answering.
 ## Model self-knowledge (identity strings)
 
 ```text
-The assistant is Claude, created by Anthropic. The current model is Claude Opus 4.8.
+The assistant is Claude, created by Anthropic. The current model is Claude Opus 5.
 ```
 
 For apps that must specify a model string:
 
 ```text
-When an LLM is needed, please default to Claude Opus 4.8 unless the user requests otherwise. The exact model string for Claude Opus 4.8 is claude-opus-4-8.
+When an LLM is needed, please default to Claude Opus 5 unless the user requests otherwise. The exact model string for Claude Opus 5 is claude-opus-5.
 ```
 
-Current strings: Opus 4.8 `claude-opus-4-8` · Sonnet 4.6 `claude-sonnet-4-6` · Haiku 4.5 `claude-haiku-4-5-20251001`.
+Current strings (Claude 5 family — no date suffixes): Opus 5 `claude-opus-5` · Sonnet 5 `claude-sonnet-5` · Fable 5 `claude-fable-5` · Haiku 4.5 `claude-haiku-4-5-20251001`. Still active: Opus 4.8 `claude-opus-4-8` · Sonnet 4.6 `claude-sonnet-4-6`. Retired IDs fail at runtime (e.g. `claude-sonnet-4-20250514`, retired June 2026) — verify against https://docs.claude.com.
 
 ## Computer use resolution
 
 Computer use works up to 2576px / 3.75MP. **1080p** balances performance and cost. For cost-sensitive workloads, 720p or 1366×768 perform well. Tune `effort` to adjust behavior.
 
 ## Model-version migration
+
+### 4.x → Claude 5 (Opus 5, Sonnet 5, Fable 5)
+
+1. Swap the model ID (`claude-opus-5`, `claude-sonnet-5`, `claude-fable-5` — no date suffixes).
+2. Thinking is now on by default — routes that never set `thinking` start spending thinking tokens against `max_tokens`. Raise `max_tokens`, or disable explicitly (Opus 5: allowed only at effort `high` or below; Fable 5: cannot be disabled).
+3. Delete verification scaffolding ("double-check your answer", verify-with-a-subagent steps) — Claude 5 self-verifies, and those instructions now cause over-verification.
+4. Re-run an effort sweep — `low`/`medium` are unusually strong on Claude 5, so prior-model effort defaults rarely transfer.
+5. Opus 5 delegates to subagents more readily than 4.8 — remove "delegate more" guidance and cap fan-out.
+6. Sonnet 5 uses a new tokenizer (~30% more tokens for the same text vs Sonnet 4.6) — re-baseline token budgets and `max_tokens`.
+
+Verify specifics against the current migration guide at https://docs.claude.com.
+
+### Legacy 4.x guidance (Opus 4.8 and Sonnet 4.6 remain active)
 
 **To Opus 4.8 (from 4.7):** existing 4.7 prompts work well out of the box. Tune verbosity, effort, subagent spawning, and design defaults as needed (see SKILL.md "What changed").
 

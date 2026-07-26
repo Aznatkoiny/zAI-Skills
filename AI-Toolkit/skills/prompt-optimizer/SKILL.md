@@ -1,11 +1,11 @@
 ---
 name: prompt-optimizer
-description: Optimize prompts for Claude's latest models (Opus 4.8, Opus 4.7, Opus 4.6, Sonnet 4.6, Haiku 4.5) using Anthropic's official prompt-engineering guidance. Use when users want to improve, refine, debug, or create prompts or system prompts for Claude. Triggers include requests to optimize/fix/refine a prompt, make a prompt more effective, write a system prompt, improve instruction following, control verbosity or output formatting, tune effort or thinking depth, fix tool-use/agentic/subagent behavior, migrate prompts to a newer Claude model, or migrate away from prefilled responses. Also use when users report Claude being too verbose, ignoring or partially applying instructions, over- or under-using tools, overthinking, overengineering, spawning too many subagents, hallucinating about code, or producing generic "AI slop" output.
+description: Optimize prompts for Claude's latest models (Claude 5 family — Opus 5, Sonnet 5, Fable 5 — plus the still-active Opus 4.8, Sonnet 4.6, and Haiku 4.5) using Anthropic's official prompt-engineering guidance. Use when users want to improve, refine, debug, or create prompts or system prompts for Claude. Triggers include requests to optimize/fix/refine a prompt, make a prompt more effective, write a system prompt, improve instruction following, control verbosity or output formatting, tune effort or thinking depth, fix tool-use/agentic/subagent behavior, migrate prompts to a newer Claude model, or migrate away from prefilled responses. Also use when users report Claude being too verbose, ignoring or partially applying instructions, over- or under-using tools, overthinking, overengineering, spawning too many subagents, hallucinating about code, or producing generic "AI slop" output.
 ---
 
 # Prompt Optimizer
 
-Optimize prompts for Claude's latest models — Opus 4.8, Opus 4.7, Opus 4.6, Sonnet 4.6, Haiku 4.5 — using Anthropic's official guidance. Diagnose what is wrong, pick the right lever, apply a proven fix, then measure.
+Optimize prompts for Claude's latest models — the Claude 5 family (Opus 5, Sonnet 5, Fable 5) plus the still-active Opus 4.8, Sonnet 4.6, and Haiku 4.5 — using Anthropic's official guidance. Diagnose what is wrong, pick the right lever, apply a proven fix, then measure.
 
 ## Two levers, not one
 
@@ -21,12 +21,14 @@ On the latest models, **`effort` is frequently the highest-leverage change.** If
 These shifts change how to optimize. Do not carry over old habits blindly:
 
 - **Effort governs depth, tool use, and thoroughness.** Start `xhigh` for coding/agentic work, minimum `high` for intelligence-sensitive work. Lower effort means more literal, more scoped, less tool use.
-- **Thinking is off by default on Opus 4.8** unless you set `thinking: {type: "adaptive"}`. Opus 4.6 and Sonnet 4.6 use adaptive thinking. `budget_tokens` is deprecated — control depth through `effort`.
+- **Thinking defaults changed with Claude 5.** On the Claude 5 family thinking is on by default (Fable 5 rejects an explicit `disabled`); on Opus 4.8 it stays off unless you set `thinking: {type: "adaptive"}`. Opus 4.6 and Sonnet 4.6 use adaptive thinking. `budget_tokens` is removed on Claude 5 / Opus 4.8 — control depth through `effort`.
 - **Literal instruction following.** The model does what you said, not what you implied. State scope explicitly ("apply to every section, not just the first one").
 - **Dial back anti-laziness prompting.** Aggressive "CRITICAL / You MUST" language needed for older models now causes overtriggering. Use normal phrasing ("Use this tool when...").
 - **Prefilled assistant responses are no longer supported** on 4.6+ models (the request returns a 400). Migrations in references/formatting.md.
 - **Verbosity is calibrated to task complexity** and prose is more direct. Tune with positive examples of the concision you want, not "don't" rules.
-- **Fewer subagents by default** on Opus 4.8. Steer explicitly when you want fan-out.
+- **Subagent appetite differs by model.** Opus 4.8 under-delegates; Claude Opus 5 delegates readily. Steer explicitly — and cap fan-out on Opus 5.
+
+Effort levels and thinking defaults shift between releases — verify against the current docs at https://docs.claude.com before relying on the specifics here.
 
 ## Optimization workflow
 

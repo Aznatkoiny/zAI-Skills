@@ -3,10 +3,12 @@
   "version": "1.0.0",
   "description": "MCP server providing financial data tools for consulting workflows — SEC EDGAR, FRED, and Yahoo Finance",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/index.cjs",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
+    "build": "npm run bundle",
+    "bundle": "esbuild src/index.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/index.cjs",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/index.cjs",
     "dev": "tsc --watch"
   },
   "dependencies": {
@@ -16,6 +18,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "esbuild": "^0.28.1",
     "typescript": "^5.7.0"
   },
   "engines": {

@@ -4,7 +4,7 @@ A multi-agent consulting system for Claude Code that replicates the structure an
 
 ## What It Does
 
-An **Engagement Manager** agent (opus) orchestrates four specialist sub-agents (all opus) to decompose complex strategic briefs into workstreams, delegate to specialists, enforce quality gates, and synthesize deliverables. For quick-turn tasks, 15 slash commands provide direct access to consulting methodologies.
+The **/engagement** command is the entry point for complex briefs. It orchestrates from the main conversation (Claude Code subagents cannot spawn other subagents): it decomposes the brief into MECE workstreams, delegates each to a specialist subagent, runs the **Engagement Manager** agent (opus) as the quality gate over every output, and synthesizes an answer-first recommendation. For quick-turn tasks, 15 further slash commands (16 total) provide direct access to consulting methodologies.
 
 ## Components
 
@@ -12,13 +12,18 @@ An **Engagement Manager** agent (opus) orchestrates four specialist sub-agents (
 
 | Agent | Model | Role |
 |-------|-------|------|
-| `engagement-manager` | opus | Orchestrator, quality gate, client proxy |
-| `research-analyst` | opus | Market research, competitive intelligence, company profiling |
+| `engagement-manager` | opus | Quality gate, cross-workstream consistency, synthesis |
+| `research-analyst` | sonnet | Market research, competitive intelligence, company profiling |
 | `financial-modeler` | opus | Financial models, business cases, NPV/ROI, sensitivity analysis |
-| `deck-builder` | opus | Presentation storylines, pyramid principle, slide decks |
-| `due-diligence` | opus | Target screening, risk assessment, DD checklists |
+| `deck-builder` | sonnet | Presentation storylines, pyramid principle, slide decks |
+| `due-diligence` | sonnet | Target screening, risk assessment, DD checklists |
 
-### Slash Commands (15)
+Models are deliberately tiered: quality-gate judgment (`engagement-manager`) and quantitative modeling (`financial-modeler`) run on opus; the research, deck, and DD specialists run on sonnet.
+
+### Slash Commands (16)
+
+**Orchestration**
+- `/engagement` — Full multi-workstream engagement: decompose, delegate to specialists, quality-gate, synthesize
 
 **Research**
 - `/market-size` — Structured market sizing (top-down + bottom-up)
@@ -66,12 +71,14 @@ An **Engagement Manager** agent (opus) orchestrates four specialist sub-agents (
 /market-size European electric vehicle charging infrastructure
 ```
 
-### Complex Engagements (Engagement Manager)
-For multi-workstream briefs, the Engagement Manager automatically activates:
+### Complex Engagements (/engagement)
+For multi-workstream briefs, use the `/engagement` command:
 
-> Evaluate whether FedEx should acquire a cold chain logistics company in Europe. Build me a board-ready recommendation.
+```
+/engagement Evaluate whether FedEx should acquire a cold chain logistics company in Europe. Build me a board-ready recommendation.
+```
 
-The EM will decompose this into workstreams, delegate to specialists, enforce quality reviews, and synthesize a cohesive deliverable package.
+The command decomposes the brief into workstreams, tracks state in `engagement-state.json` (schema in `templates/engagement-state.schema.json`), delegates to the specialist subagents in dependency order, runs the Engagement Manager as the quality gate over each output, and synthesizes a cohesive deliverable package.
 
 ## Architecture
 
@@ -80,11 +87,12 @@ Consultant (You)
     │
     ├── Slash Commands ──→ Direct, quick-turn outputs
     │
-    └── Complex Briefs ──→ Engagement Manager (opus)
-                               ├── Research Analyst (sonnet)
-                               ├── Financial Modeler (sonnet)
-                               ├── Deck Builder (sonnet)
-                               └── Due Diligence (sonnet)
+    └── /engagement ──→ Main conversation orchestrates:
+            ├── Research Analyst (sonnet)
+            ├── Financial Modeler (opus)
+            ├── Due Diligence (sonnet)
+            ├── Deck Builder (sonnet, when a deck is requested)
+            └── Engagement Manager (opus) ── quality gate + synthesis
 ```
 
 ## Financial Intelligence MCP Server
@@ -97,7 +105,7 @@ A custom MCP server that gives agents direct access to financial data from SEC E
 |------|--------|-------------|
 | `fin_get_company_financials` | SEC EDGAR XBRL | Revenue, EBITDA, margins, growth rates for public companies |
 | `fin_get_filing_text` | SEC EDGAR | Full text from 10-K, 10-Q, 8-K filings |
-| `fin_get_stock_data` | Yahoo Finance | Price history, market cap, P/E, key statistics |
+| `fin_get_stock_data` | Yahoo Finance | Price, daily change, 52-week range, volume, OHLCV history |
 | `fin_get_macro_indicators` | FRED | GDP, CPI, interest rates, unemployment, and thousands more |
 | `fin_get_earnings_transcript` | SEC EDGAR 8-K | Earnings-related 8-K filings (Item 2.02 proxy) |
 | `fin_compare_companies` | SEC EDGAR | Side-by-side comparison of 2-5 companies |

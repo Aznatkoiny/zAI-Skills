@@ -1,5 +1,7 @@
 # Generative Deep Learning
 
+> **TensorFlow backend required.** Code in this file uses `tf.*` APIs directly and only runs with `KERAS_BACKEND="tensorflow"`.
+
 ## Table of Contents
 - [Text Generation](#text-generation)
 - [Variational Autoencoders (VAEs)](#variational-autoencoders-vaes)

@@ -1,11 +1,11 @@
 # AI-Toolkit
 
-Skills for Deep Learning, Reinforcement Learning, Prompt Engineering, and Web3 Payments.
+Skills for Deep Learning, Reinforcement Learning (Python & C++), Prompt Engineering, Web3 Payments, and OpenClaw Setup.
 
 ## Installation
 
 ```bash
-/plugin install AI-Toolkit@zAI-Skills
+/plugin install ai-toolkit@zAI-Skills
 ```
 
 ## Skills
@@ -65,7 +65,7 @@ C++ Reinforcement Learning using libtorch (PyTorch C++ frontend) and modern C++1
 
 ### prompt-optimizer
 
-Optimize prompts for Claude 4.x models using Anthropic's official best practices. Use when:
+Optimize prompts for Claude's latest models using Anthropic's official best practices. Use when:
 - Improving or creating effective prompts for Claude
 - Fixing underperforming prompts or reducing verbosity
 - Creating system prompts or controlling output formatting
@@ -92,6 +92,23 @@ Build applications using the x402 protocol — Coinbase's open standard for HTTP
 - Client patterns (fetch, axios, wallet setup)
 - Agentic patterns (AI agent payments, MCP server integration)
 - Deployment guide (testnet to mainnet migration)
+
+### openclaw-setup
+
+Set up, configure, secure, and deploy OpenClaw — the open-source personal AI assistant that connects to your messaging channels. Use when:
+- Installing OpenClaw from scratch on macOS or Linux
+- Configuring Anthropic auth, model selection, and cost controls
+- Connecting messaging channels (Telegram, iMessage)
+- Applying security hardening and safe defaults
+- Deploying to a Hostinger VPS with Docker
+- Running health checks (`openclaw doctor`, `openclaw security audit`)
+
+**Reference Materials:**
+- Mac mini local deployment walkthrough
+- Hostinger VPS Docker deployment guide
+- Anthropic auth, cost control, and smart model routing
+- Telegram and iMessage channel setup
+- Security defaults, hardening, and incident response
 
 ## License
 

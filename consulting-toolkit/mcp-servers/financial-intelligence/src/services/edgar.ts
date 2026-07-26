@@ -1,4 +1,4 @@
-import axios, { type AxiosInstance } from "axios";
+import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse } from "axios";
 import {
   EDGAR_BASE_URL,
   EDGAR_XBRL_URL,
@@ -19,8 +19,12 @@ import { RateLimiter } from "./rate-limiter.js";
 
 const limiter = new RateLimiter(RATE_LIMITS.edgar);
 
+// Placeholder only — the SEC requires a real contact; index.ts warns loudly
+// at startup when EDGAR_USER_AGENT is unset.
+const EDGAR_USER_AGENT_PLACEHOLDER = "FinancialIntelligenceMCP bot@example.com";
+
 function createClient(): AxiosInstance {
-  const userAgent = process.env.EDGAR_USER_AGENT || "FinancialIntelligenceMCP bot@example.com";
+  const userAgent = process.env.EDGAR_USER_AGENT || EDGAR_USER_AGENT_PLACEHOLDER;
   return axios.create({
     baseURL: EDGAR_BASE_URL,
     headers: {
@@ -37,9 +41,75 @@ function getClient(): AxiosInstance {
   return client;
 }
 
+// ── Rate-limited GET with retry ──
+// SEC returns 429/503 when throttling; retry with exponential backoff.
+
+const MAX_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 500;
+
+async function edgarGet<T = unknown>(
+  url: string,
+  config?: AxiosRequestConfig
+): Promise<AxiosResponse<T>> {
+  for (let attempt = 0; ; attempt++) {
+    await limiter.acquire();
+    try {
+      return await getClient().get<T>(url, config);
+    } catch (err) {
+      const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+      const retryable = status === 429 || (status !== undefined && status >= 500);
+      if (!retryable || attempt >= MAX_RETRIES) throw err;
+      const backoffMs = RETRY_BASE_DELAY_MS * 2 ** attempt;
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+    }
+  }
+}
+
 // Pad CIK to 10 digits as required by EDGAR URLs
 function padCik(cik: string): string {
   return cik.replace(/^0+/, "").padStart(10, "0");
+}
+
+// ── Submissions Cache ──
+// getCompanyInfo and getFilings both need the CIK{cik}.json submissions
+// payload; a short TTL cache avoids re-downloading it within one workflow.
+
+interface SubmissionsPayload {
+  cik: string;
+  name?: string;
+  entityName?: string;
+  tickers?: string[];
+  sic?: string;
+  sicDescription?: string;
+  exchanges?: string[];
+  filings?: {
+    recent?: Record<string, string[]>;
+  };
+}
+
+const SUBMISSIONS_CACHE_TTL_MS = 15 * 60 * 1000;
+const SUBMISSIONS_CACHE_MAX_ENTRIES = 32;
+const submissionsCache = new Map<string, { data: SubmissionsPayload; fetchedAt: number }>();
+
+async function getSubmissions(cik: string): Promise<SubmissionsPayload> {
+  const key = padCik(cik);
+  const cached = submissionsCache.get(key);
+  if (cached && Date.now() - cached.fetchedAt < SUBMISSIONS_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  const { data } = await edgarGet<SubmissionsPayload>(
+    `${EDGAR_SUBMISSIONS_URL}/CIK${key}.json`
+  );
+
+  // Evict oldest entries to bound memory (submissions payloads can be large)
+  while (submissionsCache.size >= SUBMISSIONS_CACHE_MAX_ENTRIES) {
+    const oldestKey = submissionsCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    submissionsCache.delete(oldestKey);
+  }
+  submissionsCache.set(key, { data, fetchedAt: Date.now() });
+  return data;
 }
 
 // ── Ticker → CIK Resolution ──
@@ -54,12 +124,11 @@ let tickerMap: Map<string, TickerMapping> | null = null;
 
 async function loadTickerMap(): Promise<Map<string, TickerMapping>> {
   if (tickerMap) return tickerMap;
-  await limiter.acquire();
-  const { data } = await getClient().get(
+  const { data } = await edgarGet<Record<string, TickerMapping>>(
     "https://www.sec.gov/files/company_tickers.json"
   );
   tickerMap = new Map<string, TickerMapping>();
-  for (const entry of Object.values(data) as TickerMapping[]) {
+  for (const entry of Object.values(data)) {
     tickerMap.set(entry.ticker.toUpperCase(), entry);
   }
   return tickerMap;
@@ -86,10 +155,7 @@ export async function getCompanyInfo(
     cik = await resolveTickerToCik(tickerOrCik);
   }
 
-  await limiter.acquire();
-  const { data } = await getClient().get(
-    `${EDGAR_SUBMISSIONS_URL}/CIK${padCik(cik)}.json`
-  );
+  const data = await getSubmissions(cik);
 
   return {
     cik: data.cik,
@@ -112,8 +178,7 @@ interface XBRLResponse {
 }
 
 export async function getCompanyFacts(cik: string): Promise<XBRLResponse> {
-  await limiter.acquire();
-  const { data } = await getClient().get<XBRLResponse>(
+  const { data } = await edgarGet<XBRLResponse>(
     `${EDGAR_XBRL_URL}/CIK${padCik(cik)}.json`
   );
   return data;
@@ -125,7 +190,7 @@ function extractMetricFromFacts(
   period: "annual" | "quarterly",
   limit: number
 ): FinancialPeriod[] {
-  const tags = XBRL_METRIC_TAGS[metricName];
+  const tags = (XBRL_METRIC_TAGS as Record<string, string[] | undefined>)[metricName];
   if (!tags || tags.length === 0) return [];
 
   const gaap = facts["us-gaap"] || {};
@@ -260,10 +325,8 @@ export async function getFilings(
   limit: number
 ): Promise<{ company: EdgarCompanyInfo; filings: FilingInfo[] }> {
   const info = await getCompanyInfo(tickerOrCik);
-  await limiter.acquire();
-  const { data } = await getClient().get(
-    `${EDGAR_SUBMISSIONS_URL}/CIK${padCik(info.cik)}.json`
-  );
+  // Served from the submissions cache — getCompanyInfo just fetched this payload
+  const data = await getSubmissions(info.cik);
 
   const recentFilings = data.filings?.recent || {};
   const forms: string[] = recentFilings.form || [];
@@ -300,8 +363,7 @@ export async function getFilingDocument(
   const accessionPath = accessionNumber.replace(/-/g, "");
   const numericCik = parseInt(cik, 10).toString();
   const url = `https://www.sec.gov/Archives/edgar/data/${numericCik}/${accessionPath}/${primaryDocument}`;
-  await limiter.acquire();
-  const { data } = await getClient().get(url, {
+  const { data } = await edgarGet<string>(url, {
     responseType: "text",
     headers: { Accept: "text/html,text/plain,*/*" },
   });
@@ -325,23 +387,41 @@ function stripHtml(html: string): string {
 
 // ── Company Search by SIC Code ──
 
-export async function getCompaniesBySic(sicCode: string, limit: number = 15): Promise<EdgarCompanyInfo[]> {
-  await limiter.acquire();
-  const { data } = await getClient().get(
-    `${EDGAR_EFTS_URL}/search-index?q=%22${sicCode}%22&dateRange=custom&startdt=2024-01-01&forms=10-K`,
-    { baseURL: "" }
-  );
+// Hard cap on submissions lookups during the fallback ticker-map scan so a
+// niche SIC code cannot hammer data.sec.gov for minutes on end.
+const MAX_SIC_SCAN_REQUESTS = 300;
 
-  // Fallback: use the ticker map to find companies by SIC
-  const map = await loadTickerMap();
+export interface SicSearchResult {
+  companies: EdgarCompanyInfo[];
+  note?: string;
+}
+
+interface EftsSearchResponse {
+  hits?: {
+    hits?: { _source?: { file_num?: string } }[];
+  };
+}
+
+export async function getCompaniesBySic(sicCode: string, limit: number = 15): Promise<SicSearchResult> {
+  const encodedSic = encodeURIComponent(sicCode);
   const companies: EdgarCompanyInfo[] = [];
   const seenCiks = new Set<string>();
 
-  // Try to get company info for each match
-  if (data?.hits?.hits) {
-    for (const hit of data.hits.hits) {
+  // Best-effort full-text search for recent 10-K filers mentioning the SIC code
+  let searchData: EftsSearchResponse | null = null;
+  try {
+    const { data } = await edgarGet<EftsSearchResponse>(
+      `${EDGAR_EFTS_URL}/search-index?q=%22${encodedSic}%22&forms=10-K`,
+      { baseURL: "" }
+    );
+    searchData = data;
+  } catch {
+    // Full-text search is best-effort; fall through to the ticker-map scan
+  }
+
+  if (searchData?.hits?.hits) {
+    for (const hit of searchData.hits.hits) {
       if (companies.length >= limit) break;
-      const entityName = hit._source?.entity_name;
       const fileCik = hit._source?.file_num?.split("-")[0];
       if (fileCik && !seenCiks.has(fileCik)) {
         seenCiks.add(fileCik);
@@ -357,11 +437,19 @@ export async function getCompaniesBySic(sicCode: string, limit: number = 15): Pr
     }
   }
 
-  // If we didn't find enough via search, scan ticker map
+  // If we didn't find enough via search, scan the ticker map (capped)
+  let scanned = 0;
+  let scanCapped = false;
   if (companies.length < limit) {
-    for (const [ticker, entry] of map) {
+    const map = await loadTickerMap();
+    for (const entry of map.values()) {
       if (companies.length >= limit) break;
+      if (scanned >= MAX_SIC_SCAN_REQUESTS) {
+        scanCapped = true;
+        break;
+      }
       if (seenCiks.has(entry.cik_str)) continue;
+      scanned++;
       try {
         const info = await getCompanyInfo(entry.cik_str);
         if (info.sic === sicCode) {
@@ -374,5 +462,10 @@ export async function getCompaniesBySic(sicCode: string, limit: number = 15): Pr
     }
   }
 
-  return companies;
+  return {
+    companies,
+    note: scanCapped
+      ? `Peer discovery stopped after ${MAX_SIC_SCAN_REQUESTS} SEC submissions lookups to respect SEC fair-access limits; results may be a partial sample of SIC ${sicCode}.`
+      : undefined,
+  };
 }

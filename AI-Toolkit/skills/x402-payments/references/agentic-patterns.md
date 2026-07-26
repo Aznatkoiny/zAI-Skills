@@ -15,12 +15,13 @@ Source: `examples/typescript/clients/mcp/`
 Build an MCP (Model Context Protocol) server that wraps x402-protected APIs as tools for Claude Desktop.
 
 ```bash
-npm install @modelcontextprotocol/sdk @x402/axios @x402/core @x402/evm @x402/svm viem @solana/kit @scure/base axios
+npm install @modelcontextprotocol/sdk zod @x402/axios @x402/core @x402/evm @x402/svm viem @solana/kit @scure/base axios
 ```
 
 ```typescript
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
 import axios from "axios";
 import { x402Client, wrapAxiosWithPayment } from "@x402/axios";
 import { registerExactEvmScheme } from "@x402/evm/exact/client";
@@ -56,17 +57,20 @@ const mcpServer = new McpServer({
   version: "1.0.0",
 });
 
-mcpServer.tool("get_weather", "Get weather (costs $0.001 USDC)", {}, async () => {
+// No-argument tool: use the (name, description, callback) overload
+mcpServer.tool("get_weather", "Get weather (costs $0.001 USDC)", async () => {
   const response = await api.get("/weather");
   return {
     content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }],
   };
 });
 
+// Tools with arguments take a Zod raw shape ({ city: z.string() }),
+// not a raw JSON Schema object — the SDK validates inputs with Zod.
 mcpServer.tool(
   "get_forecast",
   "Get 5-day forecast (costs $0.01 USDC)",
-  { city: { type: "string", description: "City name" } },
+  { city: z.string().describe("City name") },
   async ({ city }) => {
     const response = await api.get(`/forecast?city=${encodeURIComponent(city)}`);
     return {
@@ -89,7 +93,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
   "mcpServers": {
     "x402-weather": {
       "command": "node",
-      "args": ["--experimental-modules", "/path/to/mcp-server.js"],
+      "args": ["/path/to/mcp-server.js"],
       "env": {
         "EVM_PRIVATE_KEY": "0x...",
         "SVM_PRIVATE_KEY": "...",
@@ -160,7 +164,7 @@ async function runAgent(userMessage: string) {
 
   while (true) {
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5",
       max_tokens: 1024,
       tools,
       messages,

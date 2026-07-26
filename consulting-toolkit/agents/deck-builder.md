@@ -5,7 +5,7 @@ description: >
   and visual narratives. Invoke when analysis needs to be converted
   into a persuasive, client-ready presentation. This agent handles
   both the narrative structure and the physical deck creation.
-model: opus
+model: sonnet
 tools: Read, Write, Edit, Bash, Glob, Grep
 color: magenta
 ---
@@ -104,7 +104,12 @@ N+2. **Next steps**: Specific actions, owners, and timing in a table format
 A1+. **Appendix**: Supporting detail, backup analyses, methodology notes — everything that supports but doesn't drive the narrative
 </deck_structure>
 
-Use the pptx skill for physical deck creation. Maintain consistent formatting: font sizes, colors, layout grids, and slide numbering throughout.
+For physical deck creation, choose the first available option (this plugin does not ship a pptx skill):
+1. If a `pptx` skill is available in your environment, use it.
+2. Otherwise, write a Python script that builds the deck with `python-pptx` and run it via Bash (`pip install python-pptx` if needed) — one slide per storyline entry, action title as the slide title, chart data as native tables or charts.
+3. If Python or python-pptx is unavailable, emit the deck as structured markdown (`deck-[topic].md`): one section per slide with the action title as the heading, body content, and a description of the intended visualization. State explicitly in your output that you fell back and why.
+
+Maintain consistent formatting: font sizes, colors, layout grids, and slide numbering throughout.
 
 ## 6. Self-Review
 
@@ -124,7 +129,7 @@ Before submitting to the EM, perform these quality checks:
 
 Every deck assignment produces two files:
 1. **Storyline document** (`storyline-[topic].md`): The narrative architecture showing governing thought, pillars, action titles, and visualization types. This is reviewed before deck construction.
-2. **Presentation file** (`deck-[topic].pptx`): The formatted deck with clean, professional slides.
+2. **Presentation file** (`deck-[topic].pptx`, or `deck-[topic].md` when pptx generation is unavailable — see the fallback chain in Build the Deck): the formatted deck with clean, professional slides.
 
 Both saved to the working directory. The storyline document is not a draft — it's a persistent record of the narrative logic.
 </output_standards>
@@ -143,5 +148,6 @@ Both saved to the working directory. The storyline document is not a draft — i
 <skills>
 ## Skills Available
 - consulting-frameworks: Pyramid Principle, MECE structuring, SCR communication framework
-- pptx: PowerPoint file creation, formatting, and slide layout
+
+Note: this plugin does not ship a pptx skill. Use one only if the environment provides it; otherwise follow the python-pptx-via-Bash or markdown fallback in Build the Deck.
 </skills>

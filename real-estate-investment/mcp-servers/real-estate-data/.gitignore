@@ -1,0 +1,3 @@
+# Runtime artifacts created by run.sh / Python
+.venv/
+__pycache__/

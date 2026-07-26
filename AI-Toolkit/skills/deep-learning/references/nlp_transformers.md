@@ -1,5 +1,7 @@
 # Deep Learning for Text & Transformers
 
+> **TensorFlow backend required.** Code in this file uses `tf.*` APIs directly and only runs with `KERAS_BACKEND="tensorflow"`.
+
 ## Table of Contents
 - [Text Preprocessing](#text-preprocessing)
 - [Bag-of-Words Approaches](#bag-of-words-approaches)

@@ -1,6 +1,6 @@
 {
   "name": "career-coach",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Career coaching and job search plugin with AI-powered resume building, interview preparation, and multi-platform job discovery. Features a Career Director orchestrator, job search automation via MCP, industry-specific output styles, and LaTeX resume compilation.",
   "author": {
     "name": "Antony Zaki"

@@ -4,18 +4,20 @@ import { getStockData } from "../services/yahoo.js";
 
 type StockInput = z.infer<typeof stockDataSchema>;
 
-function formatNumber(n: number | null): string {
-  if (n === null || n === undefined) return "N/A";
-  if (Math.abs(n) >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
-  if (Math.abs(n) >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
-  if (Math.abs(n) >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-  return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
 export async function handleStockData(input: StockInput): Promise<string> {
   const { ticker, period, interval } = input;
   const data = await getStockData(ticker, period, interval);
   const { quote, history } = data;
+
+  const avgVolumeRow =
+    quote.avgVolumeBars > 0
+      ? `| Avg Volume (last ${quote.avgVolumeBars} ${interval} bars) | ${quote.avgVolume.toLocaleString()} |`
+      : `| Avg Volume | N/A |`;
+
+  const changeRow =
+    quote.change !== null && quote.changePercent !== null
+      ? `| Change | ${quote.change >= 0 ? "+" : ""}${quote.change.toFixed(2)} (${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%) |`
+      : `| Change | N/A |`;
 
   const lines: string[] = [
     `## ${quote.name} (${quote.ticker})`,
@@ -25,15 +27,10 @@ export async function handleStockData(input: StockInput): Promise<string> {
     `| Metric | Value |`,
     `|--------|-------|`,
     `| Price | $${quote.price.toFixed(2)} |`,
-    `| Change | ${quote.change >= 0 ? "+" : ""}${quote.change.toFixed(2)} (${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%) |`,
-    `| Market Cap | ${formatNumber(quote.marketCap)} |`,
-    `| P/E (TTM) | ${quote.peRatio?.toFixed(2) || "N/A"} |`,
-    `| Forward P/E | ${quote.forwardPE?.toFixed(2) || "N/A"} |`,
-    `| Dividend Yield | ${quote.dividendYield ? (quote.dividendYield * 100).toFixed(2) + "%" : "N/A"} |`,
+    changeRow,
     `| 52W High | $${quote.fiftyTwoWeekHigh.toFixed(2)} |`,
     `| 52W Low | $${quote.fiftyTwoWeekLow.toFixed(2)} |`,
-    `| Avg Volume (3M) | ${quote.avgVolume.toLocaleString()} |`,
-    `| Beta | ${quote.beta?.toFixed(2) || "N/A"} |`,
+    avgVolumeRow,
     "",
   ];
 

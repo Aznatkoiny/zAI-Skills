@@ -265,20 +265,29 @@ def validate_environment(env_class):
     assert isinstance(truncated, bool), "Truncated must be bool"
     assert isinstance(info, dict), "Info must be dict"
 
-    # 4. Check determinism with seed
-    env.reset(seed=42)
-    actions = [env.action_space.sample() for _ in range(10)]
-    env.reset(seed=42)
-    obs1, _ = env.reset(seed=123)
-    for a in actions[:5]:
-        obs1, _, _, _, _ = env.step(a)
+    # 4. Check determinism: same seed + same actions -> same observations
+    actions = [env.action_space.sample() for _ in range(5)]
 
-    env.reset(seed=123)
-    obs2, _ = env.reset(seed=123)
-    for a in actions[:5]:
-        obs2, _, _, _, _ = env.step(a)
+    obs, _ = env.reset(seed=123)
+    trajectory1 = [obs]
+    for a in actions:
+        obs, _, terminated, truncated, _ = env.step(a)
+        trajectory1.append(obs)
+        if terminated or truncated:
+            break
 
-    assert np.allclose(obs1, obs2), "Environment not deterministic with same seed"
+    obs, _ = env.reset(seed=123)
+    trajectory2 = [obs]
+    for a in actions:
+        obs, _, terminated, truncated, _ = env.step(a)
+        trajectory2.append(obs)
+        if terminated or truncated:
+            break
+
+    assert len(trajectory1) == len(trajectory2), \
+        "Environment not deterministic with same seed"
+    for o1, o2 in zip(trajectory1, trajectory2):
+        assert np.allclose(o1, o2), "Environment not deterministic with same seed"
 
     # 5. Check episode termination
     env.reset()
@@ -346,26 +355,35 @@ env = SubprocVecEnv([make_env("CartPole-v1", i) for i in range(n_envs)])
 
 ### Observation Wrappers
 
+Names below are for Gymnasium >= 1.0, which renamed `FrameStack` ->
+`FrameStackObservation` and `GrayScaleObservation` -> `GrayscaleObservation`.
+
 ```python
+import numpy as np
+import gymnasium as gym
 from gymnasium.wrappers import (
     NormalizeObservation,
     TransformObservation,
-    FrameStack,
-    GrayScaleObservation,
+    FrameStackObservation,
+    GrayscaleObservation,
     ResizeObservation
 )
 
 # Normalize observations (running mean/std)
 env = NormalizeObservation(env)
 
-# Custom transformation
-env = TransformObservation(env, lambda obs: obs / 255.0)
+# Custom transformation (Gymnasium >= 1.0 requires the resulting observation space)
+env = TransformObservation(
+    env,
+    lambda obs: obs / 255.0,
+    gym.spaces.Box(low=0.0, high=1.0, shape=env.observation_space.shape, dtype=np.float32),
+)
 
 # Stack frames (for temporal info)
-env = FrameStack(env, num_stack=4)
+env = FrameStackObservation(env, stack_size=4)
 
 # Image preprocessing
-env = GrayScaleObservation(env)
+env = GrayscaleObservation(env)
 env = ResizeObservation(env, shape=(84, 84))
 ```
 

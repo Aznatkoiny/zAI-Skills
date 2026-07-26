@@ -75,17 +75,19 @@ export async function searchTrueUpJobs(
       }
     });
   } catch (err) {
-    console.error("TrueUp search error:", err instanceof Error ? err.message : String(err));
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("TrueUp search error:", message);
     if (listings.length === 0) {
       return [{
-        title: "[TrueUp Search Error]",
+        title: "TrueUp Search Error",
         company: "TrueUp",
         location: "N/A",
         salary: null,
         url: TRUEUP_SEARCH_URL,
-        description: `Failed to fetch results from TrueUp: ${err instanceof Error ? err.message : String(err)}. The site structure may have changed.`,
+        description: `Failed to fetch results from TrueUp: ${message}. The site structure may have changed.`,
         posted_date: null,
         source: "trueup",
+        error: `Failed to fetch results from TrueUp: ${message}. The site structure may have changed.`,
       }];
     }
   }
@@ -158,14 +160,16 @@ export async function getTrueUpTrendingRoles(
       }
     });
   } catch (err) {
-    console.error("TrueUp trending roles error:", err instanceof Error ? err.message : String(err));
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("TrueUp trending roles error:", message);
     if (roles.length === 0) {
       return [{
-        title: "[TrueUp Trending Error]",
+        title: "TrueUp Trending Error",
         companies_hiring: [],
         growth_rate: null,
         avg_salary: null,
         demand_level: null,
+        error: `Failed to fetch trending roles from TrueUp: ${message}. The site may be temporarily unavailable or its structure may have changed.`,
       }];
     }
   }

@@ -3,12 +3,9 @@ export const EDGAR_BASE_URL = "https://data.sec.gov";
 export const EDGAR_EFTS_URL = "https://efts.sec.gov/LATEST";
 export const EDGAR_XBRL_URL = `${EDGAR_BASE_URL}/api/xbrl/companyfacts`;
 export const EDGAR_SUBMISSIONS_URL = `${EDGAR_BASE_URL}/submissions`;
-export const EDGAR_FULL_TEXT_SEARCH_URL = `${EDGAR_EFTS_URL}/search-index`;
 
 // FRED API — Requires FRED_API_KEY env var
 export const FRED_BASE_URL = "https://api.stlouisfed.org/fred";
-export const FRED_SERIES_URL = `${FRED_BASE_URL}/series`;
-export const FRED_OBSERVATIONS_URL = `${FRED_SERIES_URL}/observations`;
 
 // Rate limits (requests per second)
 export const RATE_LIMITS = {
@@ -18,14 +15,30 @@ export const RATE_LIMITS = {
 } as const;
 
 // Response limits
-export const CHARACTER_LIMIT = 50_000;
 export const MAX_FILING_TEXT_LENGTH = 30_000;
-export const MAX_COMPANIES_COMPARE = 5;
 export const MAX_INDUSTRY_PEERS = 15;
-export const DEFAULT_PERIODS = 5;
+
+// Known financial metric keys (the XBRL tag map below must cover every key)
+export const METRIC_KEYS = [
+  "revenue",
+  "net_income",
+  "ebitda",
+  "operating_income",
+  "total_assets",
+  "total_liabilities",
+  "stockholders_equity",
+  "cash",
+  "total_debt",
+  "depreciation",
+  "cost_of_revenue",
+  "gross_profit",
+  "eps",
+  "shares_outstanding",
+] as const;
+export type MetricKey = (typeof METRIC_KEYS)[number];
 
 // Common XBRL taxonomy tags for financial metrics
-export const XBRL_METRIC_TAGS: Record<string, string[]> = {
+export const XBRL_METRIC_TAGS: Record<MetricKey, string[]> = {
   revenue: [
     "Revenues",
     "RevenueFromContractWithCustomerExcludingAssessedTax",

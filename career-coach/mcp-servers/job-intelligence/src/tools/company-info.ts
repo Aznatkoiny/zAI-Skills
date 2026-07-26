@@ -20,6 +20,13 @@ export async function handleCompanyInfo(input: CompanyInfoInput): Promise<string
     return lines.join("\n");
   }
 
+  if (info.error) {
+    lines.push(`**Error:** ${info.error}`);
+    lines.push("");
+    lines.push("No company data could be retrieved from Glassdoor. Consider using WebSearch to look up this company instead.");
+    return lines.join("\n");
+  }
+
   // Overview section
   lines.push("### Overview");
   lines.push("");
@@ -68,11 +75,7 @@ export async function handleCompanyInfo(input: CompanyInfoInput): Promise<string
   lines.push("");
 
   if (info.interview_process) {
-    if (info.interview_process.startsWith("Error")) {
-      lines.push(`*${info.interview_process}*`);
-    } else {
-      lines.push(info.interview_process);
-    }
+    lines.push(info.interview_process);
   } else {
     lines.push("Interview process information not available from this source. Use the `job_get_interview_experiences` tool for detailed interview data.");
   }

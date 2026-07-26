@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { compareCompaniesSchema } from "../schemas/inputs.js";
 import { getFinancialMetrics } from "../services/edgar.js";
-import type { CompanyComparison, ComparisonMetric } from "../types.js";
 
 type CompareInput = z.infer<typeof compareCompaniesSchema>;
+
+// Metrics where a lower value is better; every other metric ranks highest first
+const LOWER_IS_BETTER = new Set(["total_debt", "total_liabilities", "cost_of_revenue"]);
 
 function formatValue(value: number | null): string {
   if (value === null) return "—";
@@ -97,7 +99,9 @@ export async function handleCompareCompanies(input: CompareInput): Promise<strin
 
   // Rankings for each metric
   lines.push("");
-  lines.push("### Rankings (highest value = rank 1)");
+  lines.push("### Rankings (rank 1 = best)");
+  lines.push("");
+  lines.push("*Rank 1 is the highest value, except for metrics marked \"lower is better\" (debt and cost metrics), where rank 1 is the lowest value.*");
   lines.push("");
   lines.push(`| Metric | ${companyHeaders.join(" | ")} |`);
   lines.push(`|--------|${companyHeaders.map(() => "-------").join("|")}|`);
@@ -108,17 +112,23 @@ export async function handleCompareCompanies(input: CompareInput): Promise<strin
       return { ticker: c.company.ticker, value: metric?.periods[0]?.value ?? null };
     });
 
-    // Sort by value descending, nulls last
+    // Sort best-first per metric direction, nulls excluded
+    const lowerIsBetter = LOWER_IS_BETTER.has(metricName);
     const sorted = [...values]
       .filter((v) => v.value !== null)
-      .sort((a, b) => (b.value as number) - (a.value as number));
+      .sort((a, b) =>
+        lowerIsBetter
+          ? (a.value as number) - (b.value as number)
+          : (b.value as number) - (a.value as number)
+      );
 
     const rankings = companyData.map((c) => {
       const rank = sorted.findIndex((s) => s.ticker === c.company.ticker);
       return rank >= 0 ? `#${rank + 1}` : "—";
     });
 
-    lines.push(`| **${metricName}** | ${rankings.join(" | ")} |`);
+    const label = lowerIsBetter ? `**${metricName}** (lower is better)` : `**${metricName}**`;
+    lines.push(`| ${label} | ${rankings.join(" | ")} |`);
   }
 
   lines.push("");

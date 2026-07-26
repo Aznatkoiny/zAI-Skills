@@ -6,9 +6,13 @@ import {
   getFinancialMetrics,
 } from "../services/edgar.js";
 import { MAX_INDUSTRY_PEERS } from "../constants.js";
-import type { BenchmarkMetric, IndustryBenchmarks } from "../types.js";
+import type { BenchmarkMetric } from "../types.js";
 
 type BenchmarkInput = z.infer<typeof industryBenchmarksSchema>;
+
+function isRatioMetric(name: string): boolean {
+  return name.includes("pct") || name.includes("margin") || name.includes("growth");
+}
 
 function computeStats(values: number[]): Omit<BenchmarkMetric, "metric"> {
   if (values.length === 0) {
@@ -63,8 +67,11 @@ export async function handleIndustryBenchmarks(input: BenchmarkInput): Promise<s
 
   // Find peer companies
   let peers;
+  let searchNote: string | undefined;
   try {
-    peers = await getCompaniesBySic(sicCode, MAX_INDUSTRY_PEERS);
+    const result = await getCompaniesBySic(sicCode, MAX_INDUSTRY_PEERS);
+    peers = result.companies;
+    searchNote = result.note;
   } catch (err) {
     lines.push(`*Error finding peer companies: ${err instanceof Error ? err.message : "Unknown error"}*`);
     return lines.join("\n");
@@ -72,14 +79,22 @@ export async function handleIndustryBenchmarks(input: BenchmarkInput): Promise<s
 
   if (peers.length === 0) {
     lines.push("*No peer companies found for this SIC code.*");
+    if (searchNote) {
+      lines.push("");
+      lines.push(`*${searchNote}*`);
+    }
     return lines.join("\n");
   }
 
   lines.push(`**Peer companies found:** ${peers.length}`);
   lines.push(`**Peers:** ${peers.map((p) => p.ticker || p.name).join(", ")}`);
+  if (searchNote) {
+    lines.push("");
+    lines.push(`*${searchNote}*`);
+  }
   lines.push("");
 
-  // Fetch financials for each peer
+  // Fetch financials for each peer (2 periods so growth rates can be derived)
   const peerData = await Promise.all(
     peers.map(async (peer) => {
       try {
@@ -87,7 +102,7 @@ export async function handleIndustryBenchmarks(input: BenchmarkInput): Promise<s
           peer.cik,
           input.metrics,
           "annual",
-          1
+          2
         );
       } catch {
         return null;
@@ -102,13 +117,21 @@ export async function handleIndustryBenchmarks(input: BenchmarkInput): Promise<s
     return lines.join("\n");
   }
 
-  // Compute benchmarks for each metric
-  lines.push(`### Benchmark Statistics (${validPeers.length} peers with data)`);
-  lines.push("");
-  lines.push(`| Metric | Median | Mean | P25 | P75 | Min | Max |`);
-  lines.push(`|--------|--------|------|-----|-----|-----|-----|`);
+  // Split metrics: ratios are true benchmarks; absolute dollar values only
+  // describe the size mix of the sampled peers.
+  const derivedNames = new Set<string>();
+  for (const peer of validPeers) {
+    for (const d of peer.derived) derivedNames.add(d.metric);
+  }
+  const ratioDerived = [...derivedNames].filter(isRatioMetric);
+  const absoluteDerived = [...derivedNames].filter((n) => !isRatioMetric(n));
 
-  for (const metricName of input.metrics) {
+  const tableHeader = [
+    `| Metric | Median | Mean | P25 | P75 | Min | Max |`,
+    `|--------|--------|------|-----|-----|-----|-----|`,
+  ];
+
+  const requestedValuesFor = (metricName: string): number[] => {
     const values: number[] = [];
     for (const peer of validPeers) {
       const metric = peer.metrics.find((m) => m.metric === metricName);
@@ -116,20 +139,10 @@ export async function handleIndustryBenchmarks(input: BenchmarkInput): Promise<s
         values.push(metric.periods[0].value);
       }
     }
+    return values;
+  };
 
-    const stats = computeStats(values);
-    lines.push(
-      `| **${metricName}** | ${formatValue(stats.median)} | ${formatValue(stats.mean)} | ${formatValue(stats.p25)} | ${formatValue(stats.p75)} | ${formatValue(stats.min)} | ${formatValue(stats.max)} |`
-    );
-  }
-
-  // Derived metrics benchmarks
-  const derivedNames = new Set<string>();
-  for (const peer of validPeers) {
-    for (const d of peer.derived) derivedNames.add(d.metric);
-  }
-
-  for (const derivedName of derivedNames) {
+  const derivedValuesFor = (derivedName: string): number[] => {
     const values: number[] = [];
     for (const peer of validPeers) {
       const d = peer.derived.find((dm) => dm.metric === derivedName);
@@ -137,18 +150,40 @@ export async function handleIndustryBenchmarks(input: BenchmarkInput): Promise<s
         values.push(d.periods[0].value);
       }
     }
+    return values;
+  };
 
-    const stats = computeStats(values);
-    const fmt = (v: number | null) => {
-      if (v === null) return "—";
-      if (derivedName.includes("pct") || derivedName.includes("margin") || derivedName.includes("growth")) {
-        return `${v.toFixed(1)}%`;
-      }
-      return formatValue(v);
-    };
+  if (ratioDerived.length > 0) {
+    lines.push(`### Benchmark Statistics — Ratios (${validPeers.length} peers with data)`);
+    lines.push("");
+    lines.push(...tableHeader);
+    for (const derivedName of ratioDerived) {
+      const stats = computeStats(derivedValuesFor(derivedName));
+      const fmt = (v: number | null) => (v === null ? "—" : `${v.toFixed(1)}%`);
+      lines.push(
+        `| **${derivedName}** | ${fmt(stats.median)} | ${fmt(stats.mean)} | ${fmt(stats.p25)} | ${fmt(stats.p75)} | ${fmt(stats.min)} | ${fmt(stats.max)} |`
+      );
+    }
+    lines.push("");
+  }
 
+  lines.push(`### Peer Size Context — Absolute Values (${validPeers.length} peers with data)`);
+  lines.push("");
+  lines.push("*Absolute dollar figures reflect the size mix of the sampled peers — use them for scale context, not as performance benchmarks. Only the ratio statistics above are directly comparable across companies.*");
+  lines.push("");
+  lines.push(...tableHeader);
+
+  for (const metricName of input.metrics) {
+    const stats = computeStats(requestedValuesFor(metricName));
     lines.push(
-      `| **${derivedName}** | ${fmt(stats.median)} | ${fmt(stats.mean)} | ${fmt(stats.p25)} | ${fmt(stats.p75)} | ${fmt(stats.min)} | ${fmt(stats.max)} |`
+      `| **${metricName}** | ${formatValue(stats.median)} | ${formatValue(stats.mean)} | ${formatValue(stats.p25)} | ${formatValue(stats.p75)} | ${formatValue(stats.min)} | ${formatValue(stats.max)} |`
+    );
+  }
+
+  for (const derivedName of absoluteDerived) {
+    const stats = computeStats(derivedValuesFor(derivedName));
+    lines.push(
+      `| **${derivedName}** | ${formatValue(stats.median)} | ${formatValue(stats.mean)} | ${formatValue(stats.p25)} | ${formatValue(stats.p75)} | ${formatValue(stats.min)} | ${formatValue(stats.max)} |`
     );
   }
 

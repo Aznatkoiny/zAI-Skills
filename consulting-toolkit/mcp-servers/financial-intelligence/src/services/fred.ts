@@ -1,5 +1,5 @@
 import axios, { type AxiosInstance } from "axios";
-import { FRED_BASE_URL, FRED_OBSERVATIONS_URL, RATE_LIMITS } from "../constants.js";
+import { FRED_BASE_URL, RATE_LIMITS } from "../constants.js";
 import type { FredSeriesInfo, FredObservation, MacroIndicatorData } from "../types.js";
 import { RateLimiter } from "./rate-limiter.js";
 

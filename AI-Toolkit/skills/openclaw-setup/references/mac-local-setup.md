@@ -112,7 +112,7 @@ The wizard presents each step in order. Here's what each one means and the recom
 
 5. **Auth/LLM provider** — Choose **Anthropic API key** (recommended) or **Anthropic OAuth via Claude Code CLI** (if you have a Pro/Max subscription). Other options: OpenAI, Google Gemini, OpenRouter, and more. See `anthropic-auth.md` for guidance.
 
-6. **Model selection** — Pick default model. Recommended: **claude-opus-4-5** for capability and security. Wizard validates model availability against your auth.
+6. **Model selection** — Pick default model. Recommended: **claude-opus-5** for capability and security (claude-sonnet-5 for a cost-efficient alternative). Wizard validates model availability against your auth.
 
 7. **Channel setup** — Select messaging channels to enable. See `telegram-channel.md` and `imessage-channel.md`.
 

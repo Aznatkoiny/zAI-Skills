@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { filingTextSchema } from "../schemas/inputs.js";
-import { getFilings, getFilingDocument, getCompanyInfo } from "../services/edgar.js";
+import { getFilings, getFilingDocument } from "../services/edgar.js";
 import { MAX_FILING_TEXT_LENGTH } from "../constants.js";
 
 type FilingInput = z.infer<typeof filingTextSchema>;

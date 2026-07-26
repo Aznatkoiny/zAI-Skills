@@ -5,7 +5,7 @@ description: >
   risk assessment, and systematic evaluation of companies or
   opportunities. Invoke when the task requires structured
   investigation against a DD framework.
-model: opus
+model: sonnet
 tools: Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch
 color: red
 ---

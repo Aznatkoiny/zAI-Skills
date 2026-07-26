@@ -34,14 +34,26 @@ export async function getGlassdoorCompanyInfo(
 
     // Try to find company overview link from search results
     const companyLink = $search("a[href*='/Overview/'], a[data-test='employer-short-name']").first().attr("href");
-    let overviewUrl = companyLink
+    const overviewUrl = companyLink
       ? (companyLink.startsWith("http") ? companyLink : `${GLASSDOOR_BASE_URL}${companyLink}`)
       : null;
 
-    // If no search results, try direct URL pattern
+    // Without a real overview link there is no valid URL to guess (Glassdoor
+    // overview URLs require the numeric employer id), so fail explicitly
+    // instead of burning a rate-limit slot on a guaranteed-dead request.
     if (!overviewUrl) {
-      const slug = company.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-");
-      overviewUrl = `${GLASSDOOR_BASE_URL}/Overview/Working-at-${slug}-EI_IE0.htm`;
+      return {
+        name: company,
+        industry: null,
+        size: null,
+        rating: null,
+        culture_ratings: null,
+        interview_process: null,
+        headquarters: null,
+        founded: null,
+        revenue: null,
+        error: `Glassdoor search returned no overview page for "${company}" (status ${searchResponse.status}) — likely bot-blocked or the company is not listed; fall back to WebSearch.`,
+      };
     }
 
     await limiter.acquire();
@@ -69,6 +81,7 @@ export async function getGlassdoorCompanyInfo(
         headquarters: null,
         founded: null,
         revenue: null,
+        error: `Glassdoor returned ${overviewResponse.status} — likely bot-blocked; fall back to WebSearch.`,
       };
     }
 
@@ -119,17 +132,19 @@ export async function getGlassdoorCompanyInfo(
       revenue,
     };
   } catch (err) {
-    console.error("Glassdoor company info error:", err instanceof Error ? err.message : String(err));
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("Glassdoor company info error:", message);
     return {
       name: company,
       industry: null,
       size: null,
       rating: null,
       culture_ratings: null,
-      interview_process: `Error fetching company info: ${err instanceof Error ? err.message : String(err)}`,
+      interview_process: null,
       headquarters: null,
       founded: null,
       revenue: null,
+      error: `Error fetching company info from Glassdoor: ${message}. The site may be bot-blocked; fall back to WebSearch.`,
     };
   }
 }

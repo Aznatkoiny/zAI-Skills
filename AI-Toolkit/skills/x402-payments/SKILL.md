@@ -14,6 +14,8 @@ description: |
 
 # x402 Protocol Skill
 
+> Facts current as of July 2026 — verify pricing and model IDs against https://docs.claude.com, and protocol/package details against the x402 docs.
+
 ## Protocol Overview
 
 x402 embeds stablecoin payments into HTTP by using the 402 "Payment Required" status code. A server responds with payment requirements; the client signs a payment authorization, resubmits the request, and gets the resource after verification and settlement.

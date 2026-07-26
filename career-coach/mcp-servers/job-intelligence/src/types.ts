@@ -7,6 +7,8 @@ export interface JobListing {
   description: string;
   posted_date: string | null;
   source: "indeed" | "linkedin" | "trueup";
+  /** Set when this entry is an error placeholder rather than a real listing. */
+  error?: string;
 }
 
 export interface CompanyInfo {
@@ -19,6 +21,8 @@ export interface CompanyInfo {
   headquarters: string | null;
   founded: string | null;
   revenue: string | null;
+  /** Set when the lookup failed (e.g. bot-blocked) rather than returning real data. */
+  error?: string;
 }
 
 export interface SalaryData {
@@ -50,4 +54,6 @@ export interface TrendingRole {
   growth_rate: string | null;
   avg_salary: string | null;
   demand_level: "high" | "medium" | "low" | null;
+  /** Set when this entry is an error placeholder rather than a real role. */
+  error?: string;
 }

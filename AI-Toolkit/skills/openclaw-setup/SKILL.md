@@ -11,6 +11,8 @@ Deploy and configure OpenClaw — the open-source personal AI assistant (145k+ G
 - Docs: https://docs.openclaw.ai
 - Created by: Peter Steinberger (founder of PSPDFKit)
 
+> Facts current as of July 2026 — verify pricing and model IDs against https://docs.claude.com before quoting them.
+
 ## What is OpenClaw?
 
 OpenClaw is a self-hosted, conversation-first AI assistant built on LLMs. Originally launched as "Clawdbot" (November 2025), renamed to "Moltbot" (January 27, 2026) after Anthropic trademark concerns, then became "OpenClaw" (January 30, 2026). It runs a local Gateway (WebSocket control plane) on your machine or server and connects to messaging channels you already use — Telegram, iMessage, WhatsApp, Discord, Slack, and 50+ others. The assistant responds through those channels using models from Anthropic, OpenAI, or other providers.
@@ -18,7 +20,7 @@ OpenClaw is a self-hosted, conversation-first AI assistant built on LLMs. Origin
 Key facts:
 - **Runtime:** Node.js ≥22.12.0, TypeScript, pnpm monorepo
 - **Architecture:** Gateway (control plane) → Pi agent (RPC) → LLM provider
-- **Recommended model:** Anthropic Claude Opus 4.5 via OAuth (Pro/Max subscription) for best prompt-injection resistance and long-context strength
+- **Recommended model:** Anthropic Claude Opus 5 (`claude-opus-5`) via OAuth (Pro/Max subscription) for best prompt-injection resistance and long-context strength; Claude Sonnet 5 (`claude-sonnet-5`) is the cost-efficient alternative, with Claude Haiku 4.5 (`claude-haiku-4-5`) for lightweight channels and heartbeat
 - **Install method:** `curl -fsSL https://openclaw.ai/install.sh | bash` then `openclaw onboard --install-daemon`
 - **Config location:** `~/.openclaw/openclaw.json` (JSON5 format)
 - **Default port:** 18789 (WebSocket + HTTP multiplexed)
@@ -150,7 +152,7 @@ Minimal safe config (Anthropic + Telegram + secure defaults):
 ```json5
 {
   agent: {
-    model: "anthropic/claude-opus-4-5"
+    model: "anthropic/claude-opus-5"
   },
   gateway: {
     bind: "loopback",

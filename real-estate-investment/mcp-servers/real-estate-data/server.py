@@ -6,15 +6,89 @@ Redfin Data Center, Rentcast, Mashvisor, AirDNA, and ATTOM.
 """
 
 from mcp.server.fastmcp import FastMCP
+import datetime
 import os
 import json
+import re
 import urllib.request
 import urllib.parse
 import urllib.error
-import gzip
-from io import BytesIO
 
 mcp = FastMCP("real-estate-data")
+
+
+# ============================================================================
+# Shared Helpers
+# ============================================================================
+
+def _validate_geography(state_fips: str, county_fips: str = "", tract: str = "") -> str:
+    """Validate Census FIPS geography inputs. Returns an error message, or "" if valid."""
+    if not re.fullmatch(r"\d{2}", state_fips):
+        return "Invalid state_fips: must be exactly 2 digits (e.g., '06' for California)."
+    if county_fips and not re.fullmatch(r"\d{3}", county_fips):
+        return "Invalid county_fips: must be exactly 3 digits (e.g., '037' for Los Angeles County)."
+    if tract and not re.fullmatch(r"\d{6}", tract):
+        return "Invalid tract: must be exactly 6 digits (e.g., '101110')."
+    if tract and not county_fips:
+        return ("tract requires county_fips: census tracts are only unique within a county, "
+                "so provide the 3-digit county_fips along with the tract.")
+    return ""
+
+
+def _validate_zip(zip_code: str) -> str:
+    """Validate a 5-digit ZIP code. Returns an error message, or "" if valid."""
+    if not re.fullmatch(r"\d{5}", zip_code):
+        return "Invalid zip_code: must be exactly 5 digits (e.g., '90001')."
+    return ""
+
+
+def _fetch_acs(variables: list, geography: str, api_key: str, year: int):
+    """Fetch ACS 5-year data from the Census API.
+
+    If year is 0 (not specified), tries the latest likely vintage
+    (current year minus 2) and falls back one more year if that vintage
+    is not yet published (HTTP 404).
+
+    Returns (data, vintage_year). Raises urllib.error.HTTPError/URLError
+    on unrecoverable errors.
+    """
+    if year:
+        candidates = [year]
+    else:
+        latest = datetime.date.today().year - 2
+        candidates = [latest, latest - 1]
+
+    params = {"get": ",".join(variables), "key": api_key}
+    query = urllib.parse.urlencode(params)
+
+    for i, vintage in enumerate(candidates):
+        url = f"https://api.census.gov/data/{vintage}/acs/acs5?{query}&{geography}"
+        try:
+            with urllib.request.urlopen(url, timeout=30) as response:
+                return json.loads(response.read().decode()), vintage
+        except urllib.error.HTTPError as e:
+            if e.code == 404 and i < len(candidates) - 1:
+                continue
+            raise
+
+
+def _attom_address_params(address: str):
+    """Split a one-line address into ATTOM's address1/address2 query parameters.
+
+    ATTOM's propertyapi requires the street portion (address1) and the
+    city/state/zip portion (address2) as separate parameters rather than a
+    single address string.
+
+    Returns (params, error): params is a dict and error is "" on success;
+    params is None and error is a message on failure.
+    """
+    address1, _, address2 = address.partition(",")
+    address1 = address1.strip()
+    address2 = address2.strip()
+    if not address1 or not address2:
+        return None, ("Address must include a comma separating the street from the "
+                      "city/state/zip (e.g., '123 Main St, Los Angeles, CA 90001').")
+    return {"address1": address1, "address2": address2}, ""
 
 
 # ============================================================================
@@ -22,18 +96,26 @@ mcp = FastMCP("real-estate-data")
 # ============================================================================
 
 @mcp.tool()
-def get_census_demographics(state_fips: str, county_fips: str = "", tract: str = "") -> str:
+def get_census_demographics(state_fips: str, county_fips: str = "", tract: str = "", year: int = 0) -> str:
     """
     Get demographic data from Census Bureau's ACS 5-year survey.
 
     Args:
         state_fips: Two-digit state FIPS code (e.g., "06" for California)
         county_fips: Three-digit county FIPS code (optional, e.g., "037" for Los Angeles)
-        tract: Six-digit census tract code (optional)
+        tract: Six-digit census tract code (optional; requires county_fips)
+        year: ACS vintage year (optional, e.g., 2023). Defaults to the latest
+            likely vintage (current year minus 2), falling back one more year
+            if that vintage is not yet published.
 
     Returns:
-        JSON string with population, income, rent, and housing statistics
+        JSON string with population, income, rent, and housing statistics,
+        including the ACS vintage year used ("acs_vintage")
     """
+    validation_error = _validate_geography(state_fips, county_fips, tract)
+    if validation_error:
+        return json.dumps({"error": validation_error})
+
     api_key = os.environ.get("CENSUS_API_KEY", "")
     if not api_key:
         return json.dumps({
@@ -61,27 +143,18 @@ def get_census_demographics(state_fips: str, county_fips: str = "", tract: str =
     else:
         geography = f"for=state:{state_fips}"
 
-    # Build URL
-    base_url = "https://api.census.gov/data/2022/acs/acs5"
-    params = {
-        "get": ",".join(variables),
-        "key": api_key
-    }
-    url = f"{base_url}?{urllib.parse.urlencode(params)}&{geography}"
-
     try:
-        with urllib.request.urlopen(url, timeout=30) as response:
-            data = json.loads(response.read().decode())
+        data, vintage = _fetch_acs(variables, geography, api_key, year)
 
         if len(data) < 2:
             return json.dumps({"error": "No data returned from Census API"})
 
         # Parse response (first row is headers, second row is data)
-        headers = data[0]
         values = data[1]
 
         # Create result dictionary
         result = {
+            "acs_vintage": vintage,
             "total_population": int(values[0]) if values[0] and values[0] != "-666666666" else None,
             "median_household_income": int(values[1]) if values[1] and values[1] != "-666666666" else None,
             "median_gross_rent": int(values[2]) if values[2] and values[2] != "-666666666" else None,
@@ -116,17 +189,25 @@ def get_census_demographics(state_fips: str, county_fips: str = "", tract: str =
 
 
 @mcp.tool()
-def get_census_housing_stats(state_fips: str, county_fips: str = "") -> str:
+def get_census_housing_stats(state_fips: str, county_fips: str = "", year: int = 0) -> str:
     """
     Get housing statistics from Census Bureau including median home value and year built data.
 
     Args:
         state_fips: Two-digit state FIPS code (e.g., "06" for California)
         county_fips: Three-digit county FIPS code (optional, e.g., "037" for Los Angeles)
+        year: ACS vintage year (optional, e.g., 2023). Defaults to the latest
+            likely vintage (current year minus 2), falling back one more year
+            if that vintage is not yet published.
 
     Returns:
-        JSON string with median home value and housing age distribution
+        JSON string with median home value and housing age distribution,
+        including the ACS vintage year used ("acs_vintage")
     """
+    validation_error = _validate_geography(state_fips, county_fips)
+    if validation_error:
+        return json.dumps({"error": validation_error})
+
     api_key = os.environ.get("CENSUS_API_KEY", "")
     if not api_key:
         return json.dumps({
@@ -156,17 +237,8 @@ def get_census_housing_stats(state_fips: str, county_fips: str = "") -> str:
     else:
         geography = f"for=state:{state_fips}"
 
-    # Build URL
-    base_url = "https://api.census.gov/data/2022/acs/acs5"
-    params = {
-        "get": ",".join(variables),
-        "key": api_key
-    }
-    url = f"{base_url}?{urllib.parse.urlencode(params)}&{geography}"
-
     try:
-        with urllib.request.urlopen(url, timeout=30) as response:
-            data = json.loads(response.read().decode())
+        data, vintage = _fetch_acs(variables, geography, api_key, year)
 
         if len(data) < 2:
             return json.dumps({"error": "No data returned from Census API"})
@@ -176,6 +248,7 @@ def get_census_housing_stats(state_fips: str, county_fips: str = "") -> str:
 
         # Create result dictionary
         result = {
+            "acs_vintage": vintage,
             "median_home_value": int(values[0]) if values[0] and values[0] != "-666666666" else None,
             "state_fips": state_fips,
             "county_fips": county_fips if county_fips else None,
@@ -209,14 +282,15 @@ def get_census_housing_stats(state_fips: str, county_fips: str = "") -> str:
 # ============================================================================
 
 @mcp.tool()
-def get_redfin_market_data(region_type: str = "metro", time_period: str = "monthly") -> str:
+def get_redfin_market_data(region_type: str = "metro") -> str:
     """
     Get information about Redfin market data files and how to access them.
     Note: These are large TSV files (hundreds of MB) - this tool provides URLs and guidance.
 
     Args:
-        region_type: Type of region data ("national" or "metro")
-        time_period: Time period for data ("monthly" is the primary option)
+        region_type: Geographic level of the data file. Must be one of
+            "national", "metro", "city", "zip", or "neighborhood".
+            Defaults to "metro".
 
     Returns:
         JSON string with download URLs, column descriptions, and usage guidance
@@ -232,7 +306,10 @@ def get_redfin_market_data(region_type: str = "metro", time_period: str = "month
     }
 
     if region_type not in files:
-        region_type = "metro"
+        return json.dumps({
+            "error": f"Invalid region_type: '{region_type}'.",
+            "valid_region_types": list(files.keys())
+        })
 
     file_url = base_url + files[region_type]
 
@@ -342,6 +419,10 @@ def get_rentcast_market_data(zip_code: str) -> str:
     Returns:
         JSON string with market stats including median rent, rent growth, and vacancy rate
     """
+    validation_error = _validate_zip(zip_code)
+    if validation_error:
+        return json.dumps({"error": validation_error})
+
     api_key = os.environ.get("RENTCAST_API_KEY", "")
     if not api_key:
         return json.dumps({
@@ -395,6 +476,10 @@ def get_mashvisor_property(address: str, state: str, city: str, zip_code: str) -
     Returns:
         JSON string with property details, STR/LTR estimates, and neighborhood score
     """
+    validation_error = _validate_zip(zip_code)
+    if validation_error:
+        return json.dumps({"error": validation_error})
+
     api_key = os.environ.get("MASHVISOR_API_KEY", "")
     if not api_key:
         return json.dumps({
@@ -448,6 +533,11 @@ def get_mashvisor_neighborhood(city: str, state: str, zip_code: str = "") -> str
     Returns:
         JSON string with neighborhood analysis including investment score, cash on cash, cap rate
     """
+    if zip_code:
+        validation_error = _validate_zip(zip_code)
+        if validation_error:
+            return json.dumps({"error": validation_error})
+
     api_key = os.environ.get("MASHVISOR_API_KEY", "")
     if not api_key:
         return json.dumps({
@@ -494,12 +584,14 @@ def get_mashvisor_neighborhood(city: str, state: str, zip_code: str = "") -> str
 # ============================================================================
 
 @mcp.tool()
-def get_airdna_rentalizer(address: str) -> str:
+def get_airdna_rentalizer(address: str, bedrooms: int, bathrooms: float) -> str:
     """
-    Get short-term rental revenue projections for a property from AirDNA.
+    Get short-term rental revenue projections for a property from AirDNA's Rentalizer.
 
     Args:
         address: Full property address (e.g., "123 Main St, Los Angeles, CA 90001")
+        bedrooms: Number of bedrooms (e.g., 3)
+        bathrooms: Number of bathrooms (e.g., 2 or 2.5)
 
     Returns:
         JSON string with STR revenue projection, ADR, occupancy rate, and RevPAR
@@ -511,14 +603,18 @@ def get_airdna_rentalizer(address: str) -> str:
             "info": "Sign up for an API key at https://www.airdna.co/vacation-rental-data"
         })
 
-    # Build URL with query parameters
-    base_url = "https://api.airdna.co/v2/rentalizer"
-    params = {"address": address}
-    url = f"{base_url}?{urllib.parse.urlencode(params)}"
+    # Rentalizer estimates are requested via POST with a JSON body
+    url = "https://api.airdna.co/api/enterprise/v2/rentalizer/estimate"
+    payload = json.dumps({
+        "address": address,
+        "bedrooms": bedrooms,
+        "bathrooms": bathrooms
+    }).encode()
 
     # Create request with bearer token
-    req = urllib.request.Request(url)
+    req = urllib.request.Request(url, data=payload, method="POST")
     req.add_header("Authorization", f"Bearer {api_key}")
+    req.add_header("Content-Type", "application/json")
     req.add_header("Accept", "application/json")
 
     try:
@@ -599,11 +695,16 @@ def get_attom_property(address: str) -> str:
     Get detailed property information from ATTOM Data Solutions.
 
     Args:
-        address: Full property address (e.g., "123 Main St, Los Angeles, CA 90001")
+        address: Full property address with a comma between the street and the
+            city/state/zip (e.g., "123 Main St, Los Angeles, CA 90001")
 
     Returns:
         JSON string with property details, lot size, building size, year built, bed/bath count
     """
+    params, address_error = _attom_address_params(address)
+    if address_error:
+        return json.dumps({"error": address_error})
+
     api_key = os.environ.get("ATTOM_API_KEY", "")
     if not api_key:
         return json.dumps({
@@ -611,9 +712,8 @@ def get_attom_property(address: str) -> str:
             "info": "Sign up for an API key at https://api.developer.attomdata.com/"
         })
 
-    # Build URL with query parameters
+    # ATTOM requires the street (address1) and city/state/zip (address2) split
     base_url = "https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/detail"
-    params = {"address": address}
     url = f"{base_url}?{urllib.parse.urlencode(params)}"
 
     # Create request with API key header
@@ -645,11 +745,16 @@ def get_attom_valuation(address: str) -> str:
     Get automated valuation model (AVM) estimate from ATTOM Data Solutions.
 
     Args:
-        address: Full property address (e.g., "123 Main St, Los Angeles, CA 90001")
+        address: Full property address with a comma between the street and the
+            city/state/zip (e.g., "123 Main St, Los Angeles, CA 90001")
 
     Returns:
         JSON string with AVM estimate, confidence score, and comparable sales
     """
+    params, address_error = _attom_address_params(address)
+    if address_error:
+        return json.dumps({"error": address_error})
+
     api_key = os.environ.get("ATTOM_API_KEY", "")
     if not api_key:
         return json.dumps({
@@ -657,9 +762,8 @@ def get_attom_valuation(address: str) -> str:
             "info": "Sign up for an API key at https://api.developer.attomdata.com/"
         })
 
-    # Build URL with query parameters
+    # ATTOM requires the street (address1) and city/state/zip (address2) split
     base_url = "https://api.gateway.attomdata.com/propertyapi/v1.0.0/valuation/homevaluation"
-    params = {"address": address}
     url = f"{base_url}?{urllib.parse.urlencode(params)}"
 
     # Create request with API key header

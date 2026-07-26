@@ -6,10 +6,8 @@ import { CHARACTER_LIMIT } from "../constants.js";
 type TrendingRolesInput = z.infer<typeof trendingRolesSchema>;
 
 export async function handleTrendingRoles(input: TrendingRolesInput): Promise<string> {
-  const { industry, location } = input;
+  const { industry } = input;
 
-  // Note: TrueUp trending page does not support location-based filtering.
-  // The location parameter is included in the output header for context only.
   const roles = await getTrueUpTrendingRoles(industry);
 
   const lines: string[] = [
@@ -18,7 +16,7 @@ export async function handleTrendingRoles(input: TrendingRolesInput): Promise<st
   ];
 
   if (industry) lines.push(`**Industry:** ${industry}`);
-  if (location) lines.push(`**Location:** ${location}`);
+  lines.push(`**Scope:** Global (TrueUp trending data has no location filter)`);
   lines.push(`**Roles Found:** ${roles.length}`);
   lines.push("");
 
@@ -28,8 +26,8 @@ export async function handleTrendingRoles(input: TrendingRolesInput): Promise<st
   }
 
   // Check for error placeholders
-  if (roles.length === 1 && roles[0].title.startsWith("[")) {
-    lines.push("Could not retrieve trending roles data from TrueUp. The site may be temporarily unavailable or its structure may have changed.");
+  if (roles.length === 1 && roles[0].error) {
+    lines.push(`Could not retrieve trending roles data: ${roles[0].error}`);
     lines.push("");
     lines.push("Try visiting https://www.trueup.io/trending directly for the latest data.");
     return lines.join("\n");

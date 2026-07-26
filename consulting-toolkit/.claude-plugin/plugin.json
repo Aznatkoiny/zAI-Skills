@@ -1,10 +1,20 @@
 {
   "name": "consulting-toolkit",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Multi-agent consulting system with an Engagement Manager orchestrating Research, Finance, Deck, and Due Diligence agents. Includes 15 consulting slash commands, strategy frameworks, and a Financial Intelligence MCP server for real-time financial data access.",
-  "author": { "name": "Antony Zaki" },
+  "author": {
+    "name": "Antony Zaki"
+  },
   "homepage": "https://github.com/Aznatkoiny/zAI-Skills",
   "repository": "https://github.com/Aznatkoiny/zAI-Skills",
   "license": "MIT",
-  "keywords": ["consulting", "strategy", "mece", "pyramid-principle", "due-diligence", "financial-modeling", "market-sizing"]
+  "keywords": [
+    "consulting",
+    "strategy",
+    "mece",
+    "pyramid-principle",
+    "due-diligence",
+    "financial-modeling",
+    "market-sizing"
+  ]
 }

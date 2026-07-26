@@ -1,12 +1,13 @@
 import { z } from "zod";
+import { MAX_JOB_RESULTS } from "../constants.js";
 
 export const searchJobsSchema = z.object({
   query: z.string().describe("Job search query (e.g., 'Senior Software Engineer')"),
   location: z.string().optional().describe("Location filter (e.g., 'San Francisco, CA' or 'Remote')"),
   remote: z.boolean().optional().default(false).describe("Filter for remote-only positions"),
-  salary_min: z.number().optional().describe("Minimum salary filter in USD"),
+  salary_min: z.number().optional().describe("Minimum annual salary filter in USD (hourly listings are annualized at 40h/week before comparison)"),
   experience_level: z.enum(["entry", "mid", "senior", "lead", "executive"]).optional().describe("Experience level filter"),
-  limit: z.number().int().min(1).max(25).optional().default(10).describe("Maximum number of results (default 10)"),
+  limit: z.number().int().min(1).max(MAX_JOB_RESULTS).optional().default(10).describe("Maximum number of results (default 10)"),
 });
 
 export const companyInfoSchema = z.object({
@@ -24,7 +25,8 @@ export const interviewExperiencesSchema = z.object({
   role: z.string().optional().describe("Specific role to filter by"),
 });
 
+// Note: no location parameter — TrueUp trending data has no location filter,
+// so results are always global.
 export const trendingRolesSchema = z.object({
   industry: z.string().optional().describe("Industry to filter by (e.g., 'AI/ML', 'FinTech', 'Healthcare')"),
-  location: z.string().optional().describe("Location to filter by"),
 });

@@ -61,7 +61,10 @@ Every model must follow this architecture:
 
 ## 3. Build
 
-- Create models as xlsx files using the xlsx skill.
+- Create models as xlsx files. This plugin does not ship an xlsx skill, so choose the first available option:
+  1. If an `xlsx` skill is available in your environment, use it.
+  2. Otherwise, write a Python script that builds the workbook with `openpyxl` and run it via Bash (`pip install openpyxl` if needed). One worksheet per sheet in the architecture above, with real formulas (e.g., `=Assumptions!B4*Calculations!C7`) so scenario toggles work when opened.
+  3. If Python or openpyxl is unavailable, emit the model as structured markdown plus one CSV file per sheet (`financial-model-[topic]-assumptions.csv`, etc.), with formula logic documented in the markdown. State explicitly in your output that you fell back and why.
 - No magic numbers: every cell that contains a hardcoded value must be on the Assumptions sheet. If you find yourself typing a number into a calculation cell, stop and move it to Assumptions.
 - Label everything: row headers, column headers, sheet tabs, formula annotations.
 - Build error checks: sum validations, sign checks, reasonableness bounds. If revenue is negative or margins exceed 100%, the model should flag it.
@@ -94,7 +97,7 @@ A spreadsheet without a narrative is a black box. Every model must be accompanie
 ## Output Standards
 
 Every modeling assignment produces two files:
-1. **xlsx model**: Following the 5-sheet architecture above. Named descriptively: `financial-model-[topic].xlsx`
+1. **xlsx model**: Following the 5-sheet architecture above. Named descriptively: `financial-model-[topic].xlsx` (or the markdown + CSV fallback described in Build step 3, if xlsx generation is unavailable)
 2. **Narrative companion**: A markdown document summarizing the model's findings, key drivers, sensitivities, and risks. Named: `financial-model-[topic]-narrative.md`
 
 Both saved to the working directory.
@@ -114,5 +117,6 @@ Both saved to the working directory.
 <skills>
 ## Skills Available
 - consulting-frameworks: Financial frameworks (NPV/IRR, Build/Buy/Partner, Zero-Based Budgeting, Should-Cost Modeling)
-- xlsx: Spreadsheet creation, formatting, and formula support
+
+Note: this plugin does not ship an xlsx skill. Use one only if the environment provides it; otherwise follow the openpyxl-via-Bash or markdown/CSV fallback in the Build step.
 </skills>

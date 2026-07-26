@@ -340,49 +340,96 @@ torch::Tensor efficient_stack(const std::vector<Experience>& batch,
 
 ### Gradient Checkpointing
 
-For large models, trade compute for memory with gradient checkpointing.
+LibTorch has no simple public equivalent of Python's `torch.utils.checkpoint`
+— the Python API is built on autograd machinery that is not exposed as a C++
+helper. Do NOT fake it by detaching inside `forward()`: detaching truncates
+the autograd graph and silently produces wrong (zero) gradients for every
+layer below the detach point.
+
+A correct manual alternative is segment-wise recomputation: run the forward
+pass with no graph (keeping only each segment's input), then during backward
+re-run one segment at a time with gradients enabled and chain the gradients
+by hand. Peak memory holds one segment's activations instead of the whole
+model's, at the cost of a second forward pass.
 
 ```cpp
 #include <torch/torch.h>
+#include <functional>
+#include <vector>
 
-// Manual checkpointing for segments
-torch::Tensor checkpoint_forward(
-    torch::nn::Sequential& segment,
-    torch::Tensor input
-) {
-    if (torch::autograd::GradMode::is_enabled()) {
-        // During training: use checkpointing
-        auto detached = input.detach();
-        detached.set_requires_grad(true);
+class CheckpointedModel {
+public:
+    explicit CheckpointedModel(std::vector<torch::nn::Sequential> segments)
+        : segments_(std::move(segments)) {}
 
-        auto output = segment->forward(detached);
-
-        // Store function to recompute
-        return torch::autograd::make_variable(
-            output.data(),
-            /*requires_grad=*/true
-        );
-    } else {
-        // During inference: normal forward
-        return segment->forward(input);
+    // 1. Forward without building a graph; keep only segment inputs.
+    torch::Tensor forward_no_graph(torch::Tensor input) {
+        torch::NoGradGuard no_grad;
+        segment_inputs_.clear();
+        auto x = input;
+        for (auto& segment : segments_) {
+            segment_inputs_.push_back(x);
+            x = segment->forward(x);
+        }
+        return x;
     }
-}
+
+    // 2. Recompute segments in reverse, one at a time, with grad enabled.
+    //    `loss_fn` maps the final segment output to a scalar loss.
+    //    Parameter .grad() fields are accumulated exactly as in a normal
+    //    backward pass; call optimizer.zero_grad() before as usual.
+    torch::Tensor backward_with_recompute(
+        const std::function<torch::Tensor(torch::Tensor)>& loss_fn) {
+        torch::Tensor loss, grad;
+        for (int64_t i = static_cast<int64_t>(segments_.size()) - 1; i >= 0; --i) {
+            auto input = segment_inputs_[i].detach().requires_grad_(true);
+            auto output = segments_[i]->forward(input);  // recompute WITH graph
+
+            if (i == static_cast<int64_t>(segments_.size()) - 1) {
+                loss = loss_fn(output);
+                loss.backward();          // grads for the last segment
+            } else {
+                output.backward(grad);    // chain grad from the segment above
+            }
+            grad = input.grad();          // pass down to the previous segment
+        }
+        return loss;
+    }
+
+private:
+    std::vector<torch::nn::Sequential> segments_;
+    std::vector<torch::Tensor> segment_inputs_;
+};
+
+// Usage:
+//   auto out  = model.forward_no_graph(states);  // low-memory forward
+//   auto loss = model.backward_with_recompute(
+//       [&](torch::Tensor pred) { return torch::mse_loss(pred, targets); });
+//   optimizer.step();
 ```
+
+Caveat: recomputation must be deterministic. Layers with stochastic forward
+passes (e.g. dropout) or running statistics (batch norm in training mode)
+will recompute different values than the first pass — handle their state
+explicitly or avoid checkpointing those segments.
 
 ### Mixed Precision Training
 
 ```cpp
 // Use automatic mixed precision (AMP) with CUDA
+#include <ATen/autocast_mode.h>
+
 class MixedPrecisionTrainer {
 public:
     void train_step(torch::Tensor states, torch::Tensor targets) {
         optimizer_->zero_grad();
 
-        // Forward in FP16
-        at::autocast::set_enabled(true);
+        // Forward in FP16 (PyTorch >= 2.4: autocast API takes a device type)
+        at::autocast::set_autocast_enabled(at::kCUDA, true);
         auto output = model_->forward(states);
         auto loss = torch::mse_loss(output, targets);
-        at::autocast::set_enabled(false);
+        at::autocast::set_autocast_enabled(at::kCUDA, false);
+        at::autocast::clear_cache();
 
         // Scale loss and backward
         auto scaled_loss = loss * loss_scale_;

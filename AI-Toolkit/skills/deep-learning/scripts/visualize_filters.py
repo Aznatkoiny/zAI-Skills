@@ -3,7 +3,8 @@
 Convnet Filter Visualization Script
 
 Visualize what patterns convnet filters respond to using gradient ascent.
-Works with any Keras model that has Conv2D layers.
+Works with any Keras model that has convolution layers (Conv2D,
+SeparableConv2D, DepthwiseConv2D).
 
 Usage:
     python visualize_filters.py --model path/to/model.keras --layer conv2d_5
@@ -27,6 +28,13 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import argparse
 
+# Convolution layer types eligible for filter visualization
+CONV_LAYER_TYPES = (
+    keras.layers.Conv2D,
+    keras.layers.SeparableConv2D,
+    keras.layers.DepthwiseConv2D,
+)
+
 
 def deprocess_image(img: np.ndarray) -> np.ndarray:
     """
@@ -44,8 +52,10 @@ def deprocess_image(img: np.ndarray) -> np.ndarray:
     img /= img.std() + 1e-5
     img *= 0.15
 
-    # Center crop
-    img = img[25:-25, 25:-25, :]
+    # Center crop a 12.5% border to remove edge artifacts
+    margin = min(img.shape[0], img.shape[1]) // 8
+    if margin > 0:
+        img = img[margin:-margin, margin:-margin, :]
 
     # Clip to [0, 1]
     img += 0.5
@@ -109,7 +119,7 @@ def visualize_layer_filters(
 
     Args:
         model: Keras model
-        layer_name: Name of the Conv2D layer to visualize
+        layer_name: Name of the convolution layer to visualize
         num_filters: Number of filters to visualize
         filters_per_row: Filters per row in the grid
         img_size: Size of each filter visualization
@@ -121,12 +131,23 @@ def visualize_layer_filters(
     except ValueError:
         print(f"Layer '{layer_name}' not found. Available layers:")
         for l in model.layers:
-            if isinstance(l, keras.layers.Conv2D):
+            if isinstance(l, CONV_LAYER_TYPES):
                 print(f"  - {l.name}")
         return
 
+    # Sequential models have no symbolic input until they are built
+    if isinstance(model, keras.Sequential) and not model.built:
+        model.build((None, img_size[0], img_size[1], 3))
+
+    try:
+        model_input = model.input
+    except (AttributeError, ValueError) as exc:
+        print(f"Cannot create feature extractor: model has no symbolic input ({exc}).")
+        print("Build or call the model on an input batch first, then retry.")
+        return
+
     # Create feature extractor
-    feature_extractor = keras.Model(inputs=model.input, outputs=layer.output)
+    feature_extractor = keras.Model(inputs=model_input, outputs=layer.output)
 
     # Limit to actual number of filters
     actual_filters = layer.output.shape[-1]
@@ -143,24 +164,24 @@ def visualize_layer_filters(
         all_imgs.append(img)
     print()
 
-    # Create grid
+    # Create grid (display size comes from the cropped images themselves)
     n_cols = filters_per_row
     n_rows = (num_filters + n_cols - 1) // n_cols
 
-    display_size = img_size[0] - 50  # Account for cropping
+    display_height, display_width = all_imgs[0].shape[:2]
     margin = 5
 
-    grid_width = n_cols * display_size + (n_cols - 1) * margin
-    grid_height = n_rows * display_size + (n_rows - 1) * margin
+    grid_width = n_cols * display_width + (n_cols - 1) * margin
+    grid_height = n_rows * display_height + (n_rows - 1) * margin
 
     grid = np.zeros((grid_height, grid_width, 3), dtype="uint8")
 
     for idx, img in enumerate(all_imgs):
         row = idx // n_cols
         col = idx % n_cols
-        y = row * (display_size + margin)
-        x = col * (display_size + margin)
-        grid[y:y + display_size, x:x + display_size, :] = img
+        y = row * (display_height + margin)
+        x = col * (display_width + margin)
+        grid[y:y + display_height, x:x + display_width, :] = img
 
     # Display
     plt.figure(figsize=(15, 15 * n_rows / n_cols))
@@ -176,13 +197,14 @@ def visualize_layer_filters(
 
 
 def list_conv_layers(model: keras.Model) -> list:
-    """List all Conv2D layers in a model."""
+    """List all convolution layers (Conv2D, SeparableConv2D, DepthwiseConv2D)."""
     conv_layers = []
     for layer in model.layers:
-        if isinstance(layer, keras.layers.Conv2D):
+        if isinstance(layer, CONV_LAYER_TYPES):
             conv_layers.append({
                 "name": layer.name,
-                "filters": layer.filters,
+                # DepthwiseConv2D has no `filters` attribute
+                "filters": getattr(layer, "filters", None),
                 "kernel_size": layer.kernel_size
             })
     return conv_layers
@@ -194,7 +216,7 @@ def main():
     parser.add_argument("--layer", type=str, help="Layer name to visualize")
     parser.add_argument("--num-filters", type=int, default=64, help="Number of filters")
     parser.add_argument("--output", type=str, help="Output image path")
-    parser.add_argument("--list-layers", action="store_true", help="List Conv2D layers")
+    parser.add_argument("--list-layers", action="store_true", help="List convolution layers")
 
     args = parser.parse_args()
 
@@ -203,16 +225,17 @@ def main():
     model = keras.models.load_model(args.model)
 
     if args.list_layers:
-        print("\nConv2D layers in model:")
+        print("\nConvolution layers in model:")
         for layer in list_conv_layers(model):
-            print(f"  {layer['name']}: {layer['filters']} filters, kernel {layer['kernel_size']}")
+            filters = layer['filters'] if layer['filters'] is not None else "depthwise"
+            print(f"  {layer['name']}: {filters} filters, kernel {layer['kernel_size']}")
         return
 
     if not args.layer:
         # Default to last conv layer
         conv_layers = list_conv_layers(model)
         if not conv_layers:
-            print("No Conv2D layers found in model!")
+            print("No convolution layers found in model!")
             return
         args.layer = conv_layers[-1]["name"]
         print(f"No layer specified, using last conv layer: {args.layer}")

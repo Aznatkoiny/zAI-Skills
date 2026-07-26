@@ -71,16 +71,12 @@ export interface StockQuote {
   ticker: string;
   name: string;
   price: number;
-  change: number;
-  changePercent: number;
-  marketCap: number | null;
-  peRatio: number | null;
-  forwardPE: number | null;
-  dividendYield: number | null;
+  change: number | null; // null when no previous close is available
+  changePercent: number | null;
   fiftyTwoWeekHigh: number;
   fiftyTwoWeekLow: number;
   avgVolume: number;
-  beta: number | null;
+  avgVolumeBars: number; // number of most-recent history bars averaged for avgVolume
 }
 
 export interface StockPricePoint {

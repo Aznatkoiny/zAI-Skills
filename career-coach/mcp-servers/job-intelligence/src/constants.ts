@@ -13,4 +13,5 @@ export const CHARACTER_LIMIT = 50_000;
 export const MAX_JOB_RESULTS = 25;
 export const MAX_SALARY_COMPARISONS = 10;
 
-export const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+// Keep this roughly in sync with current stable Chrome — a stale UA is an easy bot signal
+export const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36";

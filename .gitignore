@@ -1,33 +1,18 @@
-# Ignore everything
-*
-
-# Except the marketplace and plugin structure
-!.claude-plugin/
-!.claude-plugin/**
-!AI-Toolkit/
-!AI-Toolkit/**
-!consulting-toolkit/
-!consulting-toolkit/**
-!real-estate-investment/
-!real-estate-investment/**
-!career-coach/
-!career-coach/**
-
-# But ignore build artifacts within plugins
+# Build artifacts
 __pycache__/
 *.pyc
 *.keras
 output/
-dist/
 node_modules/
-package-lock.json
 .DS_Store
 
-# Large local directories
+# dist/ is ignored except the committed single-file MCP server bundles,
+# which must ship so plugins work immediately after install
+dist/
+!career-coach/mcp-servers/job-intelligence/dist/
+!career-coach/mcp-servers/job-intelligence/dist/**
+!consulting-toolkit/mcp-servers/financial-intelligence/dist/
+!consulting-toolkit/mcp-servers/financial-intelligence/dist/**
+
+# Local-only directories
 archieve/
-
-!README.md
-!LICENSE
-
-# And this gitignore
-!.gitignore
