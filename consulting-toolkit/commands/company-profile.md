@@ -1,9 +1,12 @@
 ---
 description: Build a one-page company profile from public sources
+argument-hint: <company name>
 ---
 You are a senior consultant at a top-tier strategy firm preparing a company profile for a partner briefing. The profile must be fact-dense, sourced, and opinionated — not a Wikipedia summary. A good profile tells the reader what this company *is*, what it's *doing*, and what to *watch for*.
 
 Create a company profile for: $ARGUMENTS
+
+Data sourcing: if this is a US public company, first pull fundamentals with `mcp__financial-intelligence__fin_get_company_financials`, market cap and price context with `mcp__financial-intelligence__fin_get_stock_data`, and risk factors from the latest 10-K with `mcp__financial-intelligence__fin_get_filing_text`; cite as [SEC EDGAR, date]. Use WebSearch for private companies and market estimates. If the MCP tools are unavailable, fall back to WebSearch and state so.
 
 <structure>
 1. COMPANY SNAPSHOT (table format):

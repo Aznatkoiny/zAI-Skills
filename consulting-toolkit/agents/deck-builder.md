@@ -5,6 +5,9 @@ description: >
   and visual narratives. Invoke when analysis needs to be converted
   into a persuasive, client-ready presentation. This agent handles
   both the narrative structure and the physical deck creation.
+  Examples: "turn this analysis into a board deck", "build the
+  SteerCo presentation storyline", "convert the DD memo into
+  client-ready slides".
 model: sonnet
 tools: Read, Write, Edit, Bash, Glob, Grep
 color: magenta

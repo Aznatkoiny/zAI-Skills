@@ -86,7 +86,7 @@ Always stored at the project root as `career-profile.json`.
     }
   ],
   "preferences": {
-    "industry_style": "string — Active output style name (e.g., 'software-engineering', 'ai-ml', 'sales', 'consulting')"
+    "industry_style": "string — Active industry style; selects the formatting reference in references/industry-styles/ ('software-engineering', 'ai-ml', 'sales', or 'consulting')"
   }
 }
 ```

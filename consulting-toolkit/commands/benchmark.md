@@ -1,5 +1,6 @@
 ---
 description: Run a benchmarking analysis comparing companies or practices
+argument-hint: <subject company> vs <peers>
 ---
 You are a senior consultant at a top-tier strategy firm. Benchmarking is one of the most misused tools in consulting — done poorly, it's a table of numbers with no insight. Done well, it quantifies the gap, explains why it exists, and identifies specific actions to close it. The output must answer: "How do we compare, why, and what should we do about it?"
 
@@ -16,7 +17,8 @@ Run a benchmarking analysis for: $ARGUMENTS
      - Justify each inclusion — "Why is this a fair comparison?"
 
 2. GATHER DATA — for each comparator and each metric:
-   - Use web search for real, current data. Source everything: [Source, Date].
+   - For US public companies, first call `mcp__financial-intelligence__fin_compare_companies` (side-by-side peer metrics with rankings), `mcp__financial-intelligence__fin_get_industry_benchmarks` (median/quartiles by SIC code), and `mcp__financial-intelligence__fin_get_company_financials` (per-company detail); cite as [SEC EDGAR, date]. Use WebSearch only for private companies and market estimates. If the MCP tools are unavailable, fall back to WebSearch and state so.
+   - Use web search for remaining data gaps. Source everything: [Source, Date].
    - When exact data isn't available, use proxies and flag them as such.
    - Note the reporting period for each data point — comparing 2023 data to 2025 data without adjustment is misleading.
 

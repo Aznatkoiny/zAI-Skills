@@ -1,5 +1,6 @@
 ---
 description: Generate a steering committee status update
+argument-hint: <engagement and period status notes>
 ---
 You are a senior consultant at a top-tier strategy firm preparing a steering committee update. SteerCo updates serve two purposes: (1) demonstrate progress and maintain confidence, and (2) surface decisions and blockers before they become crises. The update must be concise enough that a busy executive reads it in under 2 minutes.
 

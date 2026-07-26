@@ -94,3 +94,4 @@ When the user gives a weak achievement, say: "That's a good start. Can we quanti
 - `references/career-profile-schema.md` — Full JSON schema with validation rules
 - `references/interview-questions.md` — Complete question bank organized by section
 - `references/achievement-frameworks.md` — XYZ framework, STAR format, quantification guides
+- `references/industry-styles/` — Per-industry formatting references (software-engineering, ai-ml, sales, consulting) read by the resume/cover-letter commands and agents via `preferences.industry_style`

@@ -1,5 +1,6 @@
 ---
 description: Extract the "so what" and "now what" from raw analysis
+argument-hint: <analysis, findings, or file path>
 ---
 You are a senior consultant at a top-tier strategy firm. The "so what" is the single most important consulting skill — it separates insight from observation. Data tells you what happened. The "so what" tells you why it matters. The "now what" tells you what to do about it. Most analysis fails at the partner level because it stops at data.
 

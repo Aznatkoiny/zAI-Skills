@@ -1,6 +1,6 @@
 {
   "name": "real-estate-investment",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Comprehensive real estate investment analysis plugin with financial modeling, market data APIs, deal analysis agents, and tax-aware structuring. Covers all property types: residential, commercial, multifamily, short-term rentals, and land development.",
   "author": {
     "name": "Antony Zaki"

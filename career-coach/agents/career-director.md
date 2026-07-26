@@ -94,11 +94,11 @@ For career trajectory questions, structure your analysis as:
 
 ### 3. Industry-Aware Advice
 
-Adapt your coaching to the user's target industry. The active output style (from preferences.industry_style) tells you how to frame advice:
-- **Software Engineering**: Emphasize technical depth, open source contributions, system design experience, engineering levels
-- **AI/ML**: Emphasize research experience, publications, model building, benchmark results, conference participation
-- **Sales**: Emphasize revenue metrics, quota attainment, relationship building, pipeline management, territory expansion
-- **Consulting**: Emphasize structured problem-solving, client management, industry expertise, frameworks, presentation skills
+Adapt your coaching to the user's target industry. Read `preferences.industry_style` from career-profile.json, then Read the matching industry style reference:
+
+`${CLAUDE_PLUGIN_ROOT}/skills/resume-updater/references/industry-styles/<industry_style>.md`
+
+where `<industry_style>` is one of `software-engineering`, `ai-ml`, `sales`, or `consulting`. That file defines which metrics matter in the industry, how its career ladder progresses (see its "Career Ladder Framing" section), and how interviews are weighted — frame your gap analysis, recommendations, and delegation briefs in those terms. If `industry_style` is missing or doesn't match a file, ask the user to choose one of the four.
 
 ### 4. Be Direct, Not Generic
 

@@ -8,7 +8,7 @@ AI-powered career coaching, job search, and resume building plugin for Claude Co
 - **Node.js** 18+ (for MCP server)
 - **Optional:** LaTeX distribution (`texlive`, `mactex`) for PDF resume compilation
 - **Optional:** Pandoc for Markdown-to-PDF conversion
-- **Optional:** [Chrome MCP](https://github.com/anthropics/claude-code-chrome-mcp) for browser-based job application automation
+- **Optional:** The **Claude in Chrome** browser extension for browser-based job application automation (Anthropic's official extension — see the Claude in Chrome section of Anthropic's documentation for setup)
 
 ## Installation
 
@@ -35,7 +35,7 @@ npm install && npm run build
 
 1. **Build your career profile** — Run the resume updater skill by asking Claude to update your resume. It will interview you to capture your experience, achievements, and career goals into `career-profile.json`.
 
-2. **Select an output style** — Tell Claude your industry (software engineering, AI/ML, sales, consulting) to activate the matching resume format.
+2. **Set your industry style** — Tell Claude your industry (software-engineering, ai-ml, sales, consulting). It's stored as `preferences.industry_style` in `career-profile.json` and selects the matching formatting reference for resumes, cover letters, coaching, and interview prep.
 
 3. **Search for jobs** — Ask the Career Director to find jobs matching your profile. It delegates to the Job Search agent which queries Indeed, LinkedIn, TrueUp, Glassdoor, and Levels.fyi.
 
@@ -61,12 +61,12 @@ npm install && npm run build
 
 | Command | Description |
 |---------|-------------|
-| `/resume-generator [job description or URL]` | Generate a tailored resume from your career profile, formatted for your active output style |
-| `/cover-letter [job description or URL]` | Generate a targeted cover letter (250-400 words) with company research |
+| `/resume-generator [job description, URL, or company/role]` | Generate a tailored resume from your career profile, formatted per your industry style |
+| `/cover-letter [job description, URL, or company/role]` | Generate a targeted cover letter (250-400 words) with company research |
 
-### Output Styles
+### Industry Styles
 
-Drop-in industry formatting that controls how resumes and career documents are structured:
+Industry formatting references live in `skills/resume-updater/references/industry-styles/`. The commands and agents read the file matching `preferences.industry_style` in `career-profile.json`. Each file contains the full section order (with rationale), bullet writing rules with example bullets, an ATS keyword bank, tone/formatting rules, career ladder framing, and interview weighting for that industry:
 
 | Style | Section Order |
 |-------|--------------|
@@ -75,15 +75,7 @@ Drop-in industry formatting that controls how resumes and career documents are s
 | **sales** | Experience (revenue-first), Achievements, Skills, Education |
 | **consulting** | Experience (client-impact), Education, Skills, Leadership |
 
-**Add your own:** Create a `.md` file in `output-styles/` with frontmatter:
-
-```yaml
----
-name: your-style
-description: When to activate this style
-keep-coding-instructions: true
----
-```
+**Add your own:** Create a `.md` file in `skills/resume-updater/references/industry-styles/` named after the style (e.g., `product-management.md`) covering section order, example bullets with metrics, ATS keywords, tone rules, and interview weighting — then set `preferences.industry_style` in `career-profile.json` to the file name (without `.md`).
 
 ### MCP Server — Job Intelligence
 
@@ -96,6 +88,8 @@ keep-coding-instructions: true
 | `job_get_salary_data` | Glassdoor, Levels.fyi | Compensation comparison tables |
 | `job_get_interview_experiences` | Glassdoor | Interview reports with difficulty ratings |
 | `job_search_trending_roles` | TrueUp | Trending roles and market demand |
+
+Tools surface to Claude Code as `mcp__job-intelligence__<tool_name>` (e.g., `mcp__job-intelligence__job_get_company_info`).
 
 ### Hooks
 
@@ -118,11 +112,11 @@ keep-coding-instructions: true
 
 All components share a single `career-profile.json` file at the project root. See `skills/resume-updater/references/career-profile-schema.md` for the full schema.
 
-### Chrome MCP Integration
+### Claude in Chrome Integration
 
-For browser-based job application automation, install and configure [Chrome MCP](https://github.com/anthropics/claude-code-chrome-mcp) separately. The Career Director and Job Search agents are designed to use Chrome MCP tools when available for:
+For browser-based job application automation, install and enable Anthropic's official **Claude in Chrome** browser extension separately (see the Claude in Chrome section of Anthropic's documentation for setup and site permissions). When its browser tools are available, the Career Director and Job Search agents can use them for:
 - Auto-filling job applications
-- Saving job listings from browser
+- Saving job listings from the browser
 - LinkedIn profile data extraction
 
 ## License

@@ -1,10 +1,11 @@
 ---
 description: BRRRR strategy calculator — Buy, Rehab, Rent, Refinance, Repeat analysis
+argument-hint: "[property address | quick]"
 ---
 
 # BRRRR Strategy Calculator
 
-ARGUMENTS: Optional property address or "quick" for streamlined input
+Property address, or "quick" for streamlined input (may be empty): $ARGUMENTS
 
 ## Instructions
 

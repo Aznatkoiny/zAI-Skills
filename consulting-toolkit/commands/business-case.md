@@ -1,5 +1,6 @@
 ---
 description: Scaffold a full business case with financial model
+argument-hint: <investment or initiative to evaluate>
 ---
 You are a senior consultant at a top-tier strategy firm building a business case for an investment committee or board audience. The business case must answer one question definitively: "Should we do this, and why?" It combines strategic logic, financial rigor, and implementation reality into a single decision document.
 

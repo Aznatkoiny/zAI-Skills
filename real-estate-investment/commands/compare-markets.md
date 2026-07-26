@@ -1,10 +1,11 @@
 ---
 description: Compare and score real estate markets using demographic, economic, and rental data
+argument-hint: "[market1, market2, ...]"
 ---
 
 # Compare Real Estate Markets
 
-ARGUMENTS: Optional comma-separated list of markets (e.g., "Austin, Phoenix, Nashville")
+Markets to compare (may be empty): $ARGUMENTS
 
 ## Instructions
 
@@ -12,7 +13,7 @@ When this command is invoked, perform a comparative market analysis:
 
 ### 1. Collect Market List
 
-Use AskUserQuestion to gather 2-5 markets to compare (skip if provided via ARGUMENTS):
+If $ARGUMENTS contains a comma-separated list of markets (e.g., "Austin, Phoenix, Nashville"), use those. Otherwise use AskUserQuestion to gather 2-5 markets to compare:
 - City or metro area names
 - Example: "Austin, TX", "Phoenix Metro", "Nashville-Davidson"
 
@@ -45,8 +46,17 @@ For each market, collect the following data points:
 - Days on market
 
 **Data Collection Method:**
-- First, check for available MCP tools (Census API, Redfin, Rentcast)
-- If MCP tools are unavailable, guide user to manually input key metrics OR use WebSearch for publicly available data
+
+Pull data from the `real-estate-data` MCP server first (tools surface as `mcp__real-estate-data__<name>`):
+
+- `mcp__real-estate-data__get_census_demographics` — population, median income, median rent, vacancy rate, owner/renter split by state/county/tract (requires `CENSUS_API_KEY` — the key is free to obtain)
+- `mcp__real-estate-data__get_census_housing_stats` — median home value and housing-stock age distribution (requires `CENSUS_API_KEY`)
+- `mcp__real-estate-data__get_redfin_market_data` — download URLs and column guide for Redfin market tracker TSVs: median sale price, inventory, days on market, months of supply (no key needed; download and filter with Bash)
+- `mcp__real-estate-data__get_rentcast_market_data` — ZIP-level median rent, rent growth, and vacancy (requires `RENTCAST_API_KEY`; free tier, 50 requests/month)
+- `mcp__real-estate-data__get_mashvisor_neighborhood` — neighborhood investment score, cash-on-cash, cap rate (requires `MASHVISOR_API_KEY`, paid)
+- `mcp__real-estate-data__get_airdna_market_stats` — market-level STR ADR/occupancy if comparing STR markets (requires `AIRDNA_API_KEY`, paid)
+
+**Fallback chain:** MCP tool → WebSearch for publicly available data (BLS job growth, Census QuickFacts, market reports) → ask the user to manually input key metrics. Label each metric with its source.
 
 ### 4. Score Each Market
 

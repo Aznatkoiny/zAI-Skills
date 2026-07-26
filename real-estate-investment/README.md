@@ -50,10 +50,12 @@ With no keys configured, you still get the Redfin market-data tool plus everythi
 
 | Agent | Model | Role |
 |-------|-------|------|
-| `deal-analyzer` | inherit | Builds full pro formas and return metrics from property details, with go/no-go recommendations |
-| `market-researcher` | inherit | Compares and scores rental markets, trends, and submarkets |
-| `portfolio-reviewer` | inherit | Aggregate multi-property portfolio analysis, risk, and optimization opportunities |
-| `tax-optimizer` | inherit | Depreciation schedules, cost segregation, 1031 exchanges, entity structure selection |
+| `deal-analyzer` | sonnet | Builds full pro formas and return metrics from property details, with go/no-go recommendations |
+| `market-researcher` | sonnet | Compares and scores rental markets, trends, and submarkets |
+| `portfolio-reviewer` | opus | Aggregate multi-property portfolio analysis, risk, and optimization opportunities |
+| `tax-optimizer` | opus | Depreciation schedules, cost segregation, 1031 exchanges, entity structure selection |
+
+Model tiering: `deal-analyzer` and `market-researcher` run structured, formula-driven workflows and use Sonnet; `tax-optimizer` and `portfolio-reviewer` make judgment-heavy recommendations (tax strategy, disposition/refinance priorities) and use Opus. Each agent's frontmatter whitelists only the built-in and `mcp__real-estate-data__*` tools it needs.
 
 ### Commands (6)
 
@@ -90,6 +92,8 @@ The **real-estate-investment** skill routes analysis by property type and method
 **Tax Disclaimer** — PostToolUse hook on `Write` that scans written content for tax topics (depreciation, 1031, cost segregation, opportunity zones, entity structure) and reminds that analysis is educational, recommending a CPA or tax attorney.
 
 ### MCP Server — Real Estate Data (11 tools)
+
+The server is registered as `real-estate-data`, so its tools surface in Claude Code as `mcp__real-estate-data__<tool>` (e.g., `mcp__real-estate-data__estimate_rent`).
 
 | Tool | Provider | Description |
 |------|----------|-------------|

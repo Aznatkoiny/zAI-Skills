@@ -1,10 +1,11 @@
 ---
 description: Syndication waterfall distribution calculator — model GP/LP profit splits across IRR hurdles
+argument-hint: "[american|european]"
 ---
 
 # Syndication Waterfall Calculator
 
-ARGUMENTS: Optional waterfall type ("american" or "european")
+Requested waterfall type (may be empty): $ARGUMENTS
 
 ## Instructions
 
@@ -35,7 +36,7 @@ Use AskUserQuestion to gather:
 - **Tier 3**: GP promote at second hurdle (e.g., 60/40 LP/GP split until 15% IRR)
 - **Tier 4**: Final split above highest hurdle (e.g., 50/50 LP/GP split above 15% IRR)
 
-**Waterfall Type (skip if provided via ARGUMENTS):**
+**Waterfall Type (skip if provided via $ARGUMENTS):**
 - **American Waterfall**: Distributions split deal-by-deal as they occur
 - **European Waterfall**: All cash flows aggregated, waterfall applies to total returns at exit
 

@@ -1,10 +1,11 @@
 ---
 description: Short-term rental revenue projection — estimate Airbnb/VRBO income with seasonal modeling
+argument-hint: "[property address or market]"
 ---
 
 # Short-Term Rental Revenue Projection
 
-ARGUMENTS: Optional property address or market name
+Property or market to project (may be empty): $ARGUMENTS
 
 ## Instructions
 
@@ -17,21 +18,27 @@ the `references/property-types.md` file from the `real-estate-investment` skill 
 
 ### 2. Collect Property Details
 
-Use AskUserQuestion to gather (skip if provided via ARGUMENTS):
+Use AskUserQuestion to gather (skip anything already provided in $ARGUMENTS):
 
 **Property Characteristics:**
 - Location (city, neighborhood)
 - Property type (entire home, condo, unique property)
-- Bedrooms and bathrooms
+- Bedrooms and bathrooms (required for the AirDNA rentalizer tool below)
 - Square footage
 - Notable amenities (pool, hot tub, waterfront, etc.)
 
-**Comparable Data:**
-- Average nightly rate (from Airbnb/VRBO comps or AirDNA)
-- Check for MCP tools: AirDNA server for market data
-- If no MCP available, guide user to research comps manually
+### 3. Acquire STR Market Data
 
-### 3. Model Seasonal Revenue
+Pull comparable data from the `real-estate-data` MCP server (tools surface as `mcp__real-estate-data__<name>`):
+
+- `mcp__real-estate-data__get_airdna_rentalizer` — property-level STR revenue projection: ADR, occupancy, RevPAR. Requires the full address plus `bedrooms` (int) and `bathrooms` (can be fractional, e.g., 2.5). Requires `AIRDNA_API_KEY` (paid).
+- `mcp__real-estate-data__get_airdna_market_stats` — market-level STR ADR, occupancy, revenue, and listings count by city/state (requires `AIRDNA_API_KEY`, paid)
+- `mcp__real-estate-data__get_mashvisor_property` — alternative STR/LTR income estimates for the property (requires `MASHVISOR_API_KEY`, paid)
+- `mcp__real-estate-data__estimate_rent` — long-term rent estimate for the STR-vs-LTR comparison in step 6 (requires `RENTCAST_API_KEY`; free tier, 50 requests/month)
+
+**Fallback chain:** if a tool is unavailable or returns a missing-key error, fall back to WebSearch for Airbnb/VRBO comps and published market ADR/occupancy data; if that fails, ask the user to research comps manually and input a base ADR and occupancy. State which source each figure came from.
+
+### 4. Model Seasonal Revenue
 
 Create month-by-month revenue projection:
 
@@ -61,7 +68,7 @@ Monthly Revenue = ADR × Occupancy Rate × Days in Month
 Sum of all monthly revenues
 ```
 
-### 4. Calculate Platform Fees and Expenses
+### 5. Calculate Platform Fees and Expenses
 
 **Platform Fees:**
 - Airbnb host fee: ~3% (or 15.5% for simplified pricing)
@@ -87,7 +94,7 @@ Typically 50-60% of gross revenue (compared to 30-40% for LTR)
 NOI = Gross Revenue - Platform Fees - Operating Expenses
 ```
 
-### 5. Compare STR vs LTR
+### 6. Compare STR vs LTR
 
 **Long-Term Rental Baseline:**
 - Research comparable LTR monthly rent for the property
@@ -111,7 +118,7 @@ This shows the minimum occupancy needed for STR to outperform LTR.
 | Management Intensity | High | Low | |
 | Regulatory Risk | High | Low | |
 
-### 6. Present Monthly Revenue Projection
+### 7. Present Monthly Revenue Projection
 
 Generate detailed month-by-month table:
 
@@ -123,7 +130,7 @@ Generate detailed month-by-month table:
 | Dec | | | 31 | | | |
 | **Total** | | | **365** | | | |
 
-### 7. Calculate Annual Summary
+### 8. Calculate Annual Summary
 
 **Annual Performance:**
 - Total gross revenue
@@ -138,7 +145,7 @@ Generate detailed month-by-month table:
 - Break-even occupancy: Z%
 - Current projected occupancy: Z%
 
-### 8. Risk Factors and Recommendations
+### 9. Risk Factors and Recommendations
 
 Highlight key considerations:
 - **Regulatory risk**: Check local STR regulations, zoning, HOA rules
@@ -151,7 +158,7 @@ Highlight key considerations:
 - Proceed with STR if: occupancy projections are conservative, regulation is stable, investor can handle management
 - Consider LTR if: slim STR margin, regulatory uncertainty, passive income preference
 
-### 9. Offer Enhanced Analysis
+### 10. Offer Enhanced Analysis
 
 Ask if user wants:
 - Python script for dynamic STR revenue modeling with custom inputs

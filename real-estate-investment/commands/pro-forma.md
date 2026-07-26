@@ -1,10 +1,11 @@
 ---
 description: Generate a real estate pro forma model in Python or Excel format
+argument-hint: "[python|excel|both]"
 ---
 
 # Generate Pro Forma Model
 
-ARGUMENTS: Optional output format ("python", "excel", or "both")
+Requested output format (may be empty): $ARGUMENTS
 
 ## Instructions
 
@@ -21,19 +22,31 @@ Use AskUserQuestion to gather:
 - **Holding period**: Number of years (default: 10)
 - **Exit assumptions**: Exit cap rate, selling costs
 
-### 2. Collect Output Preference
+### 2. Validate Assumptions with Market Data (optional but recommended)
 
-Ask for output format (skip if provided via ARGUMENTS):
+If the user has a specific property address, ground the model's assumptions using the `real-estate-data` MCP server (tools surface as `mcp__real-estate-data__<name>`):
+
+- `mcp__real-estate-data__estimate_rent` — replace guessed rent with a Rentcast AVM estimate (requires `RENTCAST_API_KEY`; free tier, 50 requests/month)
+- `mcp__real-estate-data__get_rentcast_market_data` — ZIP-level vacancy rate and rent growth for the income assumptions (requires `RENTCAST_API_KEY`)
+- `mcp__real-estate-data__get_attom_property` — year built, building size, beds/baths for expense benchmarking (requires `ATTOM_API_KEY`, paid)
+- `mcp__real-estate-data__get_attom_valuation` — AVM check on the purchase price (requires `ATTOM_API_KEY`, paid)
+- `mcp__real-estate-data__get_census_housing_stats` — area median home value context (requires `CENSUS_API_KEY` — the key is free to obtain)
+
+**Fallback chain:** MCP tool → WebSearch for comparable data → use the user's manual inputs as-is. Note in the generated model which inputs are data-backed vs. assumed.
+
+### 3. Collect Output Preference
+
+Ask for output format (skip if provided via $ARGUMENTS — "python", "excel", or "both"):
 - Python script
 - Excel formulas
 - Both
 
-### 3. Load Reference Material
+### 4. Load Reference Material
 
 Read the financial metrics reference:
 the `references/financial-metrics.md` file from the `real-estate-investment` skill in this plugin
 
-### 4. Generate Python Script (if requested)
+### 5. Generate Python Script (if requested)
 
 Create a complete Python pro forma model using the RealEstateProForma class pattern from the reference:
 
@@ -52,7 +65,7 @@ Create a complete Python pro forma model using the RealEstateProForma class patt
 - Include clear comments and docstrings
 - Add example usage at the bottom
 
-### 5. Generate Excel Formulas (if requested)
+### 6. Generate Excel Formulas (if requested)
 
 Create cell-by-cell Excel layout with formulas:
 
@@ -78,11 +91,11 @@ Create cell-by-cell Excel layout with formulas:
 - Save as `pro_forma_formulas.txt` with clear layout instructions
 - Include named range definitions
 
-### 6. Generate Both (if requested)
+### 7. Generate Both (if requested)
 
 Create both Python script and Excel formula layout.
 
-### 7. Verify and Save
+### 8. Verify and Save
 
 Save generated file(s) to the user's working directory and confirm:
 - File name(s) and location
