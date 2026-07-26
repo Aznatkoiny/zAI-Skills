@@ -2,7 +2,9 @@
   "name": "zAI-Skills",
   "description": "Development marketplace for AI-Toolkit, consulting-toolkit, real-estate-investment, and career-coach plugins",
   "owner": {
-    "name": "Antony Zaki"
+    "name": "Antony Zaki",
+    "email": "zaki.antony@gmail.com",
+    "url": "https://github.com/Aznatkoiny"
   },
   "plugins": [
     {
@@ -12,7 +14,20 @@
       "source": "./AI-Toolkit",
       "author": {
         "name": "Antony Zaki"
-      }
+      },
+      "category": "development",
+      "keywords": [
+        "deep-learning",
+        "reinforcement-learning",
+        "prompt-engineering",
+        "machine-learning",
+        "keras",
+        "pytorch",
+        "x402",
+        "web3"
+      ],
+      "homepage": "https://github.com/Aznatkoiny/zAI-Skills",
+      "license": "MIT"
     },
     {
       "name": "consulting-toolkit",
@@ -21,7 +36,19 @@
       "source": "./consulting-toolkit",
       "author": {
         "name": "Antony Zaki"
-      }
+      },
+      "category": "business",
+      "keywords": [
+        "consulting",
+        "strategy",
+        "mece",
+        "pyramid-principle",
+        "due-diligence",
+        "financial-modeling",
+        "market-sizing"
+      ],
+      "homepage": "https://github.com/Aznatkoiny/zAI-Skills",
+      "license": "MIT"
     },
     {
       "name": "real-estate-investment",
@@ -30,7 +57,20 @@
       "source": "./real-estate-investment",
       "author": {
         "name": "Antony Zaki"
-      }
+      },
+      "category": "finance",
+      "keywords": [
+        "real-estate",
+        "investment",
+        "financial-modeling",
+        "cap-rate",
+        "IRR",
+        "BRRRR",
+        "tax-strategy",
+        "market-analysis"
+      ],
+      "homepage": "https://github.com/Aznatkoiny/zAI-Skills",
+      "license": "MIT"
     },
     {
       "name": "career-coach",
@@ -39,7 +79,19 @@
       "source": "./career-coach",
       "author": {
         "name": "Antony Zaki"
-      }
+      },
+      "category": "productivity",
+      "keywords": [
+        "career",
+        "job-search",
+        "resume",
+        "interview-prep",
+        "career-coaching",
+        "linkedin",
+        "latex-resume"
+      ],
+      "homepage": "https://github.com/Aznatkoiny/zAI-Skills",
+      "license": "MIT"
     }
   ]
 }

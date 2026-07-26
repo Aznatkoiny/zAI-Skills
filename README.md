@@ -89,7 +89,12 @@ AI-powered career coaching and job search plugin with resume building, interview
 
 ---
 
-## Local Development
+## Platform support
+
+macOS and Linux; Windows via WSL — the hooks are bash scripts and the
+real-estate-investment MCP server bootstraps a Python venv via bash.
+
+## Development
 
 ```bash
 # Add local marketplace
@@ -101,6 +106,14 @@ AI-powered career coaching and job search plugin with resume building, interview
 /plugin install real-estate-investment@zAI-Skills
 /plugin install career-coach@zAI-Skills
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for repo conventions, versioning policy, and the
+release checklist. Run `python3 scripts/validate_marketplace.py` before committing; the
+same checks run in CI via `.github/workflows/validate.yml`.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

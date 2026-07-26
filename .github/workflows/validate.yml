@@ -1,0 +1,46 @@
+name: validate
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  validate:
+    name: Marketplace & plugin validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PyYAML
+        run: pip install pyyaml
+      - name: Validate marketplace, plugins, frontmatter, cross-references, counts
+        run: python scripts/validate_marketplace.py
+
+  smoke:
+    name: MCP server smoke tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Boot servers from committed bundles + run offline tests
+        run: bash scripts/smoke_servers.sh
+
+  bundles:
+    name: Committed bundle freshness (supply-chain gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Rebuild bundles from src and diff against committed dist
+        run: bash scripts/check_bundle_freshness.sh
