@@ -1,14 +1,21 @@
+/**
+ * job_get_interview_experiences — Glassdoor interview reviews (scraper
+ * tier, cached 24h). Failures are reported honestly in the Sources footer.
+ */
+
 import { z } from "zod";
 import { interviewExperiencesSchema } from "../schemas/inputs.js";
 import { getGlassdoorInterviews } from "../services/glassdoor.js";
-import { CHARACTER_LIMIT } from "../constants.js";
+import { finalizeOutput, formatSourcesFooter } from "./sources-footer.js";
 
 type InterviewExperiencesInput = z.infer<typeof interviewExperiencesSchema>;
 
 export async function handleInterviewExperiences(input: InterviewExperiencesInput): Promise<string> {
   const { company_name, role } = input;
 
-  const experiences = await getGlassdoorInterviews(company_name, role);
+  const result = await getGlassdoorInterviews(company_name, role);
+  const experiences = result.items;
+  const footerLines = formatSourcesFooter([result.meta]);
 
   const lines: string[] = [
     `## Interview Experiences: ${company_name}`,
@@ -20,18 +27,14 @@ export async function handleInterviewExperiences(input: InterviewExperiencesInpu
   lines.push("");
 
   if (experiences.length === 0) {
-    lines.push(`No interview experiences found for "${company_name}"${role ? ` (${role})` : ""}. The company may not have interview reviews on Glassdoor.`);
-    return lines.join("\n");
-  }
-
-  // Check if we only have error placeholders
-  const hasRealData = experiences.some((e) => e.difficulty || e.experience || e.questions.length > 0 || (e.process && !e.process.startsWith("Error")));
-
-  if (!hasRealData && experiences.length === 1 && experiences[0].process?.startsWith("Error")) {
-    lines.push(`Could not retrieve interview data: ${experiences[0].process}`);
-    lines.push("");
-    lines.push("Try searching on Glassdoor directly for the latest interview experiences.");
-    return lines.join("\n");
+    if (result.meta.state === "failed") {
+      lines.push(`Could not retrieve interview data from Glassdoor: ${result.meta.detail || "unknown error"}`);
+      lines.push("");
+      lines.push("Fall back to WebSearch or visit Glassdoor directly for the latest interview experiences.");
+    } else {
+      lines.push(`No interview experiences found for "${company_name}"${role ? ` (${role})` : ""}. The company may not have interview reviews on Glassdoor.`);
+    }
+    return finalizeOutput(lines, footerLines);
   }
 
   // Summary statistics
@@ -87,7 +90,7 @@ export async function handleInterviewExperiences(input: InterviewExperiencesInpu
     }
 
     // Process description
-    if (exp.process && !exp.process.startsWith("Error")) {
+    if (exp.process) {
       lines.push("**Interview Process:**");
       lines.push(`> ${exp.process}`);
       lines.push("");
@@ -103,13 +106,7 @@ export async function handleInterviewExperiences(input: InterviewExperiencesInpu
     }
   }
 
-  lines.push("*Data source: Glassdoor. Interview experiences are self-reported and individual results may vary.*");
+  lines.push("*Data source: Glassdoor (scraper-backed, cached up to 24h). Interview experiences are self-reported and individual results may vary.*");
 
-  // Truncate if over character limit
-  let result = lines.join("\n");
-  if (result.length > CHARACTER_LIMIT) {
-    result = result.substring(0, CHARACTER_LIMIT - 50) + "\n\n*[Output truncated due to length]*";
-  }
-
-  return result;
+  return finalizeOutput(lines, footerLines);
 }

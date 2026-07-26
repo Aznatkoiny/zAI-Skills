@@ -61,8 +61,14 @@ npm install && npm run build
 
 | Command | Description |
 |---------|-------------|
-| `/resume-generator [job description, URL, or company/role]` | Generate a tailored resume from your career profile, formatted per your industry style |
+| `/resume-generator [target] [--template <name>] [--output-dir <dir>]` | Generate a tailored resume from your career profile — Markdown by default, or rendered into one of the 6 LaTeX templates via `scripts/render-resume.py` |
 | `/cover-letter [job description, URL, or company/role]` | Generate a targeted cover letter (250-400 words) with company research |
+| `/job-hunt [role focus or 'from profile']` | Full pipeline: search jobs per target role, enrich the top ~10 with salary + company data, score by skill overlap, write ranked `job-search-results.md`, and seed `applications.json` |
+| `/ats-check [job description text/URL] [resume file]` | ATS keyword coverage check of a resume + profile against a job description, with a concrete rewrite suggestion per missing keyword |
+| `/mock-interview [company/role] [behavioral\|technical\|case]` | Mock interview with real reported questions, one at a time, with a session scorecard persisted to `interview-prep-notes.json` |
+| `/compare-offers [offer details or 'interactive']` | Compare offers on benchmarked 4-year total comp (assumptions stated) with cost-of-living adjustment and negotiation talking points |
+| `/validate-profile [path]` | Run `scripts/validate-profile.py` against `career-profile.json` and turn the completeness scorecard into fixes |
+| `/follow-ups` | Flag tracker entries stale >14 days or with due next-actions, and draft follow-up emails in your industry tone |
 
 ### Industry Styles
 
@@ -76,6 +82,10 @@ Industry formatting references live in `skills/resume-updater/references/industr
 | **consulting** | Experience (client-impact), Education, Skills, Leadership |
 
 **Add your own:** Create a `.md` file in `skills/resume-updater/references/industry-styles/` named after the style (e.g., `product-management.md`) covering section order, example bullets with metrics, ATS keywords, tone rules, and interview weighting — then set `preferences.industry_style` in `career-profile.json` to the file name (without `.md`).
+
+### Negotiation Guide
+
+`skills/resume-updater/references/negotiation-guide.md` is a practical offer-negotiation playbook: anchoring with market data, BATNA framing, a component-by-component flexibility table (base, equity, sign-on, level, review timing), ready-to-use scripts, and a get-it-in-writing checklist. `/compare-offers` grounds its negotiation talking points in this file; it's also readable on its own.
 
 ### MCP Server — Job Intelligence
 
@@ -91,9 +101,32 @@ Industry formatting references live in `skills/resume-updater/references/industr
 
 Tools surface to Claude Code as `mcp__job-intelligence__<tool_name>` (e.g., `mcp__job-intelligence__job_get_company_info`).
 
+#### Optional job-source API keys
+
+The server reads these environment variables when present. All are optional — without them, keyless sources (Remotive, RemoteOK, Greenhouse/Lever job boards) still work.
+
+| Env var | Purpose |
+|---------|---------|
+| `ADZUNA_APP_ID` | Adzuna job-search API application ID |
+| `ADZUNA_APP_KEY` | Adzuna job-search API application key |
+| `USAJOBS_API_KEY` | USAJOBS (US federal jobs) API key |
+| `USAJOBS_EMAIL` | Contact email USAJOBS requires in the request User-Agent |
+
 ### Hooks
 
-**LaTeX Auto-Compile** — PostToolUse hook that automatically compiles `.tex` or `.md` files written to `resumes/` into PDFs using xelatex or pandoc.
+Two PostToolUse hooks fire on `Write`/`Edit`/`MultiEdit` (both are non-blocking):
+
+- **LaTeX Auto-Compile** (`hooks/compile-latex.sh`) — automatically compiles `.tex` or `.md` files written to `resumes/` into PDFs using xelatex or pandoc.
+- **Profile Validation** (`hooks/validate-profile.sh`) — whenever `career-profile.json` is written or edited, runs `scripts/validate-profile.py` and feeds any `WARN` lines back to Claude as additional context, so schema and quality issues surface immediately after every save.
+
+### Scripts
+
+Plain-Python utilities in `scripts/` (stdlib only, Python 3.8+):
+
+| Script | Purpose |
+|--------|---------|
+| `validate-profile.py [path]` | Advisory validator for `career-profile.json`: required fields, `YYYY-MM` dates, reverse-chronological experience, max 5 target roles, and a non-empty metric on every achievement. Prints a completeness scorecard + `WARN` lines; always exits 0. Used by `/validate-profile` and the validation hook. |
+| `render-resume.py --template <name> [--profile p] [--output-dir d] [--templates-dir t]` | Merges `career-profile.json` into one of the six LaTeX templates: substitutes contact macros, generates experience/education/skills/project blocks with LaTeX escaping, writes `<output-dir>/<name>-<template>.tex`. Limitations (no proficiency levels, no per-experience locations, no one-page fitting) are documented in the script docstring. Used by `/resume-generator --template`. |
 
 ### LaTeX Templates
 
@@ -107,6 +140,8 @@ Tools surface to Claude Code as `mcp__job-intelligence__<tool_name>` (e.g., `mcp
 | `deedy-resume.tex` | Deedy two-column |
 | `altacv.tex` | Colorful sidebar with photo |
 | `awesome-cv.tex` | Elegant with icon header |
+
+Render any template directly from your profile with `/resume-generator --template <name>` (e.g., `--template jakes-resume`); the generated `.tex` lands in `resumes/` and auto-compiles to PDF when a TeX Live installation with XeLaTeX is present.
 
 ## Data Model
 

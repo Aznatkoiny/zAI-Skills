@@ -1,14 +1,21 @@
+/**
+ * job_search_trending_roles — TrueUp trending data (scraper tier, cached
+ * 6h). Failures are reported honestly in the Sources footer.
+ */
+
 import { z } from "zod";
 import { trendingRolesSchema } from "../schemas/inputs.js";
 import { getTrueUpTrendingRoles } from "../services/trueup.js";
-import { CHARACTER_LIMIT } from "../constants.js";
+import { finalizeOutput, formatSourcesFooter } from "./sources-footer.js";
 
 type TrendingRolesInput = z.infer<typeof trendingRolesSchema>;
 
 export async function handleTrendingRoles(input: TrendingRolesInput): Promise<string> {
   const { industry } = input;
 
-  const roles = await getTrueUpTrendingRoles(industry);
+  const result = await getTrueUpTrendingRoles(industry);
+  const roles = result.items;
+  const footerLines = formatSourcesFooter([result.meta]);
 
   const lines: string[] = [
     `## Trending Roles${industry ? ` in ${industry}` : ""}`,
@@ -21,16 +28,14 @@ export async function handleTrendingRoles(input: TrendingRolesInput): Promise<st
   lines.push("");
 
   if (roles.length === 0) {
-    lines.push(`No trending roles found${industry ? ` for "${industry}"` : ""}. TrueUp may not have data for this industry or the site structure may have changed.`);
-    return lines.join("\n");
-  }
-
-  // Check for error placeholders
-  if (roles.length === 1 && roles[0].error) {
-    lines.push(`Could not retrieve trending roles data: ${roles[0].error}`);
-    lines.push("");
-    lines.push("Try visiting https://www.trueup.io/trending directly for the latest data.");
-    return lines.join("\n");
+    if (result.meta.state === "failed") {
+      lines.push(`Could not retrieve trending roles data: ${result.meta.detail || "unknown error"}`);
+      lines.push("");
+      lines.push("Try visiting https://www.trueup.io/trending directly, or fall back to WebSearch for market-trend data.");
+    } else {
+      lines.push(`No trending roles found${industry ? ` for "${industry}"` : ""}. TrueUp may not have data for this industry.`);
+    }
+    return finalizeOutput(lines, footerLines);
   }
 
   // Markdown table
@@ -92,15 +97,9 @@ export async function handleTrendingRoles(input: TrendingRolesInput): Promise<st
     lines.push("");
   }
 
-  lines.push("*Data source: TrueUp. Trending data reflects current market activity and may change frequently.*");
+  lines.push("*Data source: TrueUp (scraper-backed, cached up to 6h). Trending data reflects current market activity and may change frequently.*");
 
-  // Truncate if over character limit
-  let result = lines.join("\n");
-  if (result.length > CHARACTER_LIMIT) {
-    result = result.substring(0, CHARACTER_LIMIT - 50) + "\n\n*[Output truncated due to length]*";
-  }
-
-  return result;
+  return finalizeOutput(lines, footerLines);
 }
 
 /**

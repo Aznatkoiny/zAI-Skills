@@ -1,7 +1,7 @@
 {
   "name": "job-intelligence-mcp-server",
   "version": "1.0.0",
-  "description": "MCP server providing job market data tools — Indeed, LinkedIn, TrueUp, Glassdoor, and Levels.fyi",
+  "description": "MCP server providing job market data tools — API-first (Remotive, RemoteOK, Greenhouse/Lever boards, optional Adzuna and USAJOBS) with Indeed/LinkedIn/TrueUp/Glassdoor/Levels.fyi scrapers as best-effort fallback; file-cached with per-source status reporting",
   "type": "module",
   "main": "dist/index.cjs",
   "scripts": {

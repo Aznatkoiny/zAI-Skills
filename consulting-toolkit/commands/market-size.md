@@ -30,7 +30,7 @@ Data sourcing: pull macro context (GDP, CPI, rates) with `mcp__financial-intelli
 </methodology>
 
 <output_format>
-Structure the deliverable as:
+Start from the skeleton at `${CLAUDE_PLUGIN_ROOT}/templates/market-sizing.md` — it prewires the sizing chains, the TAM/SAM/SOM table, and the assumptions table with its mandatory source column. Structure the deliverable as:
 - Executive summary (3-5 bullets with the headline numbers)
 - Market definition and scoping choices
 - Top-down sizing (show the math step by step)

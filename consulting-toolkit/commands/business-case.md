@@ -45,7 +45,7 @@ Create two deliverables:
 
 1. **Narrative document** (business-case-[topic].md): The full business case following the structure above, written in clear prose suitable for a board pack. Target 3-5 pages.
 
-2. **Financial model skeleton** (business-case-[topic]-model.md): A structured outline of the financial model showing:
+2. **Financial model skeleton** (business-case-[topic]-model.md): Start from `${CLAUDE_PLUGIN_ROOT}/templates/financial-model-narrative.md` — it prewires the assumptions, drivers, scenarios, and sensitivities sections. A structured outline of the financial model showing:
    - Assumptions sheet (all input variables with values and sources)
    - Revenue/cost build-up logic
    - Scenario definitions

@@ -115,7 +115,7 @@ A spreadsheet without a narrative is a black box. Every model must be accompanie
 
 Every modeling assignment produces two files:
 1. **xlsx model**: Following the 5-sheet architecture above. Named descriptively: `financial-model-[topic].xlsx` (or the markdown + CSV fallback described in Build step 3, if xlsx generation is unavailable)
-2. **Narrative companion**: A markdown document summarizing the model's findings, key drivers, sensitivities, and risks. Named: `financial-model-[topic]-narrative.md`
+2. **Narrative companion**: A markdown document summarizing the model's findings, key drivers, sensitivities, and risks. Named: `financial-model-[topic]-narrative.md`. Start from the skeleton at `${CLAUDE_PLUGIN_ROOT}/templates/financial-model-narrative.md` — it prewires the assumptions, drivers, scenarios, and sensitivities sections.
 
 Both saved to the working directory.
 </output_standards>

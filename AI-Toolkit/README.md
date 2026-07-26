@@ -1,12 +1,28 @@
 # AI-Toolkit
 
-Skills for Deep Learning, Reinforcement Learning (Python & C++), Prompt Engineering, Web3 Payments, and OpenClaw Setup.
+Skills for Deep Learning, Reinforcement Learning (Python & C++), Prompt Engineering, Web3 Payments, and OpenClaw Setup — plus slash commands and agents that operationalize them.
 
 ## Installation
 
 ```bash
 /plugin install ai-toolkit@zAI-Skills
 ```
+
+## Commands
+
+| Command | Arguments | Description |
+|---------|-----------|-------------|
+| `/optimize-prompt` | `[prompt file path or pasted prompt]` | Diagnose and rewrite a prompt using the prompt-optimizer skill's workflow — before/after diff, parameter recommendations (model, effort, thinking), per-change rationale, and an offer to A/B-measure the result |
+| `/rl-new-project` | `[environment or task description]` | Scaffold a Python RL project: custom Gymnasium (>=1.0) env, SB3 training script with EvalCallback + VecNormalize, Optuna tuning stub, and the RL skill's validation scripts wired into a Makefile |
+| `/x402-scaffold` | `[seller \| buyer] [evm \| svm]` | Generate an x402 payment starter — seller (paid endpoint with the 402 flow) or buyer (paying client) — with testnet-only defaults; mainnet keys/config are always the user's explicit opt-in |
+| `/openclaw-audit` | *(none — audits the local install)* | Run the openclaw-setup skill's security checklist: version (CVE-2026-25253), gateway binding, auth, DM policy, file permissions, and more — pass/fail table with remediations |
+
+## Agents
+
+| Agent | Model | Description |
+|-------|-------|-------------|
+| `rl-debugger` | sonnet | Diagnoses RL training failures using the debugging playbook — pre-training sanity checks via the skill's validation scripts, entropy/value-loss diagnostics, and the common failure-mode tables (flat reward, policy collapse, high variance, NaN) |
+| `prompt-rewriter` | opus | Rewrites a target prompt in an isolated context, applying the prompt-optimizer references end-to-end: symptom diagnosis, core-principle checks, proven snippets, and parameter recommendations |
 
 ## Skills
 

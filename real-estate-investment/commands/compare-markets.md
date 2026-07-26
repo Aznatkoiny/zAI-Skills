@@ -49,9 +49,11 @@ For each market, collect the following data points:
 
 Pull data from the `real-estate-data` MCP server first (tools surface as `mcp__real-estate-data__<name>`):
 
+- `mcp__real-estate-data__get_redfin_market_snapshot` — **the free market-data backbone for this command**: call it once per market to get a parsed snapshot of median sale price, price growth, inventory, days on market, and months of supply (no key needed)
+- `mcp__real-estate-data__get_fred_series` — national/regional economic context: mortgage rates (`MORTGAGE30US`), unemployment, CPI series to frame affordability and cycle timing (requires `FRED_API_KEY` — the key is free to obtain)
 - `mcp__real-estate-data__get_census_demographics` — population, median income, median rent, vacancy rate, owner/renter split by state/county/tract (requires `CENSUS_API_KEY` — the key is free to obtain)
 - `mcp__real-estate-data__get_census_housing_stats` — median home value and housing-stock age distribution (requires `CENSUS_API_KEY`)
-- `mcp__real-estate-data__get_redfin_market_data` — download URLs and column guide for Redfin market tracker TSVs: median sale price, inventory, days on market, months of supply (no key needed; download and filter with Bash)
+- `mcp__real-estate-data__get_redfin_market_data` — download URLs and column guide for the full Redfin market tracker TSVs, when the snapshot is not granular enough (no key needed; download and filter with Bash)
 - `mcp__real-estate-data__get_rentcast_market_data` — ZIP-level median rent, rent growth, and vacancy (requires `RENTCAST_API_KEY`; free tier, 50 requests/month)
 - `mcp__real-estate-data__get_mashvisor_neighborhood` — neighborhood investment score, cash-on-cash, cap rate (requires `MASHVISOR_API_KEY`, paid)
 - `mcp__real-estate-data__get_airdna_market_stats` — market-level STR ADR/occupancy if comparing STR markets (requires `AIRDNA_API_KEY`, paid)

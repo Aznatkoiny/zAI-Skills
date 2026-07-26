@@ -3227,8 +3227,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path) {
-      let input = path;
+    function removeDotSegments(path2) {
+      let input = path2;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3427,8 +3427,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path && path !== "/" ? path : void 0;
+        const [path2, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path2 && path2 !== "/" ? path2 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -15641,11 +15641,11 @@ var require_mime_types = __commonJS({
       }
       return exts[0];
     }
-    function lookup(path) {
-      if (!path || typeof path !== "string") {
+    function lookup(path2) {
+      if (!path2 || typeof path2 !== "string") {
         return false;
       }
-      var extension2 = extname("x." + path).toLowerCase().substr(1);
+      var extension2 = extname("x." + path2).toLowerCase().substr(1);
       if (!extension2) {
         return false;
       }
@@ -16750,7 +16750,7 @@ var require_form_data = __commonJS({
     "use strict";
     var CombinedStream = require_combined_stream();
     var util4 = require("util");
-    var path = require("path");
+    var path2 = require("path");
     var http3 = require("http");
     var https2 = require("https");
     var parseUrl = require("url").parse;
@@ -16878,11 +16878,11 @@ var require_form_data = __commonJS({
     FormData3.prototype._getContentDisposition = function(value, options) {
       var filename;
       if (typeof options.filepath === "string") {
-        filename = path.normalize(options.filepath).replace(/\\/g, "/");
+        filename = path2.normalize(options.filepath).replace(/\\/g, "/");
       } else if (options.filename || value && (value.name || value.path)) {
-        filename = path.basename(options.filename || value && (value.name || value.path));
+        filename = path2.basename(options.filename || value && (value.name || value.path));
       } else if (value && value.readable && hasOwn(value, "httpVersion")) {
-        filename = path.basename(value.client._httpMessage.path || "");
+        filename = path2.basename(value.client._httpMessage.path || "");
       }
       if (filename) {
         return 'filename="' + filename + '"';
@@ -18775,8 +18775,8 @@ function getErrorMap() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path, errorMaps, issueData } = params;
-  const fullPath = [...path, ...issueData.path || []];
+  const { data, path: path2, errorMaps, issueData } = params;
+  const fullPath = [...path2, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -18892,11 +18892,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path, key) {
+  constructor(parent, value, path2, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path;
+    this._path = path2;
     this._key = key;
   }
   get path() {
@@ -22533,10 +22533,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path) {
-  if (!path)
+function getElementAtPath(obj, path2) {
+  if (!path2)
     return obj;
-  return path.reduce((acc, key) => acc?.[key], obj);
+  return path2.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -22856,11 +22856,11 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path, issues) {
+function prefixIssues(path2, issues) {
   return issues.map((iss) => {
     var _a;
     (_a = iss).path ?? (_a.path = []);
-    iss.path.unshift(path);
+    iss.path.unshift(path2);
     return iss;
   });
 }
@@ -32345,9 +32345,9 @@ var StdioServerTransport = class {
 
 // src/constants.ts
 var EDGAR_BASE_URL = "https://data.sec.gov";
-var EDGAR_EFTS_URL = "https://efts.sec.gov/LATEST";
 var EDGAR_XBRL_URL = `${EDGAR_BASE_URL}/api/xbrl/companyfacts`;
 var EDGAR_SUBMISSIONS_URL = `${EDGAR_BASE_URL}/submissions`;
+var EDGAR_BROWSE_URL = "https://www.sec.gov/cgi-bin/browse-edgar";
 var FRED_BASE_URL = "https://api.stlouisfed.org/fred";
 var RATE_LIMITS = {
   edgar: 10,
@@ -32359,6 +32359,14 @@ var RATE_LIMITS = {
 };
 var MAX_FILING_TEXT_LENGTH = 3e4;
 var MAX_INDUSTRY_PEERS = 15;
+var FILING_SECTION_PAGE_SIZE = 25e3;
+var FILING_SECTIONS = [
+  "risk_factors",
+  "mdna",
+  "business",
+  "legal_proceedings",
+  "financial_statements"
+];
 var METRIC_KEYS = [
   "revenue",
   "net_income",
@@ -32468,6 +32476,22 @@ var filingTextBase = external_exports.object({
 });
 var filingTextShape = filingTextBase.shape;
 var filingTextSchema = filingTextBase.refine(
+  (d) => Boolean(d.ticker || d.cik),
+  { message: "Either ticker or cik must be provided." }
+);
+var filingSectionBase = external_exports.object({
+  ticker: external_exports.string().optional().describe("Stock ticker symbol. Provide ticker or cik."),
+  cik: external_exports.string().optional().describe("SEC CIK number. Provide ticker or cik."),
+  section: external_exports.enum(FILING_SECTIONS).describe(
+    "Section to extract: risk_factors (Item 1A), mdna (Management's Discussion & Analysis), business (Item 1, 10-K only), legal_proceedings, financial_statements"
+  ),
+  filing_type: external_exports.enum(["10-K", "10-Q"]).optional().default("10-K").describe("Filing to read the section from \u2014 the most recent filing of this type (default 10-K)"),
+  page: external_exports.number().int().min(1).optional().default(1).describe(
+    "Page of the section to return. Pages are up to 25,000 characters; each response's footer reports the total page count and the next page to request."
+  )
+});
+var filingSectionShape = filingSectionBase.shape;
+var filingSectionSchema = filingSectionBase.refine(
   (d) => Boolean(d.ticker || d.cik),
   { message: "Either ticker or cik must be provided." }
 );
@@ -33013,9 +33037,9 @@ function isVisitable(thing) {
 function removeBrackets(key) {
   return utils_default.endsWith(key, "[]") ? key.slice(0, -2) : key;
 }
-function renderKey(path, key, dots) {
-  if (!path) return key;
-  return path.concat(key).map(function each(token, i) {
+function renderKey(path2, key, dots) {
+  if (!path2) return key;
+  return path2.concat(key).map(function each(token, i) {
     token = removeBrackets(token);
     return !dots && i ? "[" + token + "]" : token;
   }).join(dots ? "." : "");
@@ -33063,9 +33087,9 @@ function toFormData(obj, formData, options) {
     }
     return value;
   }
-  function defaultVisitor(value, key, path) {
+  function defaultVisitor(value, key, path2) {
     let arr = value;
-    if (value && !path && typeof value === "object") {
+    if (value && !path2 && typeof value === "object") {
       if (utils_default.endsWith(key, "{}")) {
         key = metaTokens ? key : key.slice(0, -2);
         value = JSON.stringify(value);
@@ -33084,7 +33108,7 @@ function toFormData(obj, formData, options) {
     if (isVisitable(value)) {
       return true;
     }
-    formData.append(renderKey(path, key, dots), convertValue(value));
+    formData.append(renderKey(path2, key, dots), convertValue(value));
     return false;
   }
   const stack = [];
@@ -33093,10 +33117,10 @@ function toFormData(obj, formData, options) {
     convertValue,
     isVisitable
   });
-  function build(value, path) {
+  function build(value, path2) {
     if (utils_default.isUndefined(value)) return;
     if (stack.indexOf(value) !== -1) {
-      throw Error("Circular reference detected in " + path.join("."));
+      throw Error("Circular reference detected in " + path2.join("."));
     }
     stack.push(value);
     utils_default.forEach(value, function each(el, key) {
@@ -33104,11 +33128,11 @@ function toFormData(obj, formData, options) {
         formData,
         el,
         utils_default.isString(key) ? key.trim() : key,
-        path,
+        path2,
         exposedHelpers
       );
       if (result === true) {
-        build(el, path ? path.concat(key) : [key]);
+        build(el, path2 ? path2.concat(key) : [key]);
       }
     });
     stack.pop();
@@ -33320,7 +33344,7 @@ var platform_default = {
 // node_modules/axios/lib/helpers/toURLEncodedForm.js
 function toURLEncodedForm(data, options) {
   return toFormData_default(data, new platform_default.classes.URLSearchParams(), {
-    visitor: function(value, key, path, helpers) {
+    visitor: function(value, key, path2, helpers) {
       if (platform_default.isNode && utils_default.isBuffer(value)) {
         this.append(key, value.toString("base64"));
         return false;
@@ -33350,11 +33374,11 @@ function arrayToObject(arr) {
   return obj;
 }
 function formDataToJSON(formData) {
-  function buildPath(path, value, target, index) {
-    let name = path[index++];
+  function buildPath(path2, value, target, index) {
+    let name = path2[index++];
     if (name === "__proto__") return true;
     const isNumericKey = Number.isFinite(+name);
-    const isLast = index >= path.length;
+    const isLast = index >= path2.length;
     name = !name && utils_default.isArray(target) ? target.length : name;
     if (isLast) {
       if (utils_default.hasOwnProp(target, name)) {
@@ -33367,7 +33391,7 @@ function formDataToJSON(formData) {
     if (!target[name] || !utils_default.isObject(target[name])) {
       target[name] = [];
     }
-    const result = buildPath(path, value, target[name], index);
+    const result = buildPath(path2, value, target[name], index);
     if (result && utils_default.isArray(target[name])) {
       target[name] = arrayToObject(target[name]);
     }
@@ -34704,9 +34728,9 @@ var http_default = isHttpAdapterSupported && function httpAdapter(config2) {
       auth = urlUsername + ":" + urlPassword;
     }
     auth && headers.delete("authorization");
-    let path;
+    let path2;
     try {
-      path = buildURL(
+      path2 = buildURL(
         parsed.pathname + parsed.search,
         config2.params,
         config2.paramsSerializer
@@ -34724,7 +34748,7 @@ var http_default = isHttpAdapterSupported && function httpAdapter(config2) {
       false
     );
     const options = {
-      path,
+      path: path2,
       method,
       headers: headers.toJSON(),
       agents: { http: config2.httpAgent, https: config2.httpsAgent },
@@ -34960,14 +34984,14 @@ var isURLSameOrigin_default = platform_default.hasStandardBrowserEnv ? /* @__PUR
 var cookies_default = platform_default.hasStandardBrowserEnv ? (
   // Standard browser envs support document.cookie
   {
-    write(name, value, expires, path, domain, secure, sameSite) {
+    write(name, value, expires, path2, domain, secure, sameSite) {
       if (typeof document === "undefined") return;
       const cookie = [`${name}=${encodeURIComponent(value)}`];
       if (utils_default.isNumber(expires)) {
         cookie.push(`expires=${new Date(expires).toUTCString()}`);
       }
-      if (utils_default.isString(path)) {
-        cookie.push(`path=${path}`);
+      if (utils_default.isString(path2)) {
+        cookie.push(`path=${path2}`);
       }
       if (utils_default.isString(domain)) {
         cookie.push(`domain=${domain}`);
@@ -36189,6 +36213,63 @@ var RateLimiter = class {
   }
 };
 
+// src/services/cache.ts
+var import_node_crypto = require("node:crypto");
+var import_promises = require("node:fs/promises");
+var import_node_os = require("node:os");
+var path = __toESM(require("node:path"), 1);
+var HOUR_MS = 60 * 60 * 1e3;
+var CACHE_TTLS = {
+  tickerMap: 24 * HOUR_MS,
+  // company_tickers.json — updated ~daily by the SEC
+  submissions: 6 * HOUR_MS,
+  // CIK submissions payloads
+  companyFacts: 6 * HOUR_MS,
+  // XBRL companyfacts payloads
+  fredSeries: 1 * HOUR_MS,
+  // FRED series info + observations
+  filingDocument: 7 * 24 * HOUR_MS,
+  // filed documents are immutable once published
+  sicBrowse: 24 * HOUR_MS
+  // browse-edgar SIC company listings
+};
+var CACHE_ROOT = path.join((0, import_node_os.homedir)(), ".cache", "financial-intelligence");
+function entryPath(namespace, key) {
+  const digest = (0, import_node_crypto.createHash)("sha256").update(key).digest("hex");
+  return path.join(CACHE_ROOT, namespace, `${digest}.json`);
+}
+async function readEntry(file, ttlMs) {
+  try {
+    const raw = await (0, import_promises.readFile)(file, "utf8");
+    const envelope = JSON.parse(raw);
+    if (typeof envelope.fetchedAt === "number" && Date.now() - envelope.fetchedAt < ttlMs && "data" in envelope) {
+      return envelope.data;
+    }
+  } catch {
+  }
+  return void 0;
+}
+async function writeEntry(file, data) {
+  try {
+    await (0, import_promises.mkdir)(path.dirname(file), { recursive: true });
+    const envelope = { fetchedAt: Date.now(), data };
+    const tmp = `${file}.${(0, import_node_crypto.randomBytes)(6).toString("hex")}.tmp`;
+    await (0, import_promises.writeFile)(tmp, JSON.stringify(envelope), "utf8");
+    await (0, import_promises.rename)(tmp, file);
+  } catch {
+  }
+}
+async function cachedFetch(namespace, key, ttlMs, fetcher) {
+  const file = entryPath(namespace, key);
+  const hit = await readEntry(file, ttlMs);
+  if (hit !== void 0) return hit;
+  const data = await fetcher();
+  if (data !== void 0) {
+    await writeEntry(file, data);
+  }
+  return data;
+}
+
 // src/services/edgar.ts
 var limiter = new RateLimiter(RATE_LIMITS.edgar);
 var EDGAR_USER_AGENT_PLACEHOLDER = "FinancialIntelligenceMCP bot@example.com";
@@ -36236,8 +36317,16 @@ async function getSubmissions(cik) {
   if (cached2 && Date.now() - cached2.fetchedAt < SUBMISSIONS_CACHE_TTL_MS) {
     return cached2.data;
   }
-  const { data } = await edgarGet(
-    `${EDGAR_SUBMISSIONS_URL}/CIK${key}.json`
+  const data = await cachedFetch(
+    "submissions",
+    key,
+    CACHE_TTLS.submissions,
+    async () => {
+      const resp = await edgarGet(
+        `${EDGAR_SUBMISSIONS_URL}/CIK${key}.json`
+      );
+      return resp.data;
+    }
   );
   while (submissionsCache.size >= SUBMISSIONS_CACHE_MAX_ENTRIES) {
     const oldestKey = submissionsCache.keys().next().value;
@@ -36247,25 +36336,40 @@ async function getSubmissions(cik) {
   submissionsCache.set(key, { data, fetchedAt: Date.now() });
   return data;
 }
+var TICKER_MAP_URL = "https://www.sec.gov/files/company_tickers.json";
 var tickerMap = null;
-async function loadTickerMap() {
-  if (tickerMap) return tickerMap;
-  const { data } = await edgarGet(
-    "https://www.sec.gov/files/company_tickers.json"
-  );
-  tickerMap = /* @__PURE__ */ new Map();
-  for (const entry of Object.values(data)) {
-    tickerMap.set(entry.ticker.toUpperCase(), entry);
+var cikListingMap = null;
+async function loadTickerMaps() {
+  if (tickerMap && cikListingMap) {
+    return { byTicker: tickerMap, byCik: cikListingMap };
   }
-  return tickerMap;
+  const data = await cachedFetch(
+    "tickerMap",
+    TICKER_MAP_URL,
+    CACHE_TTLS.tickerMap,
+    async () => {
+      const resp = await edgarGet(TICKER_MAP_URL);
+      return resp.data;
+    }
+  );
+  const byTicker = /* @__PURE__ */ new Map();
+  const byCik = /* @__PURE__ */ new Map();
+  for (const entry of Object.values(data)) {
+    byTicker.set(entry.ticker.toUpperCase(), entry);
+    const cikKey = String(entry.cik_str);
+    if (!byCik.has(cikKey)) byCik.set(cikKey, entry);
+  }
+  tickerMap = byTicker;
+  cikListingMap = byCik;
+  return { byTicker, byCik };
 }
 async function resolveTickerToCik(ticker) {
-  const map = await loadTickerMap();
-  const entry = map.get(ticker.toUpperCase());
+  const { byTicker } = await loadTickerMaps();
+  const entry = byTicker.get(ticker.toUpperCase());
   if (!entry) {
     throw new Error(`Ticker "${ticker}" not found in SEC EDGAR.`);
   }
-  return entry.cik_str.toString();
+  return String(entry.cik_str);
 }
 async function getCompanyInfo(tickerOrCik) {
   let cik;
@@ -36285,10 +36389,16 @@ async function getCompanyInfo(tickerOrCik) {
   };
 }
 async function getCompanyFacts(cik) {
-  const { data } = await edgarGet(
-    `${EDGAR_XBRL_URL}/CIK${padCik(cik)}.json`
+  const key = padCik(cik);
+  return cachedFetch(
+    "companyFacts",
+    key,
+    CACHE_TTLS.companyFacts,
+    async () => {
+      const { data } = await edgarGet(`${EDGAR_XBRL_URL}/CIK${key}.json`);
+      return data;
+    }
   );
-  return data;
 }
 function extractMetricFromFacts(facts, metricName, period, limit) {
   const tags = XBRL_METRIC_TAGS[metricName];
@@ -36416,70 +36526,140 @@ async function getFilingDocument(cik, accessionNumber, primaryDocument) {
   const accessionPath = accessionNumber.replace(/-/g, "");
   const numericCik = parseInt(cik, 10).toString();
   const url2 = `https://www.sec.gov/Archives/edgar/data/${numericCik}/${accessionPath}/${primaryDocument}`;
-  const { data } = await edgarGet(url2, {
-    responseType: "text",
-    headers: { Accept: "text/html,text/plain,*/*" }
-  });
-  return stripHtml(data);
+  return cachedFetch(
+    "filingDocument",
+    url2,
+    CACHE_TTLS.filingDocument,
+    async () => {
+      const { data } = await edgarGet(url2, {
+        responseType: "text",
+        headers: { Accept: "text/html,text/plain,*/*" }
+      });
+      return stripHtml(data);
+    }
+  );
 }
 function stripHtml(html) {
   return html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "").replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#?\w+;/g, " ").replace(/\s+/g, " ").trim();
 }
-var MAX_SIC_SCAN_REQUESTS = 300;
-async function getCompaniesBySic(sicCode, limit = 15) {
-  const encodedSic = encodeURIComponent(sicCode);
-  const companies = [];
-  const seenCiks = /* @__PURE__ */ new Set();
-  let searchData = null;
-  try {
-    const { data } = await edgarGet(
-      `${EDGAR_EFTS_URL}/search-index?q=%22${encodedSic}%22&forms=10-K`,
-      { baseURL: "" }
-    );
-    searchData = data;
-  } catch {
-  }
-  if (searchData?.hits?.hits) {
-    for (const hit of searchData.hits.hits) {
-      if (companies.length >= limit) break;
-      const fileCik = hit._source?.file_num?.split("-")[0];
-      if (fileCik && !seenCiks.has(fileCik)) {
-        seenCiks.add(fileCik);
-        try {
-          const info = await getCompanyInfo(fileCik);
-          if (info.sic === sicCode) {
-            companies.push(info);
-          }
-        } catch {
-        }
-      }
+var SIC_BROWSE_PAGE_SIZE = 40;
+var MAX_SIC_BROWSE_PAGES = 5;
+function parseSicBrowseCiks(atomXml) {
+  const ciks = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const m of atomXml.matchAll(/<cik>\s*0*(\d+)\s*<\/cik>/gi)) {
+    if (!seen.has(m[1])) {
+      seen.add(m[1]);
+      ciks.push(m[1]);
     }
   }
-  let scanned = 0;
-  let scanCapped = false;
-  if (companies.length < limit) {
-    const map = await loadTickerMap();
-    for (const entry of map.values()) {
-      if (companies.length >= limit) break;
-      if (scanned >= MAX_SIC_SCAN_REQUESTS) {
-        scanCapped = true;
-        break;
-      }
-      if (seenCiks.has(entry.cik_str)) continue;
-      scanned++;
-      try {
-        const info = await getCompanyInfo(entry.cik_str);
-        if (info.sic === sicCode) {
-          seenCiks.add(entry.cik_str);
-          companies.push(info);
-        }
-      } catch {
-      }
+  return ciks;
+}
+async function fetchSicBrowsePage(sicCode, start) {
+  const url2 = `${EDGAR_BROWSE_URL}?action=getcompany&SIC=${encodeURIComponent(sicCode)}&type=10-K&dateb=&owner=include&count=${SIC_BROWSE_PAGE_SIZE}&start=${start}&output=atom`;
+  const xml = await cachedFetch("sicBrowse", url2, CACHE_TTLS.sicBrowse, async () => {
+    const { data } = await edgarGet(url2, {
+      responseType: "text",
+      headers: { Accept: "application/atom+xml,application/xml,text/xml,*/*" }
+    });
+    return data;
+  });
+  return parseSicBrowseCiks(xml);
+}
+async function getCompaniesBySic(sicCode, limit = 15) {
+  const { byCik } = await loadTickerMaps();
+  const allCiks = [];
+  const seen = /* @__PURE__ */ new Set();
+  const listed = [];
+  let exhausted = false;
+  for (let page = 0; page < MAX_SIC_BROWSE_PAGES && listed.length < limit; page++) {
+    const pageCiks = await fetchSicBrowsePage(sicCode, page * SIC_BROWSE_PAGE_SIZE);
+    for (const cik of pageCiks) {
+      if (seen.has(cik)) continue;
+      seen.add(cik);
+      allCiks.push(cik);
+      const entry = byCik.get(cik);
+      if (entry && listed.length < limit) listed.push({ cik, entry });
+    }
+    if (pageCiks.length < SIC_BROWSE_PAGE_SIZE) {
+      exhausted = true;
+      break;
+    }
+  }
+  if (listed.length > 0) {
+    const companies2 = listed.map(({ cik, entry }) => ({
+      cik,
+      ticker: entry.ticker.toUpperCase(),
+      name: entry.title,
+      sic: sicCode,
+      sicDescription: "",
+      exchanges: []
+    }));
+    return {
+      companies: companies2,
+      note: !exhausted ? `SIC ${sicCode} has more registrants than scanned (${allCiks.length} checked across ${MAX_SIC_BROWSE_PAGES} pages); the EDGAR listing is alphabetical, so these are the first ${companies2.length} currently listed 10-K filers by name, not a size-ranked sample.` : void 0
+    };
+  }
+  const companies = [];
+  for (const cik of allCiks.slice(0, limit)) {
+    try {
+      companies.push(await getCompanyInfo(cik));
+    } catch {
     }
   }
   return {
     companies,
-    note: scanCapped ? `Peer discovery stopped after ${MAX_SIC_SCAN_REQUESTS} SEC submissions lookups to respect SEC fair-access limits; results may be a partial sample of SIC ${sicCode}.` : void 0
+    note: companies.length > 0 ? `No currently listed registrants found for SIC ${sicCode}; returning raw EDGAR browse results, which may include delisted or private filers with stale financials.` : `EDGAR company browse returned no 10-K filers for SIC ${sicCode}.`
+  };
+}
+var SHARES_SOURCES = [
+  { taxonomy: "dei", tag: "EntityCommonStockSharesOutstanding" },
+  { taxonomy: "us-gaap", tag: "CommonStockSharesOutstanding" }
+];
+var EPS_TAGS = ["EarningsPerShareDiluted", "EarningsPerShareBasic"];
+async function getEquityFundamentals(ticker) {
+  const cik = await resolveTickerToCik(ticker);
+  const factsResp = await getCompanyFacts(cik);
+  let shares = null;
+  for (const src of SHARES_SOURCES) {
+    const units = factsResp.facts[src.taxonomy]?.[src.tag]?.units?.["shares"];
+    if (!units) continue;
+    const usable = [...units].filter((f) => f.end && typeof f.val === "number");
+    const latest = usable.sort((a, b) => b.end.localeCompare(a.end))[0];
+    if (latest) {
+      const sameEnd = usable.filter((f) => f.end === latest.end).length;
+      shares = {
+        value: latest.val,
+        asOf: latest.end,
+        form: latest.form,
+        tag: `${src.taxonomy}:${src.tag}`,
+        note: sameEnd > 1 ? `EDGAR reports ${sameEnd} share-count facts as of ${latest.end} (typically one per share class); this figure is a single fact and may cover only one class, understating the total.` : "For multi-class issuers this fact may reflect a single share class, understating total shares."
+      };
+      break;
+    }
+  }
+  let eps = null;
+  const gaap = factsResp.facts["us-gaap"] || {};
+  for (const tag of EPS_TAGS) {
+    const units = gaap[tag]?.units?.["USD/shares"];
+    if (!units) continue;
+    const latest = [...units].filter((f) => f.form === "10-K" && f.fp === "FY" && f.end && typeof f.val === "number").sort((a, b) => b.end.localeCompare(a.end))[0];
+    if (latest) {
+      eps = {
+        value: latest.val,
+        periodEnd: latest.end,
+        fiscalYear: latest.fy,
+        form: latest.form,
+        tag: `us-gaap:${tag}`
+      };
+      break;
+    }
+  }
+  return {
+    cik,
+    entityName: factsResp.entityName,
+    sharesOutstanding: shares,
+    epsAnnual: eps
   };
 }
 
@@ -36612,6 +36792,243 @@ async function handleFilingText(input) {
   return lines.join("\n");
 }
 
+// src/services/filing-sections.ts
+var TITLE_SEARCH = 90;
+var TITLE_OFFSET = 12;
+var XREF_BEFORE = /\b(?:in|see|under|of|and|to|per|with|within)\s+part\s+[ivx]+[,.]?\s*$|\b(?:in|see|under|described\s+in|refer(?:\s+to)?|section\s+in|included\s+in|set\s+forth\s+in)\s*$/i;
+var MIN_SECTION_CHARS = 250;
+var TOC_SPAN_MAX = 2500;
+var MIN_GAP = 40;
+function titleRe(phrase) {
+  const word = (w) => w.split("").join("[\\s'\u2019]{0,2}");
+  return new RegExp("\\b" + phrase.split(" ").map(word).join("[\\s'\u2019]{1,3}"), "i");
+}
+var MDNA_TITLE = titleRe("managements discussion");
+var RISK_TITLE = titleRe("risk factors");
+var FIN_STMTS_TITLE = titleRe("financial statements");
+var LEGAL_TITLE = titleRe("legal proceedings");
+var MINE_TITLE = titleRe("mine safety");
+var QUANT_TITLE = titleRe("quantitative and qualitative");
+var CONTROLS_TITLE = titleRe("controls and procedures");
+var UNRESOLVED_TITLE = titleRe("unresolved staff");
+var EXHIBITS_TITLE = titleRe("exhibits");
+var SPECS = {
+  "10-K": {
+    business: {
+      label: "Item 1 \u2014 Business",
+      start: { item: "1", title: titleRe("business") },
+      ends: [
+        { item: "1a", title: RISK_TITLE },
+        { item: "1b", title: UNRESOLVED_TITLE },
+        { item: "2", title: titleRe("propert") }
+      ]
+    },
+    risk_factors: {
+      label: "Item 1A \u2014 Risk Factors",
+      start: { item: "1a", title: RISK_TITLE },
+      ends: [
+        { item: "1b", title: UNRESOLVED_TITLE },
+        { item: "1c", title: titleRe("cybersecurity") },
+        { item: "2", title: titleRe("propert") }
+      ]
+    },
+    legal_proceedings: {
+      label: "Item 3 \u2014 Legal Proceedings",
+      start: { item: "3", title: LEGAL_TITLE },
+      ends: [
+        { item: "4", title: MINE_TITLE },
+        { item: "5", title: titleRe("market for") }
+      ]
+    },
+    mdna: {
+      label: "Item 7 \u2014 Management's Discussion and Analysis",
+      start: { item: "7", title: MDNA_TITLE },
+      ends: [
+        { item: "7a", title: QUANT_TITLE },
+        { item: "8", title: FIN_STMTS_TITLE }
+      ]
+    },
+    financial_statements: {
+      label: "Item 8 \u2014 Financial Statements and Supplementary Data",
+      start: { item: "8", title: FIN_STMTS_TITLE },
+      ends: [
+        { item: "9", title: titleRe("changes in and disagreements") },
+        { item: "9a", title: CONTROLS_TITLE }
+      ]
+    }
+  },
+  "10-Q": {
+    financial_statements: {
+      label: "Part I, Item 1 \u2014 Financial Statements",
+      start: { item: "1", title: FIN_STMTS_TITLE },
+      ends: [{ item: "2", title: MDNA_TITLE }]
+    },
+    mdna: {
+      label: "Part I, Item 2 \u2014 Management's Discussion and Analysis",
+      start: { item: "2", title: MDNA_TITLE },
+      ends: [
+        { item: "3", title: QUANT_TITLE },
+        { item: "4", title: CONTROLS_TITLE }
+      ]
+    },
+    legal_proceedings: {
+      label: "Part II, Item 1 \u2014 Legal Proceedings",
+      start: { item: "1", title: LEGAL_TITLE },
+      ends: [
+        { item: "1a", title: RISK_TITLE },
+        { item: "2", title: titleRe("unregistered sales") },
+        { item: "6", title: EXHIBITS_TITLE }
+      ]
+    },
+    risk_factors: {
+      label: "Part II, Item 1A \u2014 Risk Factors",
+      start: { item: "1a", title: RISK_TITLE },
+      ends: [
+        { item: "2", title: titleRe("unregistered sales") },
+        { item: "3", title: titleRe("defaults") },
+        { item: "4", title: MINE_TITLE },
+        { item: "5", title: titleRe("other information") },
+        { item: "6", title: EXHIBITS_TITLE }
+      ]
+    }
+    // business: a 10-Q has no Business section — the tool rejects the combination.
+  }
+};
+function itemPattern(item) {
+  const m = /^(\d+)([a-z])?$/i.exec(item);
+  if (!m) throw new Error(`Invalid item token: ${item}`);
+  const body = m[2] ? `${m[1]}\\s*${m[2]}` : m[1];
+  return new RegExp(`\\bitem\\s*${body}\\b`, "gi");
+}
+function allPositions(text, re) {
+  const out = [];
+  for (const m of text.matchAll(re)) {
+    out.push(m.index ?? 0);
+  }
+  return out;
+}
+function confirmedPositions(text, b) {
+  const out = [];
+  for (const m of text.matchAll(itemPattern(b.item))) {
+    const idx = m.index ?? 0;
+    const windowStart = idx + m[0].length;
+    const title = b.title.exec(text.slice(windowStart, windowStart + TITLE_SEARCH));
+    if (!title || title.index > TITLE_OFFSET) continue;
+    if (XREF_BEFORE.test(text.slice(Math.max(0, idx - 40), idx))) continue;
+    out.push(idx);
+  }
+  return out;
+}
+function isSectionAvailable(section, form) {
+  return Boolean(SPECS[form][section]);
+}
+function extractSection(text, section, form) {
+  const spec = SPECS[form][section];
+  if (!spec) return null;
+  const starts = confirmedPositions(text, spec.start);
+  const ends = spec.ends.flatMap((e) => confirmedPositions(text, e)).sort((a, b) => a - b);
+  for (const s of starts) {
+    const e = ends.find((p) => p > s + MIN_GAP) ?? text.length;
+    const span = e - s;
+    if (span < MIN_SECTION_CHARS) continue;
+    if (span < TOC_SPAN_MAX && starts.some((s2) => s2 > e)) continue;
+    return { text: text.slice(s, e), label: spec.label, approximate: false };
+  }
+  for (let i = starts.length - 1; i >= 0; i--) {
+    const s = starts[i];
+    const e = ends.find((p) => p > s + MIN_GAP);
+    if (e !== void 0) {
+      return { text: text.slice(s, e), label: spec.label, approximate: false };
+    }
+  }
+  const bareStarts = allPositions(text, itemPattern(spec.start.item));
+  const bareEnds = spec.ends.flatMap((e) => allPositions(text, itemPattern(e.item))).sort((a, b) => a - b);
+  let best = null;
+  for (const s of bareStarts) {
+    const e = bareEnds.find((p) => p > s + MIN_GAP) ?? text.length;
+    if (!best || e - s > best.e - best.s) best = { s, e };
+  }
+  if (best && best.e - best.s >= MIN_SECTION_CHARS) {
+    return { text: text.slice(best.s, best.e), label: spec.label, approximate: true };
+  }
+  return null;
+}
+
+// src/tools/filing-section.ts
+async function handleFilingSection(input) {
+  const identifier = input.ticker || input.cik;
+  if (!identifier) {
+    throw new Error("Either ticker or cik must be provided.");
+  }
+  if (!isSectionAvailable(input.section, input.filing_type)) {
+    throw new Error(
+      `Section "${input.section}" is not part of a ${input.filing_type}. The Business section (Item 1) only appears in 10-K filings \u2014 retry with filing_type "10-K".`
+    );
+  }
+  const { company, filings } = await getFilings(identifier, input.filing_type, 1);
+  if (filings.length === 0) {
+    return `## ${company.name} (${company.ticker})
+
+*No ${input.filing_type} filings found.*`;
+  }
+  const filing = filings[0];
+  const header = [
+    `## ${company.name} (${company.ticker}) \u2014 ${filing.form} filed ${filing.filingDate}`,
+    ""
+  ];
+  if (!filing.primaryDocument) {
+    return [...header, `*Filing ${filing.accessionNumber} has no primary document to extract from.*`].join("\n");
+  }
+  const text = await getFilingDocument(company.cik, filing.accessionNumber, filing.primaryDocument);
+  const located = extractSection(text, input.section, input.filing_type);
+  if (!located) {
+    return [
+      ...header,
+      `*Could not locate the "${input.section}" section boundaries in this filing's primary document (${filing.primaryDocument}). The filing may use nonstandard item headings. Fall back to fin_get_filing_text for the raw document, or read the filing on EDGAR (accession ${filing.accessionNumber}).*`
+    ].join("\n");
+  }
+  const totalPages = Math.max(1, Math.ceil(located.text.length / FILING_SECTION_PAGE_SIZE));
+  if (input.page > totalPages) {
+    return [
+      ...header,
+      `*${located.label} has ${totalPages} page(s) (${located.text.length.toLocaleString()} characters); page ${input.page} does not exist. Request a page between 1 and ${totalPages}.*`
+    ].join("\n");
+  }
+  const startChar = (input.page - 1) * FILING_SECTION_PAGE_SIZE;
+  const slice = located.text.slice(startChar, startChar + FILING_SECTION_PAGE_SIZE);
+  const endChar = startChar + slice.length;
+  const lines = [
+    `## ${company.name} (${company.ticker}) \u2014 ${located.label}`,
+    "",
+    `| Field | Value |`,
+    `|-------|-------|`,
+    `| Filing | ${filing.form} filed ${filing.filingDate} (period ${filing.reportDate}) |`,
+    `| Accession | ${filing.accessionNumber} |`,
+    `| Section length | ${located.text.length.toLocaleString()} characters |`,
+    ""
+  ];
+  if (located.approximate) {
+    lines.push(
+      "*Note: section boundaries were located by fallback item-number matching (standard headings were not found); verify the start and end of this text against the source filing.*",
+      ""
+    );
+  }
+  lines.push("```", slice, "```", "");
+  if (totalPages > 1) {
+    const next = input.page < totalPages ? `Call fin_get_filing_section again with page: ${input.page + 1} to continue.` : "End of section.";
+    lines.push(
+      `--- Page ${input.page} of ${totalPages} \u2014 characters ${(startChar + 1).toLocaleString()}\u2013${endChar.toLocaleString()} of ${located.text.length.toLocaleString()}. ${next} ---`
+    );
+  } else {
+    lines.push(`--- Complete section (${located.text.length.toLocaleString()} characters, 1 page). ---`);
+  }
+  lines.push(
+    "",
+    "*Data source: SEC EDGAR filing text; section boundaries located heuristically from item headings.*"
+  );
+  return lines.join("\n");
+}
+
 // src/services/yahoo.ts
 var limiter2 = new RateLimiter(RATE_LIMITS.yahoo);
 var YAHOO_CHART_BASE = "https://query1.finance.yahoo.com/v8/finance/chart";
@@ -36696,10 +37113,23 @@ async function getStockData(ticker, period = "1y", interval = "1d") {
 }
 
 // src/tools/stock-data.ts
+function formatLarge(value) {
+  if (Math.abs(value) >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
+  if (Math.abs(value) >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
+  if (Math.abs(value) >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
+  return `$${Math.round(value).toLocaleString()}`;
+}
 async function handleStockData(input) {
   const { ticker, period, interval } = input;
   const data = await getStockData(ticker, period, interval);
   const { quote, history } = data;
+  let fundamentals = null;
+  let fundamentalsError = null;
+  try {
+    fundamentals = await getEquityFundamentals(ticker);
+  } catch (err) {
+    fundamentalsError = err instanceof Error ? err.message : String(err);
+  }
   const avgVolumeRow = quote.avgVolumeBars > 0 ? `| Avg Volume (last ${quote.avgVolumeBars} ${interval} bars) | ${quote.avgVolume.toLocaleString()} |` : `| Avg Volume | N/A |`;
   const changeRow = quote.change !== null && quote.changePercent !== null ? `| Change | ${quote.change >= 0 ? "+" : ""}${quote.change.toFixed(2)} (${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%) |` : `| Change | N/A |`;
   const lines = [
@@ -36716,6 +37146,53 @@ async function handleStockData(input) {
     avgVolumeRow,
     ""
   ];
+  const lastBar = history.length > 0 ? history[history.length - 1] : null;
+  const closePrice = lastBar ? lastBar.close : quote.price;
+  const closeLabel = lastBar ? `$${lastBar.close.toFixed(2)} close on ${lastBar.date}` : `$${quote.price.toFixed(2)} latest quote price`;
+  lines.push("### Computed Fundamentals (EDGAR-derived)");
+  lines.push("");
+  if (fundamentals && (fundamentals.sharesOutstanding || fundamentals.epsAnnual)) {
+    const shares = fundamentals.sharesOutstanding;
+    const eps = fundamentals.epsAnnual;
+    const derivations = [];
+    lines.push(`| Metric | Value |`);
+    lines.push(`|--------|-------|`);
+    if (shares && closePrice > 0) {
+      const marketCap = shares.value * closePrice;
+      lines.push(`| Market Cap (computed) | ${formatLarge(marketCap)} |`);
+      derivations.push(
+        `*Market cap = ${shares.value.toLocaleString()} shares outstanding (${shares.tag} as of ${shares.asOf}, reported in ${shares.form}) \xD7 ${closeLabel} (Yahoo chart). Share count and price are from different dates; this is a computed estimate, not an exchange-reported figure. ${shares.note}*`
+      );
+    }
+    if (eps) {
+      const epsKind = eps.tag.includes("Diluted") ? "diluted" : "basic";
+      lines.push(`| EPS (FY${eps.fiscalYear}, ${epsKind}) | $${eps.value.toFixed(2)} |`);
+      derivations.push(
+        `*EPS = ${eps.tag} for the fiscal year ended ${eps.periodEnd} (${eps.form}); last reported full fiscal year, not trailing-twelve-month.*`
+      );
+      if (closePrice > 0) {
+        if (eps.value > 0) {
+          lines.push(`| P/E (computed) | ${(closePrice / eps.value).toFixed(1)} |`);
+          derivations.push(
+            `*P/E = ${closeLabel} \xF7 FY${eps.fiscalYear} ${epsKind} EPS $${eps.value.toFixed(2)}.*`
+          );
+        } else {
+          lines.push(`| P/E (computed) | N/A (non-positive EPS) |`);
+        }
+      }
+    }
+    lines.push("");
+    lines.push(...derivations);
+  } else if (fundamentalsError) {
+    lines.push(
+      `*EDGAR fundamentals unavailable for ${ticker.toUpperCase()} (${fundamentalsError}). Market cap and P/E are omitted rather than estimated.*`
+    );
+  } else {
+    lines.push(
+      `*No shares-outstanding or EPS facts found in EDGAR XBRL for ${ticker.toUpperCase()}. Market cap and P/E are omitted rather than estimated.*`
+    );
+  }
+  lines.push("");
   if (history.length > 0) {
     const closes = history.map((h) => h.close);
     const periodHigh = Math.max(...closes);
@@ -36744,7 +37221,9 @@ async function handleStockData(input) {
     }
   }
   lines.push("");
-  lines.push(`*Data source: Yahoo Finance | Period: ${period} | Interval: ${interval}*`);
+  lines.push(
+    `*Data sources: Yahoo Finance chart (price/volume history) + SEC EDGAR XBRL (shares outstanding, EPS) | Period: ${period} | Interval: ${interval}*`
+  );
   return lines.join("\n");
 }
 
@@ -36771,48 +37250,62 @@ function getClient2() {
   return client2;
 }
 async function getSeriesInfo(seriesId) {
-  const apiKey = getApiKey();
-  await limiter3.acquire();
-  const { data } = await getClient2().get("/series", {
-    params: {
-      series_id: seriesId,
-      api_key: apiKey,
-      file_type: "json"
+  return cachedFetch(
+    "fredSeries",
+    `series:${seriesId}`,
+    CACHE_TTLS.fredSeries,
+    async () => {
+      const apiKey = getApiKey();
+      await limiter3.acquire();
+      const { data } = await getClient2().get("/series", {
+        params: {
+          series_id: seriesId,
+          api_key: apiKey,
+          file_type: "json"
+        }
+      });
+      const s = data.seriess?.[0];
+      if (!s) {
+        throw new Error(`FRED series "${seriesId}" not found.`);
+      }
+      return {
+        id: s.id,
+        title: s.title,
+        units: s.units,
+        frequency: s.frequency,
+        seasonalAdjustment: s.seasonal_adjustment,
+        lastUpdated: s.last_updated,
+        notes: s.notes || ""
+      };
     }
-  });
-  const s = data.seriess?.[0];
-  if (!s) {
-    throw new Error(`FRED series "${seriesId}" not found.`);
-  }
-  return {
-    id: s.id,
-    title: s.title,
-    units: s.units,
-    frequency: s.frequency,
-    seasonalAdjustment: s.seasonal_adjustment,
-    lastUpdated: s.last_updated,
-    notes: s.notes || ""
-  };
+  );
 }
 async function getObservations(seriesId, startDate, endDate, limit = 20) {
-  const apiKey = getApiKey();
   const series = await getSeriesInfo(seriesId);
-  await limiter3.acquire();
-  const params = {
-    series_id: seriesId,
-    api_key: apiKey,
-    file_type: "json",
-    sort_order: "desc",
-    limit
-  };
-  if (startDate) params.observation_start = startDate;
-  if (endDate) params.observation_end = endDate;
-  const { data } = await getClient2().get("/series/observations", { params });
-  const observations = (data.observations || []).map(
-    (obs) => ({
-      date: obs.date,
-      value: obs.value === "." ? null : parseFloat(obs.value)
-    })
+  const observations = await cachedFetch(
+    "fredSeries",
+    `obs:${seriesId}:${startDate ?? ""}:${endDate ?? ""}:${limit}`,
+    CACHE_TTLS.fredSeries,
+    async () => {
+      const apiKey = getApiKey();
+      await limiter3.acquire();
+      const params = {
+        series_id: seriesId,
+        api_key: apiKey,
+        file_type: "json",
+        sort_order: "desc",
+        limit
+      };
+      if (startDate) params.observation_start = startDate;
+      if (endDate) params.observation_end = endDate;
+      const { data } = await getClient2().get("/series/observations", { params });
+      return (data.observations || []).map(
+        (obs) => ({
+          date: obs.date,
+          value: obs.value === "." ? null : parseFloat(obs.value)
+        })
+      );
+    }
   );
   return { series, observations };
 }
@@ -37231,8 +37724,15 @@ registerFinTool(
   handleFilingText
 );
 registerFinTool(
+  "fin_get_filing_section",
+  "Extract a specific section from a company's most recent 10-K or 10-Q (SEC EDGAR): risk_factors (Item 1A), mdna (Management's Discussion & Analysis), business (Item 1, 10-K only), legal_proceedings, or financial_statements. Locates item-heading boundaries in the filing text and returns the section in pages of up to 25,000 characters with a pagination footer (pass page to continue). Boundary detection is heuristic; the tool reports failure instead of returning unrelated text.",
+  filingSectionShape,
+  filingSectionSchema,
+  handleFilingSection
+);
+registerFinTool(
   "fin_get_stock_data",
-  "Get stock price data from Yahoo Finance: current price, daily change, 52-week range, average volume, and OHLCV price history for a configurable period and interval.",
+  "Get stock price data from the Yahoo Finance chart endpoint (current price, daily change, 52-week range, average volume, OHLCV history) plus computed fundamentals from SEC EDGAR XBRL: market cap (EDGAR-reported shares outstanding \xD7 latest chart close) and last-fiscal-year EPS with a derived P/E \u2014 each labeled with its derivation and as-of dates.",
   stockDataShape,
   stockDataSchema,
   handleStockData

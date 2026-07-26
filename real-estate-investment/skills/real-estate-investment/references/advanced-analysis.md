@@ -77,79 +77,29 @@ Break-Even = ($800,000 + $1,000,000) / $2,500,000 = 72%
 - Lender requirement: ≤85%
 - Lower break-even = larger financial cushion
 
-### Python: Basic Sensitivity Analysis
+### Canonical Script: `scripts/sensitivity.py`
 
-```python
-import pandas as pd
-import numpy as np
+The runnable two-way sensitivity grid lives at `scripts/sensitivity.py`
+(relative to this skill's directory). It re-runs the full
+`scripts/pro_forma.py` model for every cell of a purchase-price ×
+interest-rate grid (the loan re-sizes with price via LTV) and prints a
+markdown table of levered IRR, year-1 cash-on-cash, or year-1 DSCR:
 
-def calculate_irr(rent_growth, vacancy_rate, exit_cap):
-    """Simplified IRR calculation (replace with full DCF)"""
-    base_irr = 0.12
-    irr = base_irr + (rent_growth - 0.03) * 0.5 + (0.10 - vacancy_rate) * 0.3 - (exit_cap - 0.05) * 2
-    return irr
+```bash
+pip install numpy numpy-financial   # one-time
 
-# Define variable ranges
-variables = {
-    'rent_growth': np.arange(0.01, 0.06, 0.01),
-    'vacancy_rate': np.arange(0.05, 0.21, 0.03),
-    'exit_cap': np.arange(0.04, 0.08, 0.01)
-}
-
-# Base case values
-base_case = {
-    'rent_growth': 0.03,
-    'vacancy_rate': 0.10,
-    'exit_cap': 0.05
-}
-
-# One-way sensitivity analysis
-results = []
-for var_name, var_range in variables.items():
-    for value in var_range:
-        params = base_case.copy()
-        params[var_name] = value
-        irr = calculate_irr(**params)
-        results.append({
-            'variable': var_name,
-            'value': value,
-            'irr': irr
-        })
-
-df_sensitivity = pd.DataFrame(results)
-
-# Calculate ranges for tornado diagram
-tornado_data = df_sensitivity.groupby('variable')['irr'].agg(['min', 'max'])
-tornado_data['range'] = tornado_data['max'] - tornado_data['min']
-tornado_data = tornado_data.sort_values('range', ascending=False)
-print(tornado_data)
+python scripts/pro_forma.py --sample-input > inputs.json
+# IRR grid, ±10% price x ±100 bps rate, 5x5 (defaults):
+python scripts/sensitivity.py --input inputs.json
+# Wider DSCR grid:
+python scripts/sensitivity.py --input inputs.json --metric dscr \
+    --price-spread 0.15 --rate-spread 0.015 --steps 7
 ```
 
-### Python: Two-Way Sensitivity Table
-
-```python
-import pandas as pd
-import numpy as np
-
-def calculate_npv(exit_cap, rent_growth):
-    base_npv = 5000000
-    npv = base_npv - (exit_cap - 0.05) * 10000000 + (rent_growth - 0.03) * 8000000
-    return npv
-
-# Create two-way table
-exit_caps = np.arange(0.04, 0.08, 0.005)
-rent_growths = np.arange(0.01, 0.06, 0.005)
-
-sensitivity_table = pd.DataFrame(
-    [[calculate_npv(cap, growth) for growth in rent_growths] for cap in exit_caps],
-    index=exit_caps,
-    columns=rent_growths
-)
-
-# Format as millions
-print("NPV Sensitivity Table ($ Millions)")
-print((sensitivity_table / 1000000).round(2))
-```
+For one-way tornado sweeps of other variables (rent growth, vacancy, exit
+cap), edit the input JSON one field at a time, re-run `pro_forma.py`, and
+record the IRR swing per variable — then sort by swing per the tornado
+methodology above.
 
 ### Python: Scenario Analysis
 
@@ -294,106 +244,29 @@ print(f"Triangular: Min={min_growth:.2%}, Mode={mode_growth:.2%}, Max={max_growt
 - Vacancy Rates: Property-specific, 5-15% range
 - Cap Rates: Vary by type; multifamily typically 4-7%
 
-### Python: Monte Carlo Framework
+### Canonical Script: `scripts/monte_carlo.py`
 
-```python
-import numpy as np
-import numpy_financial as npf
-import pandas as pd
-import matplotlib.pyplot as plt
+The runnable Monte Carlo simulator lives at `scripts/monte_carlo.py`
+(relative to this skill's directory). Per draw it samples rent growth
+(normal, clipped), vacancy (normal, clipped), and exit cap rate (triangular),
+projects unlevered NOI with a terminal sale, and computes IRR and NPV; it then
+reports mean/median/std, 5th/95th percentiles, 5% VaR, P(NPV < 0), and
+P(IRR ≥ target) for each requested target:
 
-np.random.seed(42)
-n_simulations = 10000
+```bash
+pip install numpy numpy-financial   # one-time
 
-# Model parameters
-purchase_price = 50000000
-hold_period = 5
-
-# Distribution parameters
-rent_growth_mean = 0.03
-rent_growth_std = 0.02
-exit_cap_min = 0.045
-exit_cap_mode = 0.055
-exit_cap_max = 0.070
-vacancy_mean = 0.08
-vacancy_std = 0.03
-
-irr_results = []
-npv_results = []
-
-for i in range(n_simulations):
-    # Sample variables
-    rent_growth = np.random.normal(rent_growth_mean, rent_growth_std)
-    exit_cap = np.random.triangular(exit_cap_min, exit_cap_mode, exit_cap_max)
-    vacancy = np.random.normal(vacancy_mean, vacancy_std)
-
-    # Constrain to realistic bounds
-    rent_growth = np.clip(rent_growth, -0.05, 0.15)
-    vacancy = np.clip(vacancy, 0.02, 0.30)
-
-    # Cash flow projection
-    year_1_noi = 3500000 * (1 - vacancy)
-    cash_flows = [-purchase_price]
-
-    for year in range(1, hold_period + 1):
-        noi = year_1_noi * ((1 + rent_growth) ** year)
-        cash_flows.append(noi)
-
-    # Terminal value
-    terminal_noi = cash_flows[-1] * (1 + rent_growth)
-    terminal_value = terminal_noi / exit_cap
-    cash_flows[-1] += terminal_value
-
-    # Calculate metrics
-    irr = npf.irr(cash_flows)
-    npv = npf.npv(0.10, cash_flows)
-
-    irr_results.append(irr)
-    npv_results.append(npv)
-
-irr_results = np.array(irr_results)
-npv_results = np.array(npv_results)
-
-# Summary statistics
-print("=== MONTE CARLO SIMULATION RESULTS ===")
-print(f"Simulations: {n_simulations:,}")
-print(f"\nIRR Statistics:")
-print(f"  Mean: {np.mean(irr_results):.2%}")
-print(f"  Median: {np.median(irr_results):.2%}")
-print(f"  Std Dev: {np.std(irr_results):.2%}")
-print(f"  5th Percentile: {np.percentile(irr_results, 5):.2%}")
-print(f"  95th Percentile: {np.percentile(irr_results, 95):.2%}")
-
-print(f"\nNPV Statistics:")
-print(f"  Mean: ${np.mean(npv_results):,.0f}")
-print(f"  5th Percentile: ${np.percentile(npv_results, 5):,.0f}")
-print(f"  95th Percentile: ${np.percentile(npv_results, 95):,.0f}")
-
-# Probability of meeting targets
-target_irr = 0.12
-prob_exceed = np.sum(irr_results >= target_irr) / n_simulations
-print(f"\nP(IRR >= {target_irr:.0%}): {prob_exceed:.1%}")
-
-# Visualize
-fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-
-axes[0].hist(irr_results, bins=50, edgecolor='black', alpha=0.7)
-axes[0].axvline(np.mean(irr_results), color='red', linestyle='--', label=f'Mean: {np.mean(irr_results):.2%}')
-axes[0].axvline(target_irr, color='green', linestyle='--', label=f'Target: {target_irr:.0%}')
-axes[0].set_xlabel('IRR')
-axes[0].set_ylabel('Frequency')
-axes[0].set_title('Distribution of IRR Outcomes')
-axes[0].legend()
-
-axes[1].hist(npv_results / 1000000, bins=50, edgecolor='black', alpha=0.7)
-axes[1].axvline(np.mean(npv_results) / 1000000, color='red', linestyle='--')
-axes[1].set_xlabel('NPV ($ Millions)')
-axes[1].set_ylabel('Frequency')
-axes[1].set_title('Distribution of NPV Outcomes')
-
-plt.tight_layout()
-plt.savefig('monte_carlo_results.png', dpi=300)
+python scripts/monte_carlo.py --sample-input > mc_inputs.json
+python scripts/monte_carlo.py --input mc_inputs.json --table            # summary
+python scripts/monte_carlo.py --input mc_inputs.json \
+    --simulations 20000 --seed 42 --output mc_results.json              # full JSON
 ```
+
+The input JSON carries the distribution parameters (`rent_growth` mean/std
+with clip bounds, `vacancy` mean/std with clip bounds, `exit_cap`
+min/mode/max), plus `purchase_price`, `year_1_noi_at_full_occupancy`,
+`hold_period`, `discount_rate`, and `target_irrs`. Pass `--seed` for
+reproducible runs.
 
 ### Python: Correlated Variables
 
@@ -427,29 +300,9 @@ print(f"Correlation: {np.corrcoef(rent_growth, exit_cap)[0, 1]:.2f}")
 - **5th Percentile:** 5% chance of worse outcome (downside risk)
 - **95th Percentile:** Upside potential
 
-**Value at Risk (VaR):**
-
-```python
-# 5% VaR
-var_5 = np.percentile(npv_results, 5)
-print(f"5% VaR: ${var_5:,.0f}")
-print(f"Interpretation: 5% chance NPV ≤ ${var_5:,.0f}")
-
-# Probability of loss
-prob_loss = np.sum(npv_results < 0) / len(npv_results)
-print(f"P(NPV < 0): {prob_loss:.1%}")
-```
-
-**IRR Target Probabilities:**
-
-```python
-targets = [0.08, 0.10, 0.12, 0.15, 0.18]
-
-print("IRR Target Probabilities:")
-for target in targets:
-    prob = np.sum(irr_results >= target) / len(irr_results)
-    print(f"  P(IRR >= {target:.0%}): {prob:.1%}")
-```
+**Value at Risk & target probabilities:** `scripts/monte_carlo.py` reports
+the 5% VaR (5th-percentile NPV), P(NPV < 0), and P(IRR ≥ target) for every
+entry in `target_irrs` directly — read them off its JSON or `--table` output.
 
 ### Iteration Count Guidelines
 
@@ -457,22 +310,9 @@ for target in targets:
 - **Recommended:** 5,000-10,000 iterations for robust results
 - **Complex Models:** 10,000+ when modeling many variables
 
-**Test for Convergence:**
-```python
-# Run multiple iteration counts and check stability
-iteration_counts = [100, 500, 1000, 5000, 10000]
-means = []
-
-for n in iteration_counts:
-    temp_results = [run_simulation() for _ in range(n)]
-    means.append(np.mean(temp_results))
-
-print("Mean IRR by Iteration Count:")
-for n, m in zip(iteration_counts, means):
-    print(f"{n:>6,} iterations: {m:.4%}")
-```
-
-Results converge when increasing iterations no longer changes mean/distribution.
+**Test for convergence:** re-run `scripts/monte_carlo.py` with increasing
+`--simulations` (1,000 → 5,000 → 10,000, same `--seed` policy) and compare the
+mean IRR across runs. Results converge when increasing iterations no longer changes mean/distribution.
 
 ---
 
@@ -648,115 +488,33 @@ Re-evaluates GP compensation at end of investment period to ensure it matches ac
 | Cumulative, Simple | $4,000,000 |
 | Cumulative, Compound | $4,693,000 |
 
-### Python: Waterfall Calculator with IRR Hurdles
+### Canonical Script: `scripts/waterfall.py`
 
-```python
-import numpy as np
-import numpy_financial as npf
+The corrected incremental-tier, dated-cash-flow waterfall lives at
+`scripts/waterfall.py` (relative to this skill's directory) as
+`calculate_waterfall_irr` — European-style (whole-fund), annual periods,
+IRR hurdles measured on the investor's dated cash flows, GP co-investment
+pari passu with promote on top:
 
-def calculate_waterfall_irr(
-    lp_capital,
-    gp_capital,
-    annual_cash_flows,
-    hurdles=[0.08, 0.12, 0.18],
-    lp_splits=[1.00, 0.80, 0.70],
-    residual_lp_split=0.60,
-):
-    """
-    European-style (whole-fund) distribution waterfall with IRR hurdles.
+```bash
+pip install numpy numpy-financial   # one-time
 
-    Assumptions:
-    - annual_cash_flows[t] is total distributable cash at the end of year t+1;
-      all equity is invested at time 0 (annual periods, end-of-year flows).
-    - Hurdles are investor IRR hurdles measured on the investor's dated cash
-      flows (compound, cumulative pref — the first hurdle IS the pref rate).
-    - GP co-investment (gp_capital), if any, is pari passu with LP capital:
-      it earns its pro-rata share of every investor dollar. The GP promote
-      (the 1 - split share of each tier) is on top of that.
-    - lp_splits[i] is the investor share of tier cash until investor IRR
-      reaches hurdles[i]; residual_lp_split applies above the last hurdle.
-      Default: 100% to investors until 8% IRR, then 80/20 to 12%, 70/30 to
-      18%, 60/40 thereafter.
-    - No GP catch-up tier (see simple_waterfall below for catch-up mechanics).
-
-    Returns: dict with dated LP/GP cash flows, totals, and IRRs
-    """
-    n_years = len(annual_cash_flows)
-    investor_capital = lp_capital + gp_capital
-
-    # Dated flows: index 0 = time-0 investment, 1..N = year-end distributions
-    investor_cf = np.zeros(n_years + 1)
-    investor_cf[0] = -investor_capital
-    promote_cf = np.zeros(n_years + 1)
-
-    def cash_needed_to_reach(hurdle, year, flows):
-        """Distribution at end of `year` that lifts the IRR of `flows` to
-        exactly `hurdle`: the future value of the remaining shortfall,
-        compounded at the hurdle rate."""
-        fv = sum(flows[t] * (1 + hurdle) ** (year - t) for t in range(year + 1))
-        return max(0.0, -fv)
-
-    tier_hurdles = list(hurdles) + [None]          # None = uncapped residual
-    tier_splits = list(lp_splits) + [residual_lp_split]
-
-    for year in range(1, n_years + 1):
-        remaining = annual_cash_flows[year - 1]
-        for hurdle, inv_share in zip(tier_hurdles, tier_splits):
-            if remaining <= 0:
-                break
-            if hurdle is None:
-                tier_cash = remaining              # residual tier takes the rest
-            else:
-                inv_needed = cash_needed_to_reach(hurdle, year, investor_cf)
-                if inv_needed <= 0:
-                    continue                        # hurdle already met
-                # Investors receive inv_share of each tier dollar
-                tier_cash = min(remaining, inv_needed / inv_share)
-            investor_cf[year] += tier_cash * inv_share
-            promote_cf[year] += tier_cash * (1 - inv_share)
-            remaining -= tier_cash
-
-    # Attribute investor flows pro-rata; GP = co-invest share + 100% of promote
-    lp_share = lp_capital / investor_capital
-    lp_cf = investor_cf * lp_share
-    gp_cf = investor_cf * (1 - lp_share) + promote_cf
-    gp_cf[0] = -gp_capital
-
-    project_cf = np.concatenate([[-investor_capital], annual_cash_flows])
-    total_distributions = float(np.sum(annual_cash_flows))
-    lp_total = float(np.sum(lp_cf[1:]))
-    gp_total = float(np.sum(gp_cf[1:]))
-
-    return {
-        'project_irr': npf.irr(project_cf),
-        'lp_cash_flows': lp_cf,
-        'gp_cash_flows': gp_cf,
-        'lp_total': lp_total,
-        'gp_total': gp_total,
-        'lp_irr': npf.irr(lp_cf),
-        'gp_irr': npf.irr(gp_cf) if gp_capital > 0 else None,
-        'lp_percent': lp_total / total_distributions,
-        'gp_percent': gp_total / total_distributions
-    }
-
-# Example usage: $10M LP, 5-year hold, single $15M distribution at exit
-results = calculate_waterfall_irr(
-    lp_capital=10000000,
-    gp_capital=0,
-    annual_cash_flows=[0, 0, 0, 0, 15000000],
-    hurdles=[0.08, 0.12, 0.18],
-    lp_splits=[1.00, 0.80, 0.70],
-    residual_lp_split=0.60
-)
-
-print("=" * 50)
-print("WATERFALL SUMMARY")
-print("=" * 50)
-print(f"Project IRR: {results['project_irr']:.2%}")
-print(f"LP: ${results['lp_total']:,.0f} ({results['lp_percent']:.1%}), IRR: {results['lp_irr']:.2%}")
-gp_irr = f"{results['gp_irr']:.2%}" if results['gp_irr'] is not None else "n/a (no GP capital)"
-print(f"GP: ${results['gp_total']:,.0f} ({results['gp_percent']:.1%}), IRR: {gp_irr}")
+python scripts/waterfall.py --sample-input > waterfall_inputs.json
+python scripts/waterfall.py --input waterfall_inputs.json --table       # summary
+python scripts/waterfall.py --input waterfall_inputs.json \
+    --output waterfall_results.json                                     # full JSON
 ```
+
+Input keys: `lp_capital`, `gp_capital`, `annual_cash_flows` (year-end
+distributable cash, index 0 = end of year 1), `hurdles`, `lp_splits` (investor
+share per tier), `residual_lp_split`. Defaults: 100% to investors until 8%
+IRR, then 80/20 to 12%, 70/30 to 18%, 60/40 thereafter. Output includes dated
+LP/GP cash flow vectors, totals, split percentages, and project/LP/GP IRRs.
+
+Reference case (in `--sample-input`): $10M LP, no GP capital, single $15M
+distribution at end of year 5. Tier 1 pays investors $10M × 1.08⁵ =
+$14,693,281 (100%); the remaining $306,719 splits 80/20 → GP promote $61,344;
+LP IRR 8.36%, project IRR 8.45%.
 
 **How the tier math works:** at each distribution date, the cash required to
 bring the investor IRR exactly to a hurdle equals the future value of the
@@ -766,64 +524,22 @@ by the tier's investor share — is allocated at the tier's split before moving
 to the next tier, so residual cash above a hurdle is split at the *next* tier's
 promote, never at the lowest tier's split.
 
-### Python: Simplified Waterfall
+### Simplified Waterfall: `--mode simple`
 
-```python
-def simple_waterfall(total_proceeds, lp_capital, pref_rate=0.08, promote=0.20):
-    """Simplified waterfall with pref return and single promote tier."""
-    distributions = {
-        'lp': {'return_of_capital': 0, 'pref_return': 0, 'profit_split': 0, 'total': 0},
-        'gp': {'catchup': 0, 'profit_split': 0, 'total': 0}
-    }
+For a quick split of a single total (no dated cash flows), run the same
+script in simple mode — return of capital, one year of pref, GP catch-up on
+the pref per the Catch-Up Provision formula above, then a single promote
+tier:
 
-    remaining = total_proceeds
-
-    # Tier 1: Return of capital
-    distributions['lp']['return_of_capital'] = min(lp_capital, remaining)
-    remaining -= distributions['lp']['return_of_capital']
-
-    if remaining <= 0:
-        distributions['lp']['total'] = distributions['lp']['return_of_capital']
-        return distributions
-
-    # Tier 2: Preferred return
-    pref_amount = lp_capital * pref_rate
-    distributions['lp']['pref_return'] = min(pref_amount, remaining)
-    remaining -= distributions['lp']['pref_return']
-
-    if remaining <= 0:
-        distributions['lp']['total'] = sum(distributions['lp'].values())
-        return distributions
-
-    # Tier 3: GP catch-up
-    total_tier_1_2 = distributions['lp']['return_of_capital'] + distributions['lp']['pref_return']
-    catchup_amount = total_tier_1_2 * promote / (1 - promote)
-    distributions['gp']['catchup'] = min(catchup_amount, remaining)
-    remaining -= distributions['gp']['catchup']
-
-    # Tier 4: Remaining split
-    distributions['lp']['profit_split'] = remaining * (1 - promote)
-    distributions['gp']['profit_split'] = remaining * promote
-
-    # Totals
-    distributions['lp']['total'] = sum(distributions['lp'].values())
-    distributions['gp']['total'] = sum(distributions['gp'].values())
-
-    return distributions
-
-# Example
-result = simple_waterfall(total_proceeds=15000000, lp_capital=10000000, pref_rate=0.08, promote=0.20)
-
-print("LP Distributions:")
-for key, value in result['lp'].items():
-    print(f"  {key}: ${value:,.0f}")
-
-print("\nGP Distributions:")
-for key, value in result['gp'].items():
-    print(f"  {key}: ${value:,.0f}")
-
-print(f"\nGP Promote: {result['gp']['total'] / (result['lp']['total'] + result['gp']['total']):.1%}")
+```bash
+python scripts/waterfall.py --mode simple --total-proceeds 15000000 \
+    --lp-capital 10000000 --pref-rate 0.08 --promote 0.20 --table
 ```
+
+With those inputs: LP receives $10M capital + $800K pref + $3.2M profit
+split; GP receives $200K catch-up + $800K profit split — exactly 20% of the
+$5M profit. Use `--mode irr` (the default) whenever distributions arrive in
+multiple years.
 
 ---
 

@@ -1,7 +1,14 @@
+/**
+ * LinkedIn guest-search HTML scraper — best-effort fallback source
+ * (scraper tier). LinkedIn aggressively bot-blocks; failures are reported
+ * honestly via SourceMeta and successful results are cached for 6h.
+ */
+
 import axios from "axios";
 import * as cheerio from "cheerio";
 import { RATE_LIMITS, USER_AGENT } from "../constants.js";
-import type { JobListing } from "../types.js";
+import type { JobListing, SourceResult } from "../types.js";
+import { fetchWithCache, SEARCH_TTL_MS, toSourceResult } from "./cache.js";
 import { RateLimiter } from "./rate-limiter.js";
 
 const limiter = new RateLimiter(RATE_LIMITS.linkedin);
@@ -70,25 +77,29 @@ function parseLinkedInListings($: cheerio.CheerioAPI): JobListing[] {
   return listings;
 }
 
-export async function searchLinkedInJobs(
+/**
+ * Fetch and parse LinkedIn guest-search pages. Throws when nothing could
+ * be fetched/parsed so failures are never cached.
+ */
+async function fetchLinkedInJobs(
   query: string,
-  location?: string,
-  remote?: boolean,
-  limit: number = 10
+  location: string | undefined,
+  remote: boolean | undefined,
+  limit: number
 ): Promise<JobListing[]> {
   const allListings: JobListing[] = [];
 
-  try {
-    // LinkedIn guest API returns ~25 results per request
-    const pagesToFetch = Math.ceil(limit / 25);
-    const maxPages = Math.min(pagesToFetch, 2);
+  // LinkedIn guest API returns ~25 results per request
+  const pagesToFetch = Math.ceil(limit / 25);
+  const maxPages = Math.min(pagesToFetch, 2);
 
-    for (let page = 0; page < maxPages; page++) {
-      if (allListings.length >= limit) break;
+  for (let page = 0; page < maxPages; page++) {
+    if (allListings.length >= limit) break;
 
-      const url = buildLinkedInUrl(query, location, remote, page * 25);
-      await limiter.acquire();
+    const url = buildLinkedInUrl(query, location, remote, page * 25);
+    await limiter.acquire();
 
+    try {
       const response = await axios.get(url, {
         headers: {
           "User-Agent": USER_AGENT,
@@ -105,24 +116,33 @@ export async function searchLinkedInJobs(
 
       if (pageListings.length === 0) break;
       allListings.push(...pageListings);
-    }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("LinkedIn search error:", message);
-    if (allListings.length === 0) {
-      return [{
-        title: "LinkedIn Search Error",
-        company: "LinkedIn",
-        location: "N/A",
-        salary: null,
-        url: "https://www.linkedin.com/jobs",
-        description: `Failed to fetch results from LinkedIn: ${message}. LinkedIn aggressively blocks automated requests.`,
-        posted_date: null,
-        source: "linkedin",
-        error: `Failed to fetch results from LinkedIn: ${message}. LinkedIn aggressively blocks automated requests.`,
-      }];
+    } catch (err) {
+      // Keep partial results from earlier pages; fail only if we have nothing.
+      if (allListings.length > 0) break;
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`${message} — LinkedIn aggressively blocks automated requests`);
     }
   }
 
+  if (allListings.length === 0) {
+    throw new Error("no listings parsed — likely bot-blocked or the HTML structure changed");
+  }
+
   return allListings.slice(0, limit);
+}
+
+/** Search LinkedIn (scraper, cached 6h). Never throws — failures land in meta. */
+export async function searchLinkedInJobs(
+  query: string,
+  location?: string,
+  remote?: boolean,
+  limit: number = 10
+): Promise<SourceResult<JobListing>> {
+  const res = await fetchWithCache(
+    "linkedin",
+    { query: query.toLowerCase().trim(), location: location || null, remote: !!remote, limit },
+    SEARCH_TTL_MS,
+    () => fetchLinkedInJobs(query, location, remote, limit)
+  );
+  return toSourceResult("LinkedIn", "scraper", res);
 }

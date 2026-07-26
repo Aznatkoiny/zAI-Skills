@@ -8,6 +8,8 @@ import {
   companyFinancialsSchema,
   filingTextShape,
   filingTextSchema,
+  filingSectionShape,
+  filingSectionSchema,
   stockDataShape,
   stockDataSchema,
   macroIndicatorsShape,
@@ -21,6 +23,7 @@ import {
 } from "./schemas/inputs.js";
 import { handleCompanyFinancials } from "./tools/company-financials.js";
 import { handleFilingText } from "./tools/filing-text.js";
+import { handleFilingSection } from "./tools/filing-section.js";
 import { handleStockData } from "./tools/stock-data.js";
 import { handleMacroIndicators } from "./tools/macro-indicators.js";
 import { handleEarningsTranscript } from "./tools/earnings-transcript.js";
@@ -88,8 +91,16 @@ registerFinTool(
 );
 
 registerFinTool(
+  "fin_get_filing_section",
+  "Extract a specific section from a company's most recent 10-K or 10-Q (SEC EDGAR): risk_factors (Item 1A), mdna (Management's Discussion & Analysis), business (Item 1, 10-K only), legal_proceedings, or financial_statements. Locates item-heading boundaries in the filing text and returns the section in pages of up to 25,000 characters with a pagination footer (pass page to continue). Boundary detection is heuristic; the tool reports failure instead of returning unrelated text.",
+  filingSectionShape,
+  filingSectionSchema,
+  handleFilingSection
+);
+
+registerFinTool(
   "fin_get_stock_data",
-  "Get stock price data from Yahoo Finance: current price, daily change, 52-week range, average volume, and OHLCV price history for a configurable period and interval.",
+  "Get stock price data from the Yahoo Finance chart endpoint (current price, daily change, 52-week range, average volume, OHLCV history) plus computed fundamentals from SEC EDGAR XBRL: market cap (EDGAR-reported shares outstanding × latest chart close) and last-fiscal-year EPS with a derived P/E — each labeled with its derivation and as-of dates.",
   stockDataShape,
   stockDataSchema,
   handleStockData

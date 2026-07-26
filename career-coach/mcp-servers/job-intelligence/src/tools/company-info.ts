@@ -1,93 +1,115 @@
+/**
+ * job_get_company_info — Glassdoor company profile (scraper, best-effort)
+ * enriched with live open roles from the company's public Greenhouse/Lever
+ * board when one exists (API, primary). Each source degrades independently
+ * and the response ends with an honest Sources footer.
+ */
+
 import { z } from "zod";
 import { companyInfoSchema } from "../schemas/inputs.js";
+import { getCompanyBoardJobs } from "../services/company-boards.js";
 import { getGlassdoorCompanyInfo } from "../services/glassdoor.js";
-import { CHARACTER_LIMIT } from "../constants.js";
+import { finalizeOutput, formatSourcesFooter } from "./sources-footer.js";
 
 type CompanyInfoInput = z.infer<typeof companyInfoSchema>;
+
+const MAX_OPEN_ROLES_SHOWN = 10;
 
 export async function handleCompanyInfo(input: CompanyInfoInput): Promise<string> {
   const { company_name } = input;
 
-  const info = await getGlassdoorCompanyInfo(company_name);
+  // Glassdoor scraper and ATS board API in parallel — each fails soft.
+  const [glassdoor, board] = await Promise.all([
+    getGlassdoorCompanyInfo(company_name),
+    getCompanyBoardJobs(company_name),
+  ]);
+
+  const info = glassdoor.info;
 
   const lines: string[] = [
     `## Company Profile: ${info?.name || company_name}`,
     "",
   ];
 
-  if (!info) {
-    lines.push(`No company information found for "${company_name}". The company may not be listed on Glassdoor or the search returned no results.`);
-    return lines.join("\n");
-  }
+  const footerLines = formatSourcesFooter([board.meta, glassdoor.meta]);
 
-  if (info.error) {
-    lines.push(`**Error:** ${info.error}`);
+  if (info) {
+    // Overview section
+    lines.push("### Overview");
     lines.push("");
-    lines.push("No company data could be retrieved from Glassdoor. Consider using WebSearch to look up this company instead.");
-    return lines.join("\n");
-  }
-
-  // Overview section
-  lines.push("### Overview");
-  lines.push("");
-  lines.push("| Detail | Value |");
-  lines.push("|--------|-------|");
-  lines.push(`| Company | ${info.name} |`);
-  lines.push(`| Industry | ${info.industry || "Not available"} |`);
-  lines.push(`| Size | ${info.size || "Not available"} |`);
-  lines.push(`| Headquarters | ${info.headquarters || "Not available"} |`);
-  lines.push(`| Founded | ${info.founded || "Not available"} |`);
-  lines.push(`| Revenue | ${info.revenue || "Not available"} |`);
-  lines.push("");
-
-  // Ratings section
-  lines.push("### Ratings");
-  lines.push("");
-
-  if (info.rating !== null) {
-    lines.push(`**Overall Rating:** ${info.rating.toFixed(1)} / 5.0`);
+    lines.push("| Detail | Value |");
+    lines.push("|--------|-------|");
+    lines.push(`| Company | ${info.name} |`);
+    lines.push(`| Industry | ${info.industry || "Not available"} |`);
+    lines.push(`| Size | ${info.size || "Not available"} |`);
+    lines.push(`| Headquarters | ${info.headquarters || "Not available"} |`);
+    lines.push(`| Founded | ${info.founded || "Not available"} |`);
+    lines.push(`| Revenue | ${info.revenue || "Not available"} |`);
     lines.push("");
 
-    // Visual rating bar
-    const filledStars = Math.round(info.rating);
-    const emptyStars = 5 - filledStars;
-    lines.push(`Rating: ${"*".repeat(filledStars)}${"_".repeat(emptyStars)}`);
+    // Ratings section
+    lines.push("### Ratings");
+    lines.push("");
+
+    if (info.rating !== null) {
+      lines.push(`**Overall Rating:** ${info.rating.toFixed(1)} / 5.0`);
+      lines.push("");
+
+      // Visual rating bar
+      const filledStars = Math.round(info.rating);
+      const emptyStars = 5 - filledStars;
+      lines.push(`Rating: ${"*".repeat(filledStars)}${"_".repeat(emptyStars)}`);
+      lines.push("");
+    } else {
+      lines.push("Overall rating not available.");
+      lines.push("");
+    }
+
+    if (info.culture_ratings && Object.keys(info.culture_ratings).length > 0) {
+      lines.push("#### Culture & Values Ratings");
+      lines.push("");
+      lines.push("| Category | Rating |");
+      lines.push("|----------|--------|");
+
+      for (const [category, rating] of Object.entries(info.culture_ratings)) {
+        lines.push(`| ${category} | ${rating.toFixed(1)} / 5.0 |`);
+      }
+      lines.push("");
+    }
+
+    // Interview Process section
+    lines.push("### Interview Process");
+    lines.push("");
+
+    if (info.interview_process) {
+      lines.push(info.interview_process);
+    } else {
+      lines.push("Interview process information not available from this source. Use the `job_get_interview_experiences` tool for detailed interview data.");
+    }
     lines.push("");
   } else {
-    lines.push("Overall rating not available.");
+    lines.push(`No Glassdoor profile could be retrieved for "${company_name}" (see Sources below). Consider using WebSearch for company background.`);
     lines.push("");
   }
 
-  if (info.culture_ratings && Object.keys(info.culture_ratings).length > 0) {
-    lines.push("#### Culture & Values Ratings");
+  // Open roles from the company's public ATS board (Greenhouse/Lever).
+  if (board.items.length > 0) {
+    const total = board.items.length;
+    lines.push(`### Open Roles (${board.meta.source})`);
     lines.push("");
-    lines.push("| Category | Rating |");
-    lines.push("|----------|--------|");
+    lines.push(`${total} open role${total === 1 ? "" : "s"} on the company's public job board:`);
+    lines.push("");
 
-    for (const [category, rating] of Object.entries(info.culture_ratings)) {
-      lines.push(`| ${category} | ${rating.toFixed(1)} / 5.0 |`);
+    for (const job of board.items.slice(0, MAX_OPEN_ROLES_SHOWN)) {
+      lines.push(`- [${job.title}](${job.url}) — ${job.location}`);
+    }
+    if (total > MAX_OPEN_ROLES_SHOWN) {
+      lines.push(`- ...and ${total - MAX_OPEN_ROLES_SHOWN} more (use job_search_jobs with the company name to explore)`);
     }
     lines.push("");
   }
 
-  // Interview Process section
-  lines.push("### Interview Process");
-  lines.push("");
+  lines.push("*Ratings/culture data come from Glassdoor and may lag; open roles come from the company's own job board. See Sources for per-source status.*");
 
-  if (info.interview_process) {
-    lines.push(info.interview_process);
-  } else {
-    lines.push("Interview process information not available from this source. Use the `job_get_interview_experiences` tool for detailed interview data.");
-  }
-  lines.push("");
-
-  lines.push("*Data source: Glassdoor. Information may not reflect the most current state of the company.*");
-
-  // Truncate if over character limit
-  let result = lines.join("\n");
-  if (result.length > CHARACTER_LIMIT) {
-    result = result.substring(0, CHARACTER_LIMIT - 50) + "\n\n*[Output truncated due to length]*";
-  }
-
-  return result;
+  return finalizeOutput(lines, footerLines);
 }

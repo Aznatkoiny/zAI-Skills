@@ -22,6 +22,22 @@ Proper evaluation is critical in RL due to high variance. This guide covers metr
 
 ### During Evaluation
 
+> **Canonical runnable version: [`scripts/eval_report.py`](../scripts/eval_report.py).**
+> It implements this exact evaluation loop (per-episode success read from the
+> TERMINAL step's `info` dict, mean/std/95% CI, episode lengths) as a CLI and
+> writes a Markdown report. Run it instead of re-deriving the loop:
+>
+> ```bash
+> # Trained SB3 model
+> python scripts/eval_report.py CartPole-v1 --model ppo_cartpole.zip --algo ppo \
+>     --episodes 100 --output eval_report.md
+>
+> # Random-policy baseline (no model)
+> python scripts/eval_report.py CartPole-v1 --episodes 50 --output baseline.md
+> ```
+>
+> The inline version below documents the pattern.
+
 ```python
 from stable_baselines3.common.evaluation import evaluate_policy
 import numpy as np
@@ -627,6 +643,11 @@ def load_complete_checkpoint(path, env_fn):
 ---
 
 ## Evaluation Report Template
+
+> **Runnable version: [`scripts/eval_report.py`](../scripts/eval_report.py)** —
+> generates this report (plus success rate and episode-length rows) from the
+> command line for any registered env or `module:EnvClass` spec. Prefer it over
+> copying this template.
 
 ```python
 def generate_evaluation_report(model, env, n_episodes=100, output_path="eval_report.md"):

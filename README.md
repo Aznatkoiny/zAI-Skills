@@ -31,7 +31,12 @@ Then restart Claude Code.
 
 ### [AI-Toolkit](AI-Toolkit/)
 
-Skills for building AI/ML systems and optimizing prompts.
+Skills, commands, and agents for building AI/ML systems and optimizing prompts.
+
+| Component | Details |
+|-----------|---------|
+| **Commands** | `/optimize-prompt` `/rl-new-project` `/x402-scaffold` `/openclaw-audit` |
+| **Agents** | RL Debugger (training diagnostics), Prompt Rewriter (isolated-context prompt optimization) |
 
 | Skill | Description |
 |-------|-------------|
@@ -49,9 +54,11 @@ Multi-agent consulting system replicating top-tier strategy engagement structure
 | Component | Details |
 |-----------|---------|
 | **Agents** | Engagement Manager, Research Analyst, Financial Modeler, Deck Builder, Due Diligence |
-| **Commands** | 16 slash commands across Research, Structured Thinking, Deliverables, and Engagement Management |
-| **Skill** | Consulting frameworks — MECE, Pyramid Principle, Porter's Five Forces, TAM/SAM/SOM, and more |
-| **MCP Server** | Financial Intelligence — 7 tools for SEC EDGAR, FRED, and Yahoo Finance data |
+| **Commands** | 17 slash commands across Research, Structured Thinking, Deliverables, Quality Gates, and Engagement Management |
+| **Skill** | Consulting frameworks — MECE, Pyramid Principle, Porter's Five Forces, TAM/SAM/SOM, M&A/DD, pricing, and more |
+| **MCP Server** | Financial Intelligence — 8 tools for SEC EDGAR (incl. 10-K/10-Q section extraction), FRED, and Yahoo Finance data |
+| **Templates** | 6 deliverable skeletons (DD memo, market sizing, storyline, SteerCo, model narrative, competitive landscape) |
+| **Hooks** | Citation lint — flags uncited quantitative claims in written deliverables |
 
 ### [real-estate-investment](real-estate-investment/)
 
@@ -61,8 +68,8 @@ End-to-end real estate investment analysis — from deal screening through finan
 |-----------|---------|
 | **Skill** | Core analysis hub with 5 reference files — financial metrics (12 metrics with Python/Excel), advanced analysis (Monte Carlo, sensitivity, waterfalls), property types (BRRRR, commercial, STR, land), market data (6 API integrations), tax strategy (depreciation, 1031, cost seg, 2025-2026 law) |
 | **Agents** | Deal Analyzer (autonomous pro forma + sensitivity), Market Researcher (API-driven market scoring), Tax Optimizer (depreciation, cost seg, 1031, entity structure), Portfolio Reviewer (multi-property assessment) |
-| **Commands** | `/analyze-deal` `/compare-markets` `/pro-forma` `/brrrr` `/waterfall` `/str-revenue` |
-| **MCP Server** | 11 tools across 6 APIs — Census Bureau, Redfin, Rentcast (free tier), Mashvisor, AirDNA, ATTOM |
+| **Commands** | `/analyze-deal` `/compare-markets` `/pro-forma` `/brrrr` `/waterfall` `/str-revenue` `/exit-analysis` `/screen` `/portfolio` |
+| **MCP Server** | 13 tools across 7 APIs — Census Bureau, Redfin (live market snapshots, no key), FRED, Rentcast (free tier), Mashvisor, AirDNA, ATTOM |
 | **Output Styles** | Investor Report (formal memo), Quick Screen (rapid deal screening) |
 | **Hooks** | Tax disclaimer on write operations |
 
@@ -74,11 +81,11 @@ AI-powered career coaching and job search plugin with resume building, interview
 |-----------|---------|
 | **Agents** | Career Director (Opus orchestrator + coach), Job Search (multi-platform discovery), Interview Prep (mock interviews + coaching) |
 | **Skill** | Resume Updater — interactive interview that captures experience into `career-profile.json` with achievement quality gates |
-| **Commands** | `/resume-generator` (tailored resume from profile) `/cover-letter` (targeted cover letter with company research) |
-| **MCP Server** | Job Intelligence — 5 tools across Indeed, LinkedIn, TrueUp, Glassdoor, and Levels.fyi |
-| **Output Styles** | Software Engineering, AI/ML, Sales, Consulting (extensible — drop `.md` files to add more) |
+| **Commands** | `/resume-generator` `/cover-letter` `/job-hunt` `/ats-check` `/mock-interview` `/compare-offers` `/validate-profile` `/follow-ups` |
+| **MCP Server** | Job Intelligence — 5 tools, API-first (Remotive, RemoteOK, Greenhouse/Lever boards, Adzuna, USAJobs) with scrapers as labeled fallback |
+| **Industry Styles** | Software Engineering, AI/ML, Sales, Consulting formatting references (extensible — drop `.md` files to add more) |
 | **Templates** | 6 LaTeX resume templates (modern-professional, technical-clean, jakes-resume, deedy, altacv, awesome-cv) |
-| **Hooks** | Auto-compile LaTeX/Markdown resumes to PDF on write |
+| **Hooks** | Auto-compile LaTeX/Markdown resumes to PDF; career-profile validation with achievement quality gate |
 
 ---
 

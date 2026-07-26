@@ -36,7 +36,7 @@ Effort levels and thinking defaults shift between releases — verify against th
 2. **Choose the lever** — a parameter (effort / thinking / max_tokens) and/or a prompt change.
 3. **Apply** the fix — pull a snippet from the references, or adjust the parameter.
 4. **Be explicit and positive** — say what TO do, give the reason, state the scope, prefer positive examples over negative rules.
-5. **Measure** against real cases or an eval subset, then iterate. Never assume a prompt change helped without checking.
+5. **Measure** — build a 10–20 case eval set and A/B the old vs. new prompt with the bundled harness: `python scripts/ab_eval.py cases.jsonl --prompt-a old.txt --prompt-b new.txt` (judge-based win rate, position-randomized; guide in references/evals.md). Never assume a prompt change helped without checking.
 
 ## Symptom → fix routing
 
@@ -86,3 +86,4 @@ Read the file that matches the optimization need:
 - **references/formatting.md** — output format and verbosity control, LaTeX, document creation, and prefill migration.
 - **references/agentic.md** — long-horizon reasoning and state, context awareness, multi-window workflows, autonomy & safety, subagents, parallel tools, prompt chaining.
 - **references/frontend-design.md** — overriding the Opus 4.8 design defaults, frontend-aesthetics snippets, and vision / crop-tool tips.
+- **references/evals.md** — building a 10–20 case eval set (case selection, expected_behavior phrasing, leakage, when a win rate is meaningful) and running scripts/ab_eval.py, the A/B harness with a judge-based win rate.

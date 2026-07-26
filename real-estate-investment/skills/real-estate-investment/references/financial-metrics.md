@@ -567,270 +567,41 @@ print(f"Max Loan @ 10% debt yield: ${max_loan:,.0f}")  # $3,000,000
 
 ## Python Implementation
 
-### Complete Pro Forma Class
+### Canonical Script: `scripts/pro_forma.py`
 
-```python
-import pandas as pd
-import numpy as np
-import numpy_financial as npf
+The complete `RealEstateProForma` model lives as a runnable module at
+`scripts/pro_forma.py` (relative to this skill's directory). Run it — do not
+re-write the model from prose. It builds the full year-by-year projection
+(GPR → vacancy → EGI → OpEx → NOI → debt service → net cash flow), models the
+exit sale, and reports IRR, equity multiple, NPV @ 8/10/12%, purchase cap
+rate, year-1 cash-on-cash, and year-1 DSCR.
 
-class RealEstateProForma:
-    """Complete real estate pro forma model"""
+```bash
+pip install numpy numpy-financial   # one-time
 
-    def __init__(self, property_params, loan_params, assumptions):
-        """
-        Initialize pro forma
-
-        property_params: {
-            purchase_price, units, annual_rent_per_unit,
-            other_income_pct, vacancy_rate, opex_ratio
-        }
-        loan_params: {
-            ltv, interest_rate, amortization_years
-        }
-        assumptions: {
-            holding_period, rent_growth, expense_growth,
-            capex_pct, exit_cap_rate, selling_costs_pct
-        }
-        """
-        self.property_params = property_params
-        self.loan_params = loan_params
-        self.assumptions = assumptions
-
-        self.loan_amount = property_params['purchase_price'] * loan_params['ltv']
-        self.equity_investment = property_params['purchase_price'] - self.loan_amount
-
-        self.build_pro_forma()
-
-    def build_pro_forma(self):
-        """Build complete pro forma DataFrame"""
-        years = self.assumptions['holding_period']
-        self.df = pd.DataFrame({'Year': range(0, years + 1)})
-
-        # Year 0: Acquisition
-        self.df.loc[0, 'Equity Investment'] = -self.equity_investment
-
-        # Year-1 OpEx base: opex_ratio applies to Year-1 EGI only, then the
-        # base grows at expense_growth — independent of rent growth
-        base_rent = self.property_params['annual_rent_per_unit'] * self.property_params['units']
-        egi_year1 = (base_rent * (1 + self.property_params['other_income_pct'])
-                     * (1 - self.property_params['vacancy_rate']))
-        opex_base = egi_year1 * self.property_params['opex_ratio']
-
-        # Years 1+: Operations
-        for year in range(1, years + 1):
-            # Revenue
-            growth_factor = (1 + self.assumptions['rent_growth']) ** (year - 1)
-            gross_potential_rent = base_rent * growth_factor
-
-            other_income = gross_potential_rent * self.property_params['other_income_pct']
-            potential_gross_income = gross_potential_rent + other_income
-
-            vacancy = potential_gross_income * self.property_params['vacancy_rate']
-            effective_gross_income = potential_gross_income - vacancy
-
-            # Expenses: Year-1 base escalated at expense_growth
-            operating_expenses = opex_base * (1 + self.assumptions['expense_growth']) ** (year - 1)
-
-            # NOI
-            noi = effective_gross_income - operating_expenses
-
-            # Debt Service
-            annual_debt_service = -npf.pmt(
-                self.loan_params['interest_rate'],
-                self.loan_params['amortization_years'],
-                self.loan_amount
-            )
-
-            # Cash Flow
-            cash_flow_before_capex = noi - annual_debt_service
-            capex_reserves = effective_gross_income * self.assumptions['capex_pct']
-            net_cash_flow = cash_flow_before_capex - capex_reserves
-
-            # Populate DataFrame
-            self.df.loc[year, 'Gross Potential Rent'] = gross_potential_rent
-            self.df.loc[year, 'Other Income'] = other_income
-            self.df.loc[year, 'Potential Gross Income'] = potential_gross_income
-            self.df.loc[year, 'Vacancy & Credit Loss'] = vacancy
-            self.df.loc[year, 'Effective Gross Income'] = effective_gross_income
-            self.df.loc[year, 'Operating Expenses'] = operating_expenses
-            self.df.loc[year, 'Net Operating Income'] = noi
-            self.df.loc[year, 'Debt Service'] = annual_debt_service
-            self.df.loc[year, 'Cash Flow Before CapEx'] = cash_flow_before_capex
-            self.df.loc[year, 'CapEx Reserves'] = capex_reserves
-            self.df.loc[year, 'Net Cash Flow'] = net_cash_flow
-
-        # Exit/Sale in final year
-        final_year = years
-        final_noi = self.df.loc[final_year, 'Net Operating Income']
-        exit_value = final_noi / self.assumptions['exit_cap_rate']
-        selling_costs = exit_value * self.assumptions['selling_costs_pct']
-        remaining_balance = self.calculate_loan_balance(final_year)
-        net_sale_proceeds = exit_value - selling_costs - remaining_balance
-
-        self.df.loc[final_year, 'Property Sale Value'] = exit_value
-        self.df.loc[final_year, 'Selling Costs'] = selling_costs
-        self.df.loc[final_year, 'Remaining Loan Balance'] = remaining_balance
-        self.df.loc[final_year, 'Net Sale Proceeds'] = net_sale_proceeds
-        self.df.loc[final_year, 'Total Cash Flow'] = (
-            self.df.loc[final_year, 'Net Cash Flow'] + net_sale_proceeds
-        )
-
-        # Total Cash Flow for all years
-        for year in range(1, final_year):
-            self.df.loc[year, 'Total Cash Flow'] = self.df.loc[year, 'Net Cash Flow']
-        self.df.loc[0, 'Total Cash Flow'] = self.df.loc[0, 'Equity Investment']
-
-    def calculate_loan_balance(self, year):
-        """Calculate remaining loan balance"""
-        # npf.pmt returns a negative outflow — pass it to npf.fv as-is
-        annual_payment = npf.pmt(
-            self.loan_params['interest_rate'],
-            self.loan_params['amortization_years'],
-            self.loan_amount
-        )
-        remaining_balance = -npf.fv(
-            self.loan_params['interest_rate'],
-            year,
-            annual_payment,
-            self.loan_amount
-        )
-        return remaining_balance
-
-    def calculate_metrics(self):
-        """Calculate return metrics"""
-        cash_flows = self.df['Total Cash Flow'].values
-
-        irr = npf.irr(cash_flows)
-        total_distributions = cash_flows[1:].sum()
-        equity_multiple = total_distributions / abs(cash_flows[0])
-
-        npv_8 = npf.npv(0.08, cash_flows)
-        npv_10 = npf.npv(0.10, cash_flows)
-        npv_12 = npf.npv(0.12, cash_flows)
-
-        year_1_noi = self.df.loc[1, 'Net Operating Income']
-        year_1_cash_flow = self.df.loc[1, 'Net Cash Flow']
-
-        purchase_cap_rate = year_1_noi / self.property_params['purchase_price']
-        cash_on_cash_y1 = year_1_cash_flow / self.equity_investment
-        dscr_y1 = year_1_noi / self.df.loc[1, 'Debt Service']
-
-        return pd.Series({
-            'Purchase Price': self.property_params['purchase_price'],
-            'Equity Investment': self.equity_investment,
-            'Loan Amount': self.loan_amount,
-            'LTV': self.loan_params['ltv'],
-            'Purchase Cap Rate': purchase_cap_rate,
-            'Year 1 NOI': year_1_noi,
-            'Year 1 Cash Flow': year_1_cash_flow,
-            'Year 1 Cash-on-Cash': cash_on_cash_y1,
-            'Year 1 DSCR': dscr_y1,
-            'IRR': irr,
-            'Equity Multiple': equity_multiple,
-            'NPV @ 8%': npv_8,
-            'NPV @ 10%': npv_10,
-            'NPV @ 12%': npv_12,
-            'Exit Cap Rate': self.assumptions['exit_cap_rate'],
-        })
-
-    def create_amortization_schedule(self):
-        """Create loan amortization schedule"""
-        years = self.loan_params['amortization_years']
-        rate = self.loan_params['interest_rate']
-        principal = self.loan_amount
-
-        payment = -npf.pmt(rate, years, principal)
-        periods = np.arange(1, years + 1)
-
-        interest_payments = -npf.ipmt(rate, periods, years, principal)
-        principal_payments = -npf.ppmt(rate, periods, years, principal)
-
-        remaining_balance = np.zeros(years)
-        remaining_balance[0] = principal - principal_payments[0]
-        for i in range(1, years):
-            remaining_balance[i] = remaining_balance[i-1] - principal_payments[i]
-
-        return pd.DataFrame({
-            'Year': periods,
-            'Beginning Balance': np.concatenate([[principal], remaining_balance[:-1]]),
-            'Payment': payment,
-            'Interest': interest_payments,
-            'Principal': principal_payments,
-            'Ending Balance': remaining_balance
-        })
-
-    def display_summary(self):
-        """Print formatted summary"""
-        print("=" * 80)
-        print("REAL ESTATE PRO FORMA SUMMARY")
-        print("=" * 80)
-
-        metrics = self.calculate_metrics()
-
-        print("\nINVESTMENT METRICS")
-        print("-" * 80)
-        print(f"Purchase Price:           ${metrics['Purchase Price']:>15,.0f}")
-        print(f"Loan Amount (LTV {metrics['LTV']:.1%}):  ${metrics['Loan Amount']:>15,.0f}")
-        print(f"Equity Investment:        ${metrics['Equity Investment']:>15,.0f}")
-        print(f"\nPurchase Cap Rate:        {metrics['Purchase Cap Rate']:>15.2%}")
-        print(f"Year 1 Cash-on-Cash:      {metrics['Year 1 Cash-on-Cash']:>15.2%}")
-        print(f"Year 1 DSCR:              {metrics['Year 1 DSCR']:>15.2f}x")
-        print(f"\nLevered IRR:              {metrics['IRR']:>15.2%}")
-        print(f"Equity Multiple:          {metrics['Equity Multiple']:>15.2f}x")
-        print(f"\nNPV @ 8%:                 ${metrics['NPV @ 8%']:>15,.0f}")
-        print(f"NPV @ 10%:                ${metrics['NPV @ 10%']:>15,.0f}")
-        print(f"NPV @ 12%:                ${metrics['NPV @ 12%']:>15,.0f}\n")
-
-        print("\n" + "=" * 80)
-        print("PRO FORMA CASH FLOWS")
-        print("=" * 80)
-
-        display_cols = [
-            'Year', 'Potential Gross Income', 'Effective Gross Income',
-            'Operating Expenses', 'Net Operating Income', 'Debt Service',
-            'Net Cash Flow', 'Total Cash Flow'
-        ]
-
-        pd.options.display.float_format = '${:,.0f}'.format
-        print(self.df[display_cols].to_string(index=False))
-
-
-# Example Usage
-if __name__ == "__main__":
-    property_params = {
-        'purchase_price': 5000000,
-        'units': 50,
-        'annual_rent_per_unit': 12000,
-        'other_income_pct': 0.03,
-        'vacancy_rate': 0.05,
-        'opex_ratio': 0.40
-    }
-
-    loan_params = {
-        'ltv': 0.75,
-        'interest_rate': 0.05,
-        'amortization_years': 30
-    }
-
-    assumptions = {
-        'holding_period': 10,
-        'rent_growth': 0.03,
-        'expense_growth': 0.025,
-        'capex_pct': 0.05,
-        'exit_cap_rate': 0.065,
-        'selling_costs_pct': 0.03
-    }
-
-    model = RealEstateProForma(property_params, loan_params, assumptions)
-    model.display_summary()
-
-    amort = model.create_amortization_schedule()
-    print("\n" + "=" * 80)
-    print("AMORTIZATION SCHEDULE (First 10 Years)")
-    print("=" * 80)
-    print(amort.head(10).to_string(index=False))
+python scripts/pro_forma.py --sample-input > inputs.json    # JSON input template
+python scripts/pro_forma.py --input inputs.json --table     # human-readable summary
+python scripts/pro_forma.py --input inputs.json --output results.json   # full JSON
 ```
+
+Input schema (three top-level keys, see `--sample-input` for a filled example):
+
+| Key | Fields |
+|-----|--------|
+| `property` | `purchase_price`, `units` + `annual_rent_per_unit` (or `annual_gross_rent`), `other_income_pct`, `vacancy_rate`, `opex_ratio` |
+| `loan` | `ltv`, `interest_rate` (annual), `amortization_years` |
+| `assumptions` | `holding_period`, `rent_growth`, `expense_growth`, `capex_pct`, `exit_cap_rate`, `selling_costs_pct` |
+
+Model mechanics worth knowing (all implemented in the script):
+
+- **Expense handling (corrected):** the Year-1 OpEx base equals Year-1 EGI × `opex_ratio`; from Year 2 on it escalates at `expense_growth` only — OpEx is never re-derived from grown revenue, so rent growth and expense growth stay independent.
+- **Loan balance:** `npf.pmt` returns a negative outflow; it is passed to `npf.fv` as-is and the result negated: `balance = -npf.fv(rate, year, payment, loan_amount)`.
+- **Exit:** sale value = final-year NOI / `exit_cap_rate`, less selling costs and the remaining loan balance; the final year's total cash flow adds net sale proceeds.
+- **Cash flow vector:** index 0 is `-equity` at acquisition, 1..N are annual equity cash flows; IRR, NPV, and equity multiple all run off this dated vector.
+
+For a purchase-price × interest-rate stress grid on the same input file, run
+`scripts/sensitivity.py` (documented in `references/advanced-analysis.md`
+§Sensitivity).
 
 ### Key numpy-financial Functions
 

@@ -1,5 +1,5 @@
 ---
-description: Generate a real estate pro forma model in Python or Excel format
+description: Run the canonical pro forma script on a property — metrics, cash flow table, and JSON results (Excel formulas optional)
 argument-hint: "[python|excel|both]"
 ---
 
@@ -9,18 +9,18 @@ Requested output format (may be empty): $ARGUMENTS
 
 ## Instructions
 
-When this command is invoked, generate a complete real estate pro forma financial model:
+When this command is invoked, build a real estate pro forma by **running the plugin's tested script** — do not re-write the model from prose:
 
 ### 1. Collect Property Details
 
-Use AskUserQuestion to gather:
+Use AskUserQuestion to gather (these map 1:1 to the script's input schema):
+
 - **Property type**: SFR, multifamily, commercial, STR
-- **Purchase price and acquisition costs**
-- **Financing terms**: Down payment, interest rate, loan term, amortization
-- **Income assumptions**: Monthly rent, vacancy rate, other income, annual growth rate
-- **Operating expenses**: Property taxes, insurance, maintenance, management, utilities, etc.
-- **Holding period**: Number of years (default: 10)
-- **Exit assumptions**: Exit cap rate, selling costs
+- **Purchase price**
+- **Income**: units and annual rent per unit (or a single `annual_gross_rent`), other income % of rent (default 3%), vacancy rate
+- **Operating expenses**: OpEx ratio as % of EGI (benchmarks: 35-45% multifamily, 40-50% commercial, 50-60% STR)
+- **Financing**: LTV (if the user gives a down payment %, `ltv = 1 - down_payment_pct`), annual interest rate, amortization years
+- **Assumptions**: holding period (default 10), rent growth (default 3%), expense growth (default 2.5%), CapEx reserve % of EGI (default 5%), exit cap rate, selling costs % (default 3%)
 
 ### 2. Validate Assumptions with Market Data (optional but recommended)
 
@@ -32,79 +32,51 @@ If the user has a specific property address, ground the model's assumptions usin
 - `mcp__real-estate-data__get_attom_valuation` — AVM check on the purchase price (requires `ATTOM_API_KEY`, paid)
 - `mcp__real-estate-data__get_census_housing_stats` — area median home value context (requires `CENSUS_API_KEY` — the key is free to obtain)
 
-**Fallback chain:** MCP tool → WebSearch for comparable data → use the user's manual inputs as-is. Note in the generated model which inputs are data-backed vs. assumed.
+**Fallback chain:** MCP tool → WebSearch for comparable data → use the user's manual inputs as-is. Note in the results which inputs are data-backed vs. assumed.
 
-### 3. Collect Output Preference
+### 3. Write the Input File and Run the Script
 
-Ask for output format (skip if provided via $ARGUMENTS — "python", "excel", or "both"):
-- Python script
-- Excel formulas
-- Both
+The canonical model is `${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts/pro_forma.py`. Print its schema template, write the user's parameters into `pro_forma_inputs.json` in the working directory, then run it via Bash:
 
-### 4. Load Reference Material
+```bash
+# Schema template (property / loan / assumptions keys):
+python "${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts/pro_forma.py" --sample-input
 
-Read the financial metrics reference:
-the `references/financial-metrics.md` file from the `real-estate-investment` skill in this plugin
+# After writing pro_forma_inputs.json with the user's numbers:
+python "${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts/pro_forma.py" \
+    --input pro_forma_inputs.json --output pro_forma_results.json
+python "${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts/pro_forma.py" \
+    --input pro_forma_inputs.json --table
+```
 
-### 5. Generate Python Script (if requested)
+If the imports fail, install the two dependencies first (`pip install numpy numpy-financial`, or into a project venv if the user prefers).
 
-Create a complete Python pro forma model using the RealEstateProForma class pattern from the reference:
+### 4. Present Results
 
-**Include:**
-- Property class with all input parameters
-- Income schedule calculation (gross rent, vacancy, effective gross income)
-- Expense schedule (all operating expenses with inflation)
-- Debt service calculation (monthly P&I using amortization formula)
-- Cash flow waterfall (EGI - OpEx - Debt Service = Cash Flow)
-- Return metrics calculation (Cap Rate, CoC, IRR, Equity Multiple, DSCR)
-- Exit/reversion value calculation
-- Output methods for annual projections and summary metrics
+Relay the script's summary: purchase cap rate, year-1 cash-on-cash, year-1 DSCR, levered IRR, equity multiple, NPV @ 8/10/12%, and the year-by-year cash flow table. Flag red flags (DSCR < 1.2x, negative cash flow years, IRR below the user's hurdle).
 
-**Output:**
-- Save as `pro_forma.py` in working directory
-- Include clear comments and docstrings
-- Add example usage at the bottom
+Offer a price × rate stress grid on the same input file:
 
-### 6. Generate Excel Formulas (if requested)
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts/sensitivity.py" \
+    --input pro_forma_inputs.json
+```
 
-Create cell-by-cell Excel layout with formulas:
+### 5. Generate Excel Formulas (if "excel" or "both" requested)
 
-**Structure:**
-- **Input Sheet**: All assumptions in named cells
-- **Pro Forma Sheet**: 10-year (or custom) projection with rows for:
-  - Year 0 (acquisition)
-  - Years 1-N (operations)
-  - Year N+1 (exit/sale)
+Read `${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/references/financial-metrics.md` (§Excel Reference) and create a cell-by-cell layout saved as `pro_forma_formulas.txt`:
 
-**Provide formulas for:**
-- Gross Potential Rent: `=B3*(1+$C$5)^A10` (where B3=Year 1 rent, C5=growth rate, A10=year)
-- Vacancy Loss: `=B10*$C$6` (where C6=vacancy rate)
-- Effective Gross Income: `=B10-C10`
-- Operating Expenses: Individual line items with inflation
-- NOI: `=EGI-Total OpEx`
-- Debt Service: `=PMT($C$8,$C$9,-$C$7)` (rate, periods, loan amount)
-- Cash Flow: `=NOI-DebtService`
-- Cumulative Cash Flow: `=SUM($H$10:H10)`
-- IRR: `=XIRR(CashFlows, Dates)`
+- **Input sheet**: all assumptions in named cells
+- **Pro forma sheet**: Year 0 acquisition, Years 1-N operations, exit year — GPR growth `=Base*(1+g)^(N-1)`, vacancy, EGI, OpEx escalation, NOI, `=PMT()` debt service, cash flow, `=IRR()`/`=XIRR()` returns
+- Include the NPV timing caveat (`=NPV(rate, B3:B12) + B2`) and the amortization sign convention from the reference
 
-**Output:**
-- Save as `pro_forma_formulas.txt` with clear layout instructions
-- Include named range definitions
+### 6. Deliver Files
 
-### 7. Generate Both (if requested)
-
-Create both Python script and Excel formula layout.
-
-### 8. Verify and Save
-
-Save generated file(s) to the user's working directory and confirm:
-- File name(s) and location
-- Brief usage instructions
-- Note that user can customize inputs directly in the file(s)
+Confirm what was written to the working directory: `pro_forma_inputs.json` (editable assumptions), `pro_forma_results.json` (full projection + metrics), and `pro_forma_formulas.txt` if Excel output was requested. If the user wants to customize the model logic itself, copy `${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts/pro_forma.py` into their project and edit the copy — never edit the plugin's copy.
 
 ## Notes
 
-- For STR properties, include seasonal occupancy/ADR modeling
-- For multifamily, support per-unit input with vacancy loss by unit type
-- Include sensitivity table generation option (vary key assumptions)
-- Ensure all formulas are auditable and traceable
+- The script's expense handling is the corrected version: Year-1 OpEx = Year-1 EGI × opex_ratio, then escalated at `expense_growth` only — do not "fix" it to re-derive OpEx from grown revenue
+- For STR properties, convert ADR × occupancy × 365 into `annual_gross_rent` and use an STR OpEx ratio (50-65%)
+- For multifamily, use per-unit inputs (`units` × `annual_rent_per_unit`)
+- To iterate on assumptions, edit `pro_forma_inputs.json` and re-run — that is the whole point of the JSON-in/JSON-out design

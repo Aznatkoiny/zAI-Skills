@@ -95,6 +95,31 @@ export interface StockData {
   interval: string;
 }
 
+// ── Equity Fundamentals (EDGAR-derived, for fin_get_stock_data) ──
+
+export interface ShareCountFact {
+  value: number;
+  asOf: string; // period end / cover date the share count was reported for
+  form: string; // filing form it came from (10-K, 10-Q, 8-K)
+  tag: string;  // XBRL tag, e.g. "dei:EntityCommonStockSharesOutstanding"
+  note: string; // caveat on what the single selected fact covers (share classes)
+}
+
+export interface EpsFact {
+  value: number;
+  periodEnd: string; // fiscal year end date the EPS covers
+  fiscalYear: number;
+  form: string;
+  tag: string; // e.g. "us-gaap:EarningsPerShareDiluted"
+}
+
+export interface EquityFundamentals {
+  cik: string;
+  entityName: string;
+  sharesOutstanding: ShareCountFact | null;
+  epsAnnual: EpsFact | null;
+}
+
 // ── FRED Types ──
 
 export interface FredSeriesInfo {

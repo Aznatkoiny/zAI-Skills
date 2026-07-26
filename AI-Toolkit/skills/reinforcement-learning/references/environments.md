@@ -231,6 +231,18 @@ env = gym.make("CustomEnv-v0")
 
 ## Environment Validation Checklist
 
+> **Canonical runnable version: [`scripts/validate_env.py`](../scripts/validate_env.py).**
+> It packages every check below (plus reward stats and NaN/Inf guards) as a CLI
+> that exits nonzero on failure:
+>
+> ```bash
+> python scripts/validate_env.py CartPole-v1
+> python scripts/validate_env.py my_package.envs:CustomEnv --episodes 5 --seed 7
+> ```
+>
+> The snippets below show the underlying patterns for reference — prefer the
+> script over re-deriving them.
+
 Before training, validate your custom environment:
 
 ```python
@@ -240,69 +252,44 @@ env = CustomEnv()
 check_env(env, warn=True)  # Raises errors if API violated
 ```
 
-### Manual Checks
+### Manual Checks (pattern reference)
+
+The two checks people most often get wrong, in condensed form:
 
 ```python
-def validate_environment(env_class):
-    """Comprehensive environment validation."""
-    env = env_class()
+# Determinism: sample the action sequence ONCE, then replay it twice
+# from reset(seed=...) and compare observations with np.allclose.
+actions = [env.action_space.sample() for _ in range(5)]
 
-    # 1. Check spaces are defined
-    assert env.observation_space is not None, "observation_space not defined"
-    assert env.action_space is not None, "action_space not defined"
-
-    # 2. Check reset returns correct format
-    obs, info = env.reset(seed=42)
-    assert env.observation_space.contains(obs), f"Reset obs not in space: {obs}"
-    assert isinstance(info, dict), "Info must be dict"
-
-    # 3. Check step returns correct format
-    action = env.action_space.sample()
-    obs, reward, terminated, truncated, info = env.step(action)
-    assert env.observation_space.contains(obs), f"Step obs not in space: {obs}"
-    assert isinstance(reward, (int, float)), "Reward must be numeric"
-    assert isinstance(terminated, bool), "Terminated must be bool"
-    assert isinstance(truncated, bool), "Truncated must be bool"
-    assert isinstance(info, dict), "Info must be dict"
-
-    # 4. Check determinism: same seed + same actions -> same observations
-    actions = [env.action_space.sample() for _ in range(5)]
-
+def rollout():
     obs, _ = env.reset(seed=123)
-    trajectory1 = [obs]
+    trajectory = [obs]
     for a in actions:
         obs, _, terminated, truncated, _ = env.step(a)
-        trajectory1.append(obs)
+        trajectory.append(obs)
         if terminated or truncated:
             break
+    return trajectory
 
-    obs, _ = env.reset(seed=123)
-    trajectory2 = [obs]
-    for a in actions:
-        obs, _, terminated, truncated, _ = env.step(a)
-        trajectory2.append(obs)
-        if terminated or truncated:
-            break
+traj1, traj2 = rollout(), rollout()
+assert len(traj1) == len(traj2), "Not deterministic with same seed"
+for o1, o2 in zip(traj1, traj2):
+    assert np.allclose(o1, o2), "Not deterministic with same seed"
 
-    assert len(trajectory1) == len(trajectory2), \
-        "Environment not deterministic with same seed"
-    for o1, o2 in zip(trajectory1, trajectory2):
-        assert np.allclose(o1, o2), "Environment not deterministic with same seed"
-
-    # 5. Check episode termination
-    env.reset()
-    for _ in range(10000):
-        _, _, terminated, truncated, _ = env.step(env.action_space.sample())
-        if terminated or truncated:
-            break
-    else:
-        print("Warning: Episode did not terminate in 10000 steps")
-
-    print("All checks passed!")
-    env.close()
-
-validate_environment(CustomEnv)
+# Episode termination: random actions must end the episode in bounded steps
+obs, _ = env.reset(seed=42)
+for _ in range(10_000):
+    _, _, terminated, truncated, _ = env.step(env.action_space.sample())
+    if terminated or truncated:
+        break
+else:
+    print("Warning: episode did not terminate in 10000 steps")
 ```
+
+`scripts/validate_env.py` additionally verifies: spaces are defined, `reset()`
+returns `(obs, info)` with `obs` in the observation space, `step()` returns a
+5-tuple with correct types, rewards are numeric and finite, and observations
+never contain NaN/Inf under random rollouts.
 
 ---
 
@@ -489,6 +476,18 @@ obs_space = spaces.MultiBinary(8)  # 8 binary values
 ---
 
 ## Environment Testing Script
+
+> **Canonical runnable version: [`scripts/pretrain_check.py`](../scripts/pretrain_check.py).**
+> It runs random-policy rollouts and reports the baseline return, observation
+> and reward distribution stats, episode-length sanity, and actionable warnings
+> (unbounded observations, constant/sparse rewards, huge action ranges):
+>
+> ```bash
+> python scripts/pretrain_check.py CartPole-v1 --episodes 20
+> ```
+>
+> The mean random-policy return it prints is the number a trained agent must
+> clearly beat. The inline version below is the minimal pattern for reference.
 
 ```python
 import gymnasium as gym

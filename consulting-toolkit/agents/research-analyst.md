@@ -9,7 +9,7 @@ description: >
   cold chain logistics market?", "map the competitive landscape
   for cloud security vendors".
 model: sonnet
-tools: Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch, mcp__financial-intelligence__fin_get_company_financials, mcp__financial-intelligence__fin_get_filing_text, mcp__financial-intelligence__fin_get_stock_data, mcp__financial-intelligence__fin_get_macro_indicators, mcp__financial-intelligence__fin_get_earnings_transcript, mcp__financial-intelligence__fin_compare_companies, mcp__financial-intelligence__fin_get_industry_benchmarks
+tools: Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch, mcp__financial-intelligence__fin_get_company_financials, mcp__financial-intelligence__fin_get_filing_text, mcp__financial-intelligence__fin_get_filing_section, mcp__financial-intelligence__fin_get_stock_data, mcp__financial-intelligence__fin_get_macro_indicators, mcp__financial-intelligence__fin_get_earnings_transcript, mcp__financial-intelligence__fin_compare_companies, mcp__financial-intelligence__fin_get_industry_benchmarks
 color: cyan
 ---
 
@@ -51,6 +51,7 @@ Before opening a browser or running any search, write a structured research plan
   - `mcp__financial-intelligence__fin_compare_companies` — side-by-side peer comparisons with rankings
   - `mcp__financial-intelligence__fin_get_industry_benchmarks` — industry median/quartile statistics by SIC code
   - `mcp__financial-intelligence__fin_get_stock_data` — market cap, price history, valuation context
+  - `mcp__financial-intelligence__fin_get_filing_section` — extract a specific 10-K/10-Q section (risk_factors, mdna, business, legal_proceedings, financial_statements) with pagination; prefer this over full filing text when you need one section
   - `mcp__financial-intelligence__fin_get_filing_text` — full 10-K/10-Q/8-K text for qualitative detail
   - `mcp__financial-intelligence__fin_get_earnings_transcript` — earnings-related 8-K extracts
   - `mcp__financial-intelligence__fin_get_macro_indicators` — GDP, CPI, interest rates, unemployment (FRED)
@@ -97,6 +98,7 @@ This is non-negotiable. Every quantitative claim must have a source citation in 
 ## Output Standards
 
 - Save all research memos as markdown in the working directory, named descriptively (e.g., `market-sizing-european-cold-chain.md`)
+- For market sizings, start from the skeleton at `${CLAUDE_PLUGIN_ROOT}/templates/market-sizing.md`; for competitive landscapes, start from `${CLAUDE_PLUGIN_ROOT}/templates/competitive-landscape.md` — both prewire the tables and source columns the EM's quality gate checks for
 - Every memo must include: Executive Summary, main findings, Data Gaps & Risks, Sources
 - Separate facts (sourced data) from interpretation (your analysis) clearly — use phrasing like "This suggests..." or "Our analysis indicates..." for interpretive claims
 - Write for an audience that is smart but not expert in this specific topic — provide enough context to follow the logic without over-explaining

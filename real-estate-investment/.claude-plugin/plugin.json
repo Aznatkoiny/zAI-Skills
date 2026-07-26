@@ -1,6 +1,6 @@
 {
   "name": "real-estate-investment",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Comprehensive real estate investment analysis plugin with financial modeling, market data APIs, deal analysis agents, and tax-aware structuring. Covers all property types: residential, commercial, multifamily, short-term rentals, and land development.",
   "author": {
     "name": "Antony Zaki"
@@ -37,7 +37,8 @@
         "AIRDNA_API_KEY": "${AIRDNA_API_KEY:-}",
         "ATTOM_API_KEY": "${ATTOM_API_KEY:-}",
         "RENTCAST_API_KEY": "${RENTCAST_API_KEY:-}",
-        "CENSUS_API_KEY": "${CENSUS_API_KEY:-}"
+        "CENSUS_API_KEY": "${CENSUS_API_KEY:-}",
+        "FRED_API_KEY": "${FRED_API_KEY:-}"
       }
     }
   }

@@ -9,136 +9,86 @@ Requested waterfall type (may be empty): $ARGUMENTS
 
 ## Instructions
 
-When this command is invoked, model a real estate syndication waterfall distribution:
+When this command is invoked, model a real estate syndication waterfall by **running the plugin's tested script** — do not re-write the tier math from prose:
 
 ### 1. Load Reference Material
 
-Read the advanced analysis reference for waterfall structures:
-the `references/advanced-analysis.md` file from the `real-estate-investment` skill in this plugin
+Read `${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/references/advanced-analysis.md` (§3 Waterfall Distribution Modeling) for tier structures, catch-up mechanics, American vs. European differences, and the script's documented assumptions.
 
 ### 2. Collect Syndication Structure
 
 Use AskUserQuestion to gather:
 
 **Equity Structure:**
-- Total equity raised (from Limited Partners)
-- GP equity contribution (dollar amount or %)
 - LP equity contribution (typically 90-95% of total)
+- GP equity co-investment (dollar amount or %; may be zero)
 
-**Preferred Return (Pref):**
-- Preferred return rate (annual %, typical: 6-8%)
-- Is pref cumulative or non-cumulative?
-- Is pref compounding?
-
-**Waterfall Tiers:**
-- **Tier 1**: Return of capital + Pref (split: typically 100% to LPs until pref met)
-- **Tier 2**: GP promote at first hurdle (e.g., 70/30 LP/GP split until 12% IRR)
-- **Tier 3**: GP promote at second hurdle (e.g., 60/40 LP/GP split until 15% IRR)
-- **Tier 4**: Final split above highest hurdle (e.g., 50/50 LP/GP split above 15% IRR)
+**Hurdles and Splits:**
+- Preferred return rate (annual %, typical: 6-8%) — in the script this is the **first IRR hurdle** (compound, cumulative)
+- IRR hurdle schedule and LP share per tier, e.g. 100% LP to 8%, 80/20 to 12%, 70/30 to 18%, 60/40 above (the script's defaults)
+- Residual LP split above the highest hurdle
 
 **Waterfall Type (skip if provided via $ARGUMENTS):**
-- **American Waterfall**: Distributions split deal-by-deal as they occur
-- **European Waterfall**: All cash flows aggregated, waterfall applies to total returns at exit
+- **European (whole-fund)**: hurdles measured on aggregate dated cash flows — this is what the script implements directly
+- **American (deal-by-deal)**: run the script once per deal, each with its own equity and cash flow vector, then sum GP promote across deals
 
 ### 3. Collect Cash Flow Projections
 
-Ask for investment cash flows:
-- Initial equity investment (Year 0, negative)
-- Annual operating distributions (Years 1-N)
-- Exit/sale proceeds (Year N)
+Ask for the annual distributable cash flows (end-of-year, Years 1-N), including exit proceeds in the final year. Alternatively, derive them from a hold period + target equity multiple + distribution pattern (e.g., "all at exit" or "X% annually plus exit"). If a pro forma was already built with `/pro-forma`, reuse its net cash flows and sale proceeds.
 
-OR allow user to input:
-- Hold period
-- Assumed total return multiple (e.g., 2.0x equity)
-- Distribution pattern (all at exit, or X% annually + exit)
+### 4. Run the Canonical Script
 
-### 4. Calculate Distributions by Tier
+The tested implementation is `${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts/waterfall.py`. Write the structure into `waterfall_inputs.json` and run via Bash:
 
-For each cash distribution event (American) or total return (European):
+```bash
+# Schema template:
+python "${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts/waterfall.py" --sample-input
 
-**Tier 1 - Return of Capital + Pref:**
-```
-LP receives 100% until:
-- LP capital returned
-- Preferred return paid (cumulative total)
+# After writing waterfall_inputs.json (lp_capital, gp_capital,
+# annual_cash_flows, hurdles, lp_splits, residual_lp_split):
+python "${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts/waterfall.py" \
+    --input waterfall_inputs.json --output waterfall_results.json
+python "${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts/waterfall.py" \
+    --input waterfall_inputs.json --table
 ```
 
-**Tier 2 - First Hurdle:**
-```
-Remaining cash split per tier 2 ratio until LP IRR reaches first hurdle
-```
+If the imports fail, install the dependencies first (`pip install numpy numpy-financial`).
 
-**Tier 3 - Second Hurdle (if applicable):**
-```
-Remaining cash split per tier 3 ratio until LP IRR reaches second hurdle
-```
+For a quick single-distribution split with GP catch-up (no dated flows), use simple mode instead:
 
-**Tier 4 - Above All Hurdles:**
-```
-All remaining cash split per final tier ratio
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts/waterfall.py" \
+    --mode simple --total-proceeds 15000000 --lp-capital 10000000 \
+    --pref-rate 0.08 --promote 0.20 --table
 ```
 
-### 5. Calculate Returns
+### 5. Present the Waterfall Breakdown
 
-Compute for both GP and LP:
-- **Total Cash Distributed**
-- **Total Return Multiple**: Cash Out ÷ Cash In
-- **IRR**: Internal rate of return using actual cash flow timing
-- **Profit**: Total Cash - Initial Investment
-
-Additionally for GP:
-- GP equity return
-- GP promote (carried interest)
-- Management fees (if applicable, typical: 1-2% of equity per year)
-
-### 6. Present Waterfall Breakdown
-
-Format output showing:
-
-**Distribution Waterfall Table:**
-| Tier | Description | LP Split | GP Split | LP Cumulative | GP Cumulative | LP IRR at Tier End |
-|------|-------------|----------|----------|---------------|---------------|--------------------|
-
-**Cash Flow Summary:**
-- Year-by-year distributions (for American waterfall)
-- Total distributions by tier
+From `waterfall_results.json`, present:
 
 **Return Summary:**
 | Metric | LP | GP |
 |--------|----|----|
 | Equity Invested | | |
 | Cash Distributed | | |
-| Return Multiple | | |
+| Share of Distributions | | |
 | IRR | | |
-| Profit | | |
 
-**GP Economics Breakdown:**
-- GP equity return (from GP investment)
-- GP promote/carry (from waterfall splits)
-- Management fees (if applicable)
-- Total GP compensation
+Plus project IRR, LP equity multiple, and the dated LP/GP cash flow vectors. Break GP economics into co-investment return vs. promote (the script reports GP totals; promote = GP total minus the GP's pro-rata investor share). Add management fees separately if applicable (typical: 1-2% of equity per year — not modeled by the script).
 
-### 7. Sensitivity Analysis
+### 6. Sensitivity Scenarios
 
-Show how distributions change under different return scenarios:
-- **Downside**: 1.5x return, 8% IRR
-- **Base Case**: User inputs
-- **Upside**: 2.5x return, 18% IRR
+Re-run the script with scaled cash flow vectors to show how the split shifts:
+- **Downside**: ~1.5x gross multiple
+- **Base**: user inputs
+- **Upside**: ~2.5x gross multiple
 
-For each scenario, show LP IRR and GP total compensation.
-
-### 8. Offer Code Generation
-
-Ask if user wants a Python waterfall calculator script that:
-- Accepts equity structure and hurdles as parameters
-- Calculates distributions from cash flow input
-- Outputs detailed waterfall breakdown
-
-If requested, generate and save to working directory.
+For each scenario report LP IRR, GP promote dollars, and GP % of distributions. (Promote share rises steeply with performance — that is the point of the structure.)
 
 ## Notes
 
-- Explain the difference between American and European waterfalls clearly
-- Highlight GP alignment: does GP also invest equity, or only receive promote?
-- Flag if promote structure seems aggressive (GP >30% at early hurdles)
-- Note tax implications: GP promote typically taxed as long-term capital gains
+- Explain American vs. European clearly; the script is whole-fund — model American deals per-deal as described above
+- The script has **no GP catch-up tier** in IRR mode; catch-up exists in `--mode simple`. If the user's operating agreement has a catch-up plus IRR hurdles, say so explicitly and adjust interpretation
+- Highlight GP alignment: does the GP invest equity, or only receive promote?
+- Flag aggressive structures (GP >30% at early hurdles)
+- Note tax treatment: GP promote is typically taxed as long-term capital gains (carried interest)

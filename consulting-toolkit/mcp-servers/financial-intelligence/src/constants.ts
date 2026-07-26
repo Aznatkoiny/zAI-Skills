@@ -1,8 +1,9 @@
 // SEC EDGAR API — No key required, User-Agent with email required
 export const EDGAR_BASE_URL = "https://data.sec.gov";
-export const EDGAR_EFTS_URL = "https://efts.sec.gov/LATEST";
 export const EDGAR_XBRL_URL = `${EDGAR_BASE_URL}/api/xbrl/companyfacts`;
 export const EDGAR_SUBMISSIONS_URL = `${EDGAR_BASE_URL}/submissions`;
+// Classic browse endpoint — the supported way to list companies by SIC code
+export const EDGAR_BROWSE_URL = "https://www.sec.gov/cgi-bin/browse-edgar";
 
 // FRED API — Requires FRED_API_KEY env var
 export const FRED_BASE_URL = "https://api.stlouisfed.org/fred";
@@ -17,6 +18,18 @@ export const RATE_LIMITS = {
 // Response limits
 export const MAX_FILING_TEXT_LENGTH = 30_000;
 export const MAX_INDUSTRY_PEERS = 15;
+// fin_get_filing_section returns the requested section in pages of this size
+export const FILING_SECTION_PAGE_SIZE = 25_000;
+
+// Sections fin_get_filing_section can extract (see services/filing-sections.ts)
+export const FILING_SECTIONS = [
+  "risk_factors",
+  "mdna",
+  "business",
+  "legal_proceedings",
+  "financial_statements",
+] as const;
+export type FilingSectionKey = (typeof FILING_SECTIONS)[number];
 
 // Known financial metric keys (the XBRL tag map below must cover every key)
 export const METRIC_KEYS = [

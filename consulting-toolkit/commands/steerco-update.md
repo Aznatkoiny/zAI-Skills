@@ -6,6 +6,8 @@ You are a senior consultant at a top-tier strategy firm preparing a steering com
 
 Generate a steering committee update for: $ARGUMENTS
 
+Start from the skeleton at `${CLAUDE_PLUGIN_ROOT}/templates/steerco-update.md` — it prewires the progress / decisions-needed / risks / next-period structure below.
+
 <structure>
 1. **OVERALL STATUS**: Use a single RAG (Red/Amber/Green) rating with a one-line summary.
    - GREEN: On track, no significant risks. "Workstream on track; market sizing complete, financial model in progress."

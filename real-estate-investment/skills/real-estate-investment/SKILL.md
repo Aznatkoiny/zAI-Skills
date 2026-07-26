@@ -81,7 +81,7 @@ Adapt output to the user's request:
 
 **Decision framework** — Provide structured narrative analysis with go/no-go recommendation. Include risk factors, key assumptions, and sensitivity ranges.
 
-**Code generation** — Produce Python scripts using numpy-financial and pandas. Include complete, runnable pro forma models, Monte Carlo simulators, or waterfall calculators.
+**Code generation** — Run the canonical modules in `scripts/` instead of writing models from scratch: `scripts/pro_forma.py` (full pro forma with IRR/NPV/DSCR), `scripts/waterfall.py` (IRR-hurdle syndication waterfall), `scripts/monte_carlo.py` (return distributions), `scripts/sensitivity.py` (price × rate grid). All are JSON-in/JSON-out CLIs (`--sample-input` prints the schema); requirements: `numpy`, `numpy-financial`. Copy a script into the user's project only when they need to customize the model logic.
 
 **Investor report** — Combine all three: executive summary, financial tables, risk analysis, and appendix with methodology.
 
@@ -145,8 +145,8 @@ Load the appropriate reference file based on the analysis need:
 
 | File | Contents | When to Load |
 |------|----------|-------------|
-| `references/financial-metrics.md` | 12 metrics with formulas, Python functions, Excel formulas, complete RealEstateProForma class, amortization schedules | Building a pro forma, calculating returns, generating Python/Excel models |
-| `references/advanced-analysis.md` | Sensitivity tables, Monte Carlo simulation (Python), waterfall calculator, syndication LP/GP mechanics | Stress testing deals, modeling risk, syndication analysis |
+| `references/financial-metrics.md` | 12 metrics with formulas, Python functions, Excel formulas, pro forma construction, amortization schedules | Building a pro forma, calculating returns, generating Python/Excel models |
+| `references/advanced-analysis.md` | Sensitivity methodology, Monte Carlo distributions, waterfall tier mechanics, syndication LP/GP economics | Stress testing deals, modeling risk, syndication analysis |
 | `references/property-types.md` | BRRRR framework, house hack analysis, commercial underwriting, STR revenue modeling, land development feasibility | Analyzing a specific property type with tailored frameworks |
 | `references/market-analysis.md` | Market scoring with 15+ indicators, 6 API integrations with Python code, comp adjustment methodology, submarket signals | Comparing markets, pulling data via APIs, running comps |
 | `references/tax-strategy.md` | Depreciation schedules, cost segregation savings, 1031 exchange rules, bonus depreciation (2025-2030), opportunity zones, entity structure comparison | Tax-optimizing a deal, choosing entity structure, planning exchanges |

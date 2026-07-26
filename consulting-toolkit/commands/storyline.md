@@ -39,6 +39,8 @@ Create a slide storyline for: $ARGUMENTS
 </methodology>
 
 <output_format>
+Start from the skeleton at `${CLAUDE_PLUGIN_ROOT}/templates/storyline.md` — it prewires the pyramid (governing thought, key line, support) and the title-only read-through section.
+
 **GOVERNING THOUGHT**: [single sentence]
 
 **STORYLINE**:

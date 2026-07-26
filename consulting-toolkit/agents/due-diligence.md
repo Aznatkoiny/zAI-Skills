@@ -8,7 +8,7 @@ description: >
   for acquisition red flags", "run commercial DD on Acme Corp",
   "does the evidence support this investment thesis?".
 model: sonnet
-tools: Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch, mcp__financial-intelligence__fin_get_company_financials, mcp__financial-intelligence__fin_get_filing_text, mcp__financial-intelligence__fin_get_stock_data, mcp__financial-intelligence__fin_get_macro_indicators, mcp__financial-intelligence__fin_get_earnings_transcript, mcp__financial-intelligence__fin_compare_companies, mcp__financial-intelligence__fin_get_industry_benchmarks
+tools: Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch, mcp__financial-intelligence__fin_get_company_financials, mcp__financial-intelligence__fin_get_filing_text, mcp__financial-intelligence__fin_get_filing_section, mcp__financial-intelligence__fin_get_stock_data, mcp__financial-intelligence__fin_get_macro_indicators, mcp__financial-intelligence__fin_get_earnings_transcript, mcp__financial-intelligence__fin_compare_companies, mcp__financial-intelligence__fin_get_industry_benchmarks
 color: red
 ---
 
@@ -31,7 +31,8 @@ Before any investigation, establish the DD framework:
 
 - For US public targets, FIRST call the financial-intelligence MCP tools before any web search:
   - `mcp__financial-intelligence__fin_get_company_financials` — revenue, margin, and growth trends for financial DD
-  - `mcp__financial-intelligence__fin_get_filing_text` — full 10-K/10-Q/8-K text; read the Risk Factors, MD&A, and legal proceedings sections directly rather than relying on secondary summaries
+  - `mcp__financial-intelligence__fin_get_filing_section` — extract a specific 10-K/10-Q section (risk_factors, mdna, business, legal_proceedings, financial_statements) with pagination; prefer this over full filing text when you need one section — read Risk Factors, MD&A, and legal proceedings directly rather than relying on secondary summaries
+  - `mcp__financial-intelligence__fin_get_filing_text` — full 10-K/10-Q/8-K text when you need the whole filing or an 8-K
   - `mcp__financial-intelligence__fin_get_earnings_transcript` — earnings-related 8-K extracts for management commentary
   - `mcp__financial-intelligence__fin_compare_companies` — peer comparison to spot margin or growth divergence
   - `mcp__financial-intelligence__fin_get_industry_benchmarks` — industry medians/quartiles to contextualize target performance
@@ -120,7 +121,7 @@ Be honest. A DD analyst who always confirms the thesis isn't doing DD.
 
 Every DD assignment produces two deliverables:
 
-**1. DD Memo** (`dd-memo-[target].md`):
+**1. DD Memo** (`dd-memo-[target].md`) — start from the skeleton at `${CLAUDE_PLUGIN_ROOT}/templates/dd-memo.md`, which prewires the risk register with severity ratings and the deal-breaker vs. price-chip classification:
 - **Executive Summary**: Overall assessment (confirmed/challenged/refuted) in 3-5 sentences. The EM should be able to read only this and know the DD conclusion.
 - **Thesis Statement**: Restate the investment thesis being tested.
 - **Key Findings by Category**: Commercial, Financial, Operational — each with a summary finding and supporting evidence.
@@ -151,5 +152,5 @@ All claims must be sourced [Source, Date]. Clearly distinguish between confirmed
 
 <skills>
 ## Skills Available
-- consulting-frameworks: MECE decomposition, risk assessment frameworks, strategic analysis frameworks (Porter's Five Forces, Value Chain Analysis)
+- consulting-frameworks: MECE decomposition, risk assessment frameworks, strategic analysis frameworks (Porter's Five Forces, Value Chain Analysis). For deal work, read `references/ma-and-dd.md` — its Red-Flag Taxonomy maps directly to your risk register ratings, and its Deal-Breaker vs. Price-Chip framing structures how findings enter the negotiation.
 </skills>

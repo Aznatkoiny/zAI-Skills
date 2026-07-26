@@ -1,13 +1,32 @@
 import { z } from "zod";
 import { stockDataSchema } from "../schemas/inputs.js";
 import { getStockData } from "../services/yahoo.js";
+import { getEquityFundamentals } from "../services/edgar.js";
+import type { EquityFundamentals } from "../types.js";
 
 type StockInput = z.infer<typeof stockDataSchema>;
+
+function formatLarge(value: number): string {
+  if (Math.abs(value) >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
+  if (Math.abs(value) >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
+  if (Math.abs(value) >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
+  return `$${Math.round(value).toLocaleString()}`;
+}
 
 export async function handleStockData(input: StockInput): Promise<string> {
   const { ticker, period, interval } = input;
   const data = await getStockData(ticker, period, interval);
   const { quote, history } = data;
+
+  // EDGAR fundamentals are best-effort: a ticker missing from EDGAR (foreign
+  // listings, ETFs, indices) must not break the price data.
+  let fundamentals: EquityFundamentals | null = null;
+  let fundamentalsError: string | null = null;
+  try {
+    fundamentals = await getEquityFundamentals(ticker);
+  } catch (err) {
+    fundamentalsError = err instanceof Error ? err.message : String(err);
+  }
 
   const avgVolumeRow =
     quote.avgVolumeBars > 0
@@ -33,6 +52,66 @@ export async function handleStockData(input: StockInput): Promise<string> {
     avgVolumeRow,
     "",
   ];
+
+  // ── Computed fundamentals (EDGAR-derived, clearly labeled) ──
+  const lastBar = history.length > 0 ? history[history.length - 1] : null;
+  const closePrice = lastBar ? lastBar.close : quote.price;
+  const closeLabel = lastBar
+    ? `$${lastBar.close.toFixed(2)} close on ${lastBar.date}`
+    : `$${quote.price.toFixed(2)} latest quote price`;
+
+  lines.push("### Computed Fundamentals (EDGAR-derived)");
+  lines.push("");
+  if (fundamentals && (fundamentals.sharesOutstanding || fundamentals.epsAnnual)) {
+    const shares = fundamentals.sharesOutstanding;
+    const eps = fundamentals.epsAnnual;
+    const derivations: string[] = [];
+
+    lines.push(`| Metric | Value |`);
+    lines.push(`|--------|-------|`);
+
+    if (shares && closePrice > 0) {
+      const marketCap = shares.value * closePrice;
+      lines.push(`| Market Cap (computed) | ${formatLarge(marketCap)} |`);
+      derivations.push(
+        `*Market cap = ${shares.value.toLocaleString()} shares outstanding ` +
+          `(${shares.tag} as of ${shares.asOf}, reported in ${shares.form}) × ${closeLabel} (Yahoo chart). ` +
+          `Share count and price are from different dates; this is a computed estimate, not an exchange-reported figure. ` +
+          `${shares.note}*`
+      );
+    }
+
+    if (eps) {
+      const epsKind = eps.tag.includes("Diluted") ? "diluted" : "basic";
+      lines.push(`| EPS (FY${eps.fiscalYear}, ${epsKind}) | $${eps.value.toFixed(2)} |`);
+      derivations.push(
+        `*EPS = ${eps.tag} for the fiscal year ended ${eps.periodEnd} (${eps.form}); ` +
+          `last reported full fiscal year, not trailing-twelve-month.*`
+      );
+      if (closePrice > 0) {
+        if (eps.value > 0) {
+          lines.push(`| P/E (computed) | ${(closePrice / eps.value).toFixed(1)} |`);
+          derivations.push(
+            `*P/E = ${closeLabel} ÷ FY${eps.fiscalYear} ${epsKind} EPS $${eps.value.toFixed(2)}.*`
+          );
+        } else {
+          lines.push(`| P/E (computed) | N/A (non-positive EPS) |`);
+        }
+      }
+    }
+
+    lines.push("");
+    lines.push(...derivations);
+  } else if (fundamentalsError) {
+    lines.push(
+      `*EDGAR fundamentals unavailable for ${ticker.toUpperCase()} (${fundamentalsError}). Market cap and P/E are omitted rather than estimated.*`
+    );
+  } else {
+    lines.push(
+      `*No shares-outstanding or EPS facts found in EDGAR XBRL for ${ticker.toUpperCase()}. Market cap and P/E are omitted rather than estimated.*`
+    );
+  }
+  lines.push("");
 
   if (history.length > 0) {
     // Show summary stats for the period
@@ -67,7 +146,9 @@ export async function handleStockData(input: StockInput): Promise<string> {
   }
 
   lines.push("");
-  lines.push(`*Data source: Yahoo Finance | Period: ${period} | Interval: ${interval}*`);
+  lines.push(
+    `*Data sources: Yahoo Finance chart (price/volume history) + SEC EDGAR XBRL (shares outstanding, EPS) | Period: ${period} | Interval: ${interval}*`
+  );
 
   return lines.join("\n");
 }

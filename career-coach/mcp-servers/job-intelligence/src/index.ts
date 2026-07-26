@@ -24,7 +24,7 @@ const server = new McpServer({
 
 server.tool(
   "job_search_jobs",
-  "Search for job listings across Indeed, LinkedIn, and TrueUp. Aggregates and deduplicates results from multiple sources. Scraper-backed: sites may bot-block, so results can be partial — fall back to WebSearch if sources fail.",
+  "Search job listings, API-first: Remotive and RemoteOK (keyless public APIs), Adzuna and USAJOBS (only when API keys are configured — otherwise skipped with a note), and the company's public Greenhouse/Lever board when the query names a well-known company. Indeed/LinkedIn/TrueUp scrapers run as best-effort fallback and may be bot-blocked. Results are deduplicated, cached (~6h), and every response ends with a per-source status footer (live / cached / skipped / failed). Fall back to WebSearch if all sources fail.",
   searchJobsSchema.shape,
   async (input) => {
     try {
@@ -41,7 +41,7 @@ server.tool(
 
 server.tool(
   "job_get_company_info",
-  "Get company overview, ratings, culture scores, and interview process from Glassdoor (Glassdoor is the only source — no LinkedIn data). Includes industry, size, headquarters, and employee ratings. Scraper-backed: Glassdoor may bot-block, so results can be partial — fall back to WebSearch if it fails.",
+  "Get company overview, ratings, culture scores, and interview process from Glassdoor (scraper — may bot-block), plus live open roles from the company's public Greenhouse/Lever job board when one exists (API). Results are cached (~24h) and the response ends with a per-source status footer — fall back to WebSearch if sources fail.",
   companyInfoSchema.shape,
   async (input) => {
     try {
@@ -58,7 +58,7 @@ server.tool(
 
 server.tool(
   "job_get_salary_data",
-  "Get salary and total compensation data from Glassdoor and Levels.fyi. Includes base pay, equity, bonus, and total comp breakdowns by level. Scraper-backed: sites may bot-block, so results can be partial — fall back to WebSearch if sources fail.",
+  "Get salary and total compensation data from Glassdoor and Levels.fyi. Includes base pay, equity, bonus, and total comp breakdowns by level. Scraper-backed: sites may bot-block, so results can be partial. Results are cached (~24h) and the response ends with a per-source status footer — fall back to WebSearch if sources fail.",
   salaryDataSchema.shape,
   async (input) => {
     try {
@@ -75,7 +75,7 @@ server.tool(
 
 server.tool(
   "job_get_interview_experiences",
-  "Get interview experiences from Glassdoor including difficulty ratings, questions asked, interview process descriptions, and offer outcomes. Scraper-backed: Glassdoor may bot-block, so results can be partial — fall back to WebSearch if it fails.",
+  "Get interview experiences from Glassdoor including difficulty ratings, questions asked, interview process descriptions, and offer outcomes. Scraper-backed: Glassdoor may bot-block, so results can be partial. Results are cached (~24h) and the response ends with a per-source status footer — fall back to WebSearch if it fails.",
   interviewExperiencesSchema.shape,
   async (input) => {
     try {
@@ -92,7 +92,7 @@ server.tool(
 
 server.tool(
   "job_search_trending_roles",
-  "Discover trending job roles from TrueUp with growth rates, average salaries, demand levels, and which companies are hiring. Results are global (TrueUp has no location filter). Scraper-backed: the site may bot-block, so results can be partial — fall back to WebSearch if it fails.",
+  "Discover trending job roles from TrueUp with growth rates, average salaries, demand levels, and which companies are hiring. Results are global (TrueUp has no location filter). Scraper-backed: the site may bot-block, so results can be partial. Results are cached (~6h) and the response ends with a per-source status footer — fall back to WebSearch if it fails.",
   trendingRolesSchema.shape,
   async (input) => {
     try {

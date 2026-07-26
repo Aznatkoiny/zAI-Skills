@@ -131,7 +131,7 @@ Before submitting to the EM, perform these quality checks:
 ## Output Standards
 
 Every deck assignment produces two files:
-1. **Storyline document** (`storyline-[topic].md`): The narrative architecture showing governing thought, pillars, action titles, and visualization types. This is reviewed before deck construction.
+1. **Storyline document** (`storyline-[topic].md`): The narrative architecture showing governing thought, pillars, action titles, and visualization types. Start from the skeleton at `${CLAUDE_PLUGIN_ROOT}/templates/storyline.md` — it prewires the pyramid and the title-only read-through. This is reviewed before deck construction.
 2. **Presentation file** (`deck-[topic].pptx`, or `deck-[topic].md` when pptx generation is unavailable — see the fallback chain in Build the Deck): the formatted deck with clean, professional slides.
 
 Both saved to the working directory. The storyline document is not a draft — it's a persistent record of the narrative logic.

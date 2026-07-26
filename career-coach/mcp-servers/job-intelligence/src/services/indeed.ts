@@ -1,7 +1,14 @@
+/**
+ * Indeed HTML scraper — best-effort fallback source (scraper tier).
+ * Indeed frequently bot-blocks; failures are reported honestly via
+ * SourceMeta and successful results are cached for 6h.
+ */
+
 import axios from "axios";
 import * as cheerio from "cheerio";
 import { RATE_LIMITS, USER_AGENT } from "../constants.js";
-import type { JobListing } from "../types.js";
+import type { JobListing, SourceResult } from "../types.js";
+import { fetchWithCache, SEARCH_TTL_MS, toSourceResult } from "./cache.js";
 import { RateLimiter } from "./rate-limiter.js";
 
 const limiter = new RateLimiter(RATE_LIMITS.indeed);
@@ -70,25 +77,29 @@ function parseIndeedListings($: cheerio.CheerioAPI): JobListing[] {
   return listings;
 }
 
-export async function searchIndeedJobs(
+/**
+ * Fetch and parse Indeed result pages. Throws when nothing could be
+ * fetched/parsed (bot-block or markup drift) so failures are never cached.
+ */
+async function fetchIndeedJobs(
   query: string,
-  location?: string,
-  remote?: boolean,
-  limit: number = 10
+  location: string | undefined,
+  remote: boolean | undefined,
+  limit: number
 ): Promise<JobListing[]> {
   const allListings: JobListing[] = [];
 
-  try {
-    // Fetch up to 2 pages if needed
-    const pagesToFetch = Math.ceil(limit / INDEED_PAGE_SIZE);
-    const maxPages = Math.min(pagesToFetch, 2);
+  // Fetch up to 2 pages if needed
+  const pagesToFetch = Math.ceil(limit / INDEED_PAGE_SIZE);
+  const maxPages = Math.min(pagesToFetch, 2);
 
-    for (let page = 0; page < maxPages; page++) {
-      if (allListings.length >= limit) break;
+  for (let page = 0; page < maxPages; page++) {
+    if (allListings.length >= limit) break;
 
-      const url = buildIndeedUrl(query, location, remote, page * INDEED_PAGE_SIZE);
-      await limiter.acquire();
+    const url = buildIndeedUrl(query, location, remote, page * INDEED_PAGE_SIZE);
+    await limiter.acquire();
 
+    try {
       const response = await axios.get(url, {
         headers: {
           "User-Agent": USER_AGENT,
@@ -105,24 +116,33 @@ export async function searchIndeedJobs(
 
       if (pageListings.length === 0) break;
       allListings.push(...pageListings);
-    }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("Indeed search error:", message);
-    if (allListings.length === 0) {
-      return [{
-        title: "Indeed Search Error",
-        company: "Indeed",
-        location: "N/A",
-        salary: null,
-        url: "https://www.indeed.com",
-        description: `Failed to fetch results from Indeed: ${message}. The site may be blocking automated requests or the HTML structure may have changed.`,
-        posted_date: null,
-        source: "indeed",
-        error: `Failed to fetch results from Indeed: ${message}. The site may be blocking automated requests or the HTML structure may have changed.`,
-      }];
+    } catch (err) {
+      // Keep partial results from earlier pages; fail only if we have nothing.
+      if (allListings.length > 0) break;
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`${message} — Indeed may be blocking automated requests`);
     }
   }
 
+  if (allListings.length === 0) {
+    throw new Error("no listings parsed — likely bot-blocked or the HTML structure changed");
+  }
+
   return allListings.slice(0, limit);
+}
+
+/** Search Indeed (scraper, cached 6h). Never throws — failures land in meta. */
+export async function searchIndeedJobs(
+  query: string,
+  location?: string,
+  remote?: boolean,
+  limit: number = 10
+): Promise<SourceResult<JobListing>> {
+  const res = await fetchWithCache(
+    "indeed",
+    { query: query.toLowerCase().trim(), location: location || null, remote: !!remote, limit },
+    SEARCH_TTL_MS,
+    () => fetchIndeedJobs(query, location, remote, limit)
+  );
+  return toSourceResult("Indeed", "scraper", res);
 }

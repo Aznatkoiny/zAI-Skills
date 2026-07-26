@@ -1,7 +1,15 @@
+/**
+ * Levels.fyi HTML scraper — best-effort source (scraper tier) for tech
+ * compensation with level breakdowns. May be bot-blocked; failures are
+ * reported honestly via SourceMeta and successful results are cached for
+ * 24h (salary lookups).
+ */
+
 import axios from "axios";
 import * as cheerio from "cheerio";
 import { RATE_LIMITS, USER_AGENT } from "../constants.js";
-import type { SalaryData } from "../types.js";
+import type { SalaryData, SourceResult } from "../types.js";
+import { fetchWithCache, LOOKUP_TTL_MS, toSourceResult } from "./cache.js";
 import { RateLimiter } from "./rate-limiter.js";
 
 const limiter = new RateLimiter(RATE_LIMITS.levelsfyi);
@@ -9,165 +17,174 @@ const limiter = new RateLimiter(RATE_LIMITS.levelsfyi);
 const LEVELS_BASE_URL = "https://www.levels.fyi";
 
 /**
- * Get salary/compensation data from Levels.fyi for a specific role.
- * Levels.fyi specializes in tech compensation with detailed level breakdowns.
+ * Fetch and parse Levels.fyi compensation data. Throws when nothing could
+ * be parsed so failures are never cached.
  */
-export async function getLevelsSalaryData(
+async function fetchLevelsSalaryData(
   role: string,
   company?: string,
   location?: string
 ): Promise<SalaryData[]> {
   const salaries: SalaryData[] = [];
 
-  try {
-    // Build search URL — Levels.fyi uses path-based search
-    let searchPath = "/t";
-    const roleLower = role.toLowerCase();
+  // Build search URL — Levels.fyi uses path-based search
+  let searchPath = "/t";
+  const roleLower = role.toLowerCase();
 
-    // Map common roles to Levels.fyi paths
-    if (roleLower.includes("software engineer")) {
-      searchPath = "/t/software-engineer";
-    } else if (roleLower.includes("product manager")) {
-      searchPath = "/t/product-manager";
-    } else if (roleLower.includes("data scientist")) {
-      searchPath = "/t/data-scientist";
-    } else if (roleLower.includes("designer") || roleLower.includes("ux")) {
-      searchPath = "/t/product-designer";
-    } else if (roleLower.includes("devops") || roleLower.includes("sre")) {
-      searchPath = "/t/devops";
-    } else if (roleLower.includes("data engineer")) {
-      searchPath = "/t/data-engineer";
-    } else if (roleLower.includes("machine learning") || roleLower.includes("ml")) {
-      searchPath = "/t/machine-learning-engineer";
-    } else if (roleLower.includes("frontend") || roleLower.includes("front-end")) {
-      searchPath = "/t/front-end-engineer";
-    } else if (roleLower.includes("backend") || roleLower.includes("back-end")) {
-      searchPath = "/t/back-end-engineer";
-    } else if (roleLower.includes("mobile") || roleLower.includes("ios") || roleLower.includes("android")) {
-      searchPath = "/t/mobile-developer";
-    } else if (roleLower.includes("security")) {
-      searchPath = "/t/security-engineer";
-    } else if (roleLower.includes("engineering manager")) {
-      searchPath = "/t/engineering-manager";
-    } else {
-      // Fallback: slugify role
-      const slug = role.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-      searchPath = `/t/${slug}`;
-    }
+  // Map common roles to Levels.fyi paths
+  if (roleLower.includes("software engineer")) {
+    searchPath = "/t/software-engineer";
+  } else if (roleLower.includes("product manager")) {
+    searchPath = "/t/product-manager";
+  } else if (roleLower.includes("data scientist")) {
+    searchPath = "/t/data-scientist";
+  } else if (roleLower.includes("designer") || roleLower.includes("ux")) {
+    searchPath = "/t/product-designer";
+  } else if (roleLower.includes("devops") || roleLower.includes("sre")) {
+    searchPath = "/t/devops";
+  } else if (roleLower.includes("data engineer")) {
+    searchPath = "/t/data-engineer";
+  } else if (roleLower.includes("machine learning") || roleLower.includes("ml")) {
+    searchPath = "/t/machine-learning-engineer";
+  } else if (roleLower.includes("frontend") || roleLower.includes("front-end")) {
+    searchPath = "/t/front-end-engineer";
+  } else if (roleLower.includes("backend") || roleLower.includes("back-end")) {
+    searchPath = "/t/back-end-engineer";
+  } else if (roleLower.includes("mobile") || roleLower.includes("ios") || roleLower.includes("android")) {
+    searchPath = "/t/mobile-developer";
+  } else if (roleLower.includes("security")) {
+    searchPath = "/t/security-engineer";
+  } else if (roleLower.includes("engineering manager")) {
+    searchPath = "/t/engineering-manager";
+  } else {
+    // Fallback: slugify role
+    const slug = role.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+    searchPath = `/t/${slug}`;
+  }
 
-    // Add company filter
-    if (company) {
-      const companySlug = company.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-      searchPath += `/c/${companySlug}`;
-    }
+  // Add company filter
+  if (company) {
+    const companySlug = company.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+    searchPath += `/c/${companySlug}`;
+  }
 
-    // Add location filter
-    if (location) {
-      const locationSlug = location.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-      searchPath += `/l/${locationSlug}`;
-    }
+  // Add location filter
+  if (location) {
+    const locationSlug = location.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+    searchPath += `/l/${locationSlug}`;
+  }
 
-    const url = `${LEVELS_BASE_URL}${searchPath}`;
+  const url = `${LEVELS_BASE_URL}${searchPath}`;
 
-    await limiter.acquire();
+  await limiter.acquire();
 
-    const response = await axios.get(url, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
-      timeout: 15_000,
-      maxRedirects: 5,
-      validateStatus: (status) => status < 500,
-    });
+  const response = await axios.get(url, {
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
+    timeout: 15_000,
+    maxRedirects: 5,
+    validateStatus: (status) => status < 500,
+  });
 
-    const $ = cheerio.load(response.data);
+  const $ = cheerio.load(response.data);
 
-    // Parse compensation data from Levels.fyi
-    // They show compensation entries with base, stock, bonus breakdowns
-    $("[class*='CompRow'], [class*='comp-row'], [class*='SalaryRow'], table tbody tr, [class*='entry']").each((_index, element) => {
-      try {
-        const el = $(element);
+  // Parse compensation data from Levels.fyi
+  // They show compensation entries with base, stock, bonus breakdowns
+  $("[class*='CompRow'], [class*='comp-row'], [class*='SalaryRow'], table tbody tr, [class*='entry']").each((_index, element) => {
+    try {
+      const el = $(element);
 
-        const companyText = el.find("[class*='company'], [class*='Company'], td:nth-child(1) a, [data-test='company']").first().text().trim() || company || null;
-        const levelText = el.find("[class*='level'], [class*='Level'], td:nth-child(2), [data-test='level']").first().text().trim() || null;
-        const locationText = el.find("[class*='location'], [class*='Location'], td:nth-child(3), [data-test='location']").first().text().trim() || location || null;
+      const companyText = el.find("[class*='company'], [class*='Company'], td:nth-child(1) a, [data-test='company']").first().text().trim() || company || null;
+      const levelText = el.find("[class*='level'], [class*='Level'], td:nth-child(2), [data-test='level']").first().text().trim() || null;
+      const locationText = el.find("[class*='location'], [class*='Location'], td:nth-child(3), [data-test='location']").first().text().trim() || location || null;
 
-        // Parse compensation components
-        const totalText = el.find("[class*='total'], [class*='Total'], td:nth-child(4), [data-test='total-comp']").first().text().trim();
-        const baseText = el.find("[class*='base'], [class*='Base'], td:nth-child(5), [data-test='base']").first().text().trim();
-        const stockText = el.find("[class*='stock'], [class*='Stock'], [class*='equity'], td:nth-child(6), [data-test='stock']").first().text().trim();
-        const bonusText = el.find("[class*='bonus'], [class*='Bonus'], td:nth-child(7), [data-test='bonus']").first().text().trim();
+      // Parse compensation components
+      const totalText = el.find("[class*='total'], [class*='Total'], td:nth-child(4), [data-test='total-comp']").first().text().trim();
+      const baseText = el.find("[class*='base'], [class*='Base'], td:nth-child(5), [data-test='base']").first().text().trim();
+      const stockText = el.find("[class*='stock'], [class*='Stock'], [class*='equity'], td:nth-child(6), [data-test='stock']").first().text().trim();
+      const bonusText = el.find("[class*='bonus'], [class*='Bonus'], td:nth-child(7), [data-test='bonus']").first().text().trim();
 
-        const total_comp = parseDollarAmount(totalText);
-        const base = parseDollarAmount(baseText);
-        const equity = parseDollarAmount(stockText);
-        const bonus = parseDollarAmount(bonusText);
+      const total_comp = parseDollarAmount(totalText);
+      const base = parseDollarAmount(baseText);
+      const equity = parseDollarAmount(stockText);
+      const bonus = parseDollarAmount(bonusText);
 
-        // Only add if we have at least some compensation data
-        if (total_comp || base || companyText) {
-          salaries.push({
-            role,
-            company: companyText,
-            location: locationText,
-            base,
-            equity,
-            bonus,
-            total_comp: total_comp || (base && equity && bonus ? base + equity + bonus : base),
-            level: levelText,
-            source: "levelsfyi",
-          });
-        }
-      } catch (innerErr) {
-        console.error("Error parsing individual Levels.fyi salary entry:", innerErr);
+      // Only add if we have at least some compensation data
+      if (total_comp || base) {
+        salaries.push({
+          role,
+          company: companyText,
+          location: locationText,
+          base,
+          equity,
+          bonus,
+          total_comp: total_comp || (base && equity && bonus ? base + equity + bonus : base),
+          level: levelText,
+          source: "levelsfyi",
+        });
       }
-    });
-
-    // Also try parsing summary/aggregate data if individual entries not found
-    if (salaries.length === 0) {
-      try {
-        // Look for summary compensation display
-        const summaryTotal = $("[class*='median'], [class*='Median'], [class*='avg'], [class*='average']").first().text().trim();
-        const summaryBase = $("[class*='baseMedian'], [class*='basePay']").first().text().trim();
-        const summaryStock = $("[class*='stockMedian'], [class*='stockPay']").first().text().trim();
-        const summaryBonus = $("[class*='bonusMedian'], [class*='bonusPay']").first().text().trim();
-
-        if (summaryTotal || summaryBase) {
-          salaries.push({
-            role,
-            company: company || "Aggregate",
-            location: location || null,
-            base: parseDollarAmount(summaryBase),
-            equity: parseDollarAmount(summaryStock),
-            bonus: parseDollarAmount(summaryBonus),
-            total_comp: parseDollarAmount(summaryTotal),
-            level: "Median",
-            source: "levelsfyi",
-          });
-        }
-      } catch {
-        // skip summary parse errors
-      }
+    } catch (innerErr) {
+      console.error("Error parsing individual Levels.fyi salary entry:", innerErr);
     }
-  } catch (err) {
-    console.error("Levels.fyi salary error:", err instanceof Error ? err.message : String(err));
-    if (salaries.length === 0) {
-      return [{
-        role,
-        company: company || null,
-        location: location || null,
-        base: null,
-        equity: null,
-        bonus: null,
-        total_comp: null,
-        level: null,
-        source: "levelsfyi",
-      }];
+  });
+
+  // Also try parsing summary/aggregate data if individual entries not found
+  if (salaries.length === 0) {
+    try {
+      // Look for summary compensation display
+      const summaryTotal = $("[class*='median'], [class*='Median'], [class*='avg'], [class*='average']").first().text().trim();
+      const summaryBase = $("[class*='baseMedian'], [class*='basePay']").first().text().trim();
+      const summaryStock = $("[class*='stockMedian'], [class*='stockPay']").first().text().trim();
+      const summaryBonus = $("[class*='bonusMedian'], [class*='bonusPay']").first().text().trim();
+
+      if (summaryTotal || summaryBase) {
+        salaries.push({
+          role,
+          company: company || "Aggregate",
+          location: location || null,
+          base: parseDollarAmount(summaryBase),
+          equity: parseDollarAmount(summaryStock),
+          bonus: parseDollarAmount(summaryBonus),
+          total_comp: parseDollarAmount(summaryTotal),
+          level: "Median",
+          source: "levelsfyi",
+        });
+      }
+    } catch {
+      // skip summary parse errors
     }
   }
 
+  if (salaries.length === 0) {
+    throw new Error("no compensation entries parsed — likely bot-blocked or no data for this role");
+  }
+
   return salaries;
+}
+
+/**
+ * Get salary/compensation data from Levels.fyi (scraper, cached 24h).
+ * Never throws — failures land in meta.
+ */
+export async function getLevelsSalaryData(
+  role: string,
+  company?: string,
+  location?: string
+): Promise<SourceResult<SalaryData>> {
+  const res = await fetchWithCache(
+    "levelsfyi",
+    {
+      role: role.toLowerCase().trim(),
+      company: company?.toLowerCase().trim() || null,
+      location: location?.toLowerCase().trim() || null,
+    },
+    LOOKUP_TTL_MS,
+    () => fetchLevelsSalaryData(role, company, location)
+  );
+  return toSourceResult("Levels.fyi", "scraper", res);
 }
 
 /**

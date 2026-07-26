@@ -40,6 +40,8 @@ Data sourcing: for US public competitors, first pull revenue and margin data wit
 </quality_standards>
 
 <output_format>
+Start from the skeleton at `${CLAUDE_PLUGIN_ROOT}/templates/competitive-landscape.md` — it prewires the 2x2 positioning map and the capability table.
+
 - Executive summary (3-5 bullets)
 - Competitive arena definition
 - Competitor comparison table (name | revenue | share | differentiator | trajectory)

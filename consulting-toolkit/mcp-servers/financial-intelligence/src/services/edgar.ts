@@ -3,7 +3,7 @@ import {
   EDGAR_BASE_URL,
   EDGAR_XBRL_URL,
   EDGAR_SUBMISSIONS_URL,
-  EDGAR_EFTS_URL,
+  EDGAR_BROWSE_URL,
   RATE_LIMITS,
   XBRL_METRIC_TAGS,
 } from "../constants.js";
@@ -14,8 +14,12 @@ import type {
   FinancialPeriod,
   DerivedMetric,
   FilingInfo,
+  ShareCountFact,
+  EpsFact,
+  EquityFundamentals,
 } from "../types.js";
 import { RateLimiter } from "./rate-limiter.js";
+import { cachedFetch, CACHE_TTLS } from "./cache.js";
 
 const limiter = new RateLimiter(RATE_LIMITS.edgar);
 
@@ -72,7 +76,8 @@ function padCik(cik: string): string {
 
 // ── Submissions Cache ──
 // getCompanyInfo and getFilings both need the CIK{cik}.json submissions
-// payload; a short TTL cache avoids re-downloading it within one workflow.
+// payload; a short in-memory TTL cache avoids re-downloading it within one
+// workflow, backed by the shared disk cache across server restarts.
 
 interface SubmissionsPayload {
   cik: string;
@@ -98,8 +103,16 @@ async function getSubmissions(cik: string): Promise<SubmissionsPayload> {
     return cached.data;
   }
 
-  const { data } = await edgarGet<SubmissionsPayload>(
-    `${EDGAR_SUBMISSIONS_URL}/CIK${key}.json`
+  const data = await cachedFetch<SubmissionsPayload>(
+    "submissions",
+    key,
+    CACHE_TTLS.submissions,
+    async () => {
+      const resp = await edgarGet<SubmissionsPayload>(
+        `${EDGAR_SUBMISSIONS_URL}/CIK${key}.json`
+      );
+      return resp.data;
+    }
   );
 
   // Evict oldest entries to bound memory (submissions payloads can be large)
@@ -115,32 +128,52 @@ async function getSubmissions(cik: string): Promise<SubmissionsPayload> {
 // ── Ticker → CIK Resolution ──
 
 interface TickerMapping {
-  cik_str: string;
+  cik_str: string | number;
   ticker: string;
   title: string;
 }
 
-let tickerMap: Map<string, TickerMapping> | null = null;
+const TICKER_MAP_URL = "https://www.sec.gov/files/company_tickers.json";
 
-async function loadTickerMap(): Promise<Map<string, TickerMapping>> {
-  if (tickerMap) return tickerMap;
-  const { data } = await edgarGet<Record<string, TickerMapping>>(
-    "https://www.sec.gov/files/company_tickers.json"
-  );
-  tickerMap = new Map<string, TickerMapping>();
-  for (const entry of Object.values(data)) {
-    tickerMap.set(entry.ticker.toUpperCase(), entry);
+let tickerMap: Map<string, TickerMapping> | null = null;
+let cikListingMap: Map<string, TickerMapping> | null = null;
+
+async function loadTickerMaps(): Promise<{
+  byTicker: Map<string, TickerMapping>;
+  byCik: Map<string, TickerMapping>;
+}> {
+  if (tickerMap && cikListingMap) {
+    return { byTicker: tickerMap, byCik: cikListingMap };
   }
-  return tickerMap;
+  const data = await cachedFetch<Record<string, TickerMapping>>(
+    "tickerMap",
+    TICKER_MAP_URL,
+    CACHE_TTLS.tickerMap,
+    async () => {
+      const resp = await edgarGet<Record<string, TickerMapping>>(TICKER_MAP_URL);
+      return resp.data;
+    }
+  );
+  const byTicker = new Map<string, TickerMapping>();
+  const byCik = new Map<string, TickerMapping>();
+  for (const entry of Object.values(data)) {
+    byTicker.set(entry.ticker.toUpperCase(), entry);
+    const cikKey = String(entry.cik_str);
+    // First listing per CIK wins — the SEC file orders primary listings first.
+    if (!byCik.has(cikKey)) byCik.set(cikKey, entry);
+  }
+  tickerMap = byTicker;
+  cikListingMap = byCik;
+  return { byTicker, byCik };
 }
 
 export async function resolveTickerToCik(ticker: string): Promise<string> {
-  const map = await loadTickerMap();
-  const entry = map.get(ticker.toUpperCase());
+  const { byTicker } = await loadTickerMaps();
+  const entry = byTicker.get(ticker.toUpperCase());
   if (!entry) {
     throw new Error(`Ticker "${ticker}" not found in SEC EDGAR.`);
   }
-  return entry.cik_str.toString();
+  return String(entry.cik_str);
 }
 
 // ── Company Info ──
@@ -178,10 +211,16 @@ interface XBRLResponse {
 }
 
 export async function getCompanyFacts(cik: string): Promise<XBRLResponse> {
-  const { data } = await edgarGet<XBRLResponse>(
-    `${EDGAR_XBRL_URL}/CIK${padCik(cik)}.json`
+  const key = padCik(cik);
+  return cachedFetch<XBRLResponse>(
+    "companyFacts",
+    key,
+    CACHE_TTLS.companyFacts,
+    async () => {
+      const { data } = await edgarGet<XBRLResponse>(`${EDGAR_XBRL_URL}/CIK${key}.json`);
+      return data;
+    }
   );
-  return data;
 }
 
 function extractMetricFromFacts(
@@ -363,11 +402,19 @@ export async function getFilingDocument(
   const accessionPath = accessionNumber.replace(/-/g, "");
   const numericCik = parseInt(cik, 10).toString();
   const url = `https://www.sec.gov/Archives/edgar/data/${numericCik}/${accessionPath}/${primaryDocument}`;
-  const { data } = await edgarGet<string>(url, {
-    responseType: "text",
-    headers: { Accept: "text/html,text/plain,*/*" },
-  });
-  return stripHtml(data);
+  // Filed documents are immutable once published; cache the stripped text.
+  return cachedFetch<string>(
+    "filingDocument",
+    url,
+    CACHE_TTLS.filingDocument,
+    async () => {
+      const { data } = await edgarGet<string>(url, {
+        responseType: "text",
+        headers: { Accept: "text/html,text/plain,*/*" },
+      });
+      return stripHtml(data);
+    }
+  );
 }
 
 function stripHtml(html: string): string {
@@ -386,86 +433,182 @@ function stripHtml(html: string): string {
 }
 
 // ── Company Search by SIC Code ──
+//
+// Uses EDGAR's classic browse endpoint — the supported way to list companies
+// by SIC code (the full-text search API cannot filter by SIC; a previous
+// implementation derived CIKs from EFTS file numbers, which never resolve).
+//
+// Note on parsing: the atom output's name attributes are broken server-side
+// (they serialize as Perl "ARRAY(0x...)" strings), so only CIKs are parsed
+// from the feed. Names and tickers come from the cached company_tickers.json
+// listing map, which also filters the alphabetical registrant roll (full of
+// long-dead filers) down to currently listed companies — the population that
+// peer benchmarking actually wants.
 
-// Hard cap on submissions lookups during the fallback ticker-map scan so a
-// niche SIC code cannot hammer data.sec.gov for minutes on end.
-const MAX_SIC_SCAN_REQUESTS = 300;
+const SIC_BROWSE_PAGE_SIZE = 40;
+const MAX_SIC_BROWSE_PAGES = 5;
 
 export interface SicSearchResult {
   companies: EdgarCompanyInfo[];
   note?: string;
 }
 
-interface EftsSearchResponse {
-  hits?: {
-    hits?: { _source?: { file_num?: string } }[];
-  };
+function parseSicBrowseCiks(atomXml: string): string[] {
+  const ciks: string[] = [];
+  const seen = new Set<string>();
+  for (const m of atomXml.matchAll(/<cik>\s*0*(\d+)\s*<\/cik>/gi)) {
+    if (!seen.has(m[1])) {
+      seen.add(m[1]);
+      ciks.push(m[1]);
+    }
+  }
+  return ciks;
 }
 
-export async function getCompaniesBySic(sicCode: string, limit: number = 15): Promise<SicSearchResult> {
-  const encodedSic = encodeURIComponent(sicCode);
-  const companies: EdgarCompanyInfo[] = [];
-  const seenCiks = new Set<string>();
+async function fetchSicBrowsePage(sicCode: string, start: number): Promise<string[]> {
+  const url =
+    `${EDGAR_BROWSE_URL}?action=getcompany&SIC=${encodeURIComponent(sicCode)}` +
+    `&type=10-K&dateb=&owner=include&count=${SIC_BROWSE_PAGE_SIZE}&start=${start}&output=atom`;
+  const xml = await cachedFetch<string>("sicBrowse", url, CACHE_TTLS.sicBrowse, async () => {
+    const { data } = await edgarGet<string>(url, {
+      responseType: "text",
+      headers: { Accept: "application/atom+xml,application/xml,text/xml,*/*" },
+    });
+    return data;
+  });
+  return parseSicBrowseCiks(xml);
+}
 
-  // Best-effort full-text search for recent 10-K filers mentioning the SIC code
-  let searchData: EftsSearchResponse | null = null;
-  try {
-    const { data } = await edgarGet<EftsSearchResponse>(
-      `${EDGAR_EFTS_URL}/search-index?q=%22${encodedSic}%22&forms=10-K`,
-      { baseURL: "" }
-    );
-    searchData = data;
-  } catch {
-    // Full-text search is best-effort; fall through to the ticker-map scan
-  }
+export async function getCompaniesBySic(
+  sicCode: string,
+  limit: number = 15
+): Promise<SicSearchResult> {
+  const { byCik } = await loadTickerMaps();
 
-  if (searchData?.hits?.hits) {
-    for (const hit of searchData.hits.hits) {
-      if (companies.length >= limit) break;
-      const fileCik = hit._source?.file_num?.split("-")[0];
-      if (fileCik && !seenCiks.has(fileCik)) {
-        seenCiks.add(fileCik);
-        try {
-          const info = await getCompanyInfo(fileCik);
-          if (info.sic === sicCode) {
-            companies.push(info);
-          }
-        } catch {
-          // Skip companies that fail to resolve
-        }
-      }
+  const allCiks: string[] = [];
+  const seen = new Set<string>();
+  const listed: { cik: string; entry: TickerMapping }[] = [];
+  let exhausted = false;
+
+  for (let page = 0; page < MAX_SIC_BROWSE_PAGES && listed.length < limit; page++) {
+    const pageCiks = await fetchSicBrowsePage(sicCode, page * SIC_BROWSE_PAGE_SIZE);
+    for (const cik of pageCiks) {
+      if (seen.has(cik)) continue;
+      seen.add(cik);
+      allCiks.push(cik);
+      const entry = byCik.get(cik);
+      if (entry && listed.length < limit) listed.push({ cik, entry });
+    }
+    if (pageCiks.length < SIC_BROWSE_PAGE_SIZE) {
+      exhausted = true;
+      break;
     }
   }
 
-  // If we didn't find enough via search, scan the ticker map (capped)
-  let scanned = 0;
-  let scanCapped = false;
-  if (companies.length < limit) {
-    const map = await loadTickerMap();
-    for (const entry of map.values()) {
-      if (companies.length >= limit) break;
-      if (scanned >= MAX_SIC_SCAN_REQUESTS) {
-        scanCapped = true;
-        break;
-      }
-      if (seenCiks.has(entry.cik_str)) continue;
-      scanned++;
-      try {
-        const info = await getCompanyInfo(entry.cik_str);
-        if (info.sic === sicCode) {
-          seenCiks.add(entry.cik_str);
-          companies.push(info);
-        }
-      } catch {
-        // Skip
-      }
+  if (listed.length > 0) {
+    const companies: EdgarCompanyInfo[] = listed.map(({ cik, entry }) => ({
+      cik,
+      ticker: entry.ticker.toUpperCase(),
+      name: entry.title,
+      sic: sicCode,
+      sicDescription: "",
+      exchanges: [],
+    }));
+    return {
+      companies,
+      note: !exhausted
+        ? `SIC ${sicCode} has more registrants than scanned (${allCiks.length} checked across ${MAX_SIC_BROWSE_PAGES} pages); the EDGAR listing is alphabetical, so these are the first ${companies.length} currently listed 10-K filers by name, not a size-ranked sample.`
+        : undefined,
+    };
+  }
+
+  // No currently listed registrants matched — fall back to the raw browse
+  // results (may include delisted or private filers), resolved via the
+  // cached submissions payloads.
+  const companies: EdgarCompanyInfo[] = [];
+  for (const cik of allCiks.slice(0, limit)) {
+    try {
+      companies.push(await getCompanyInfo(cik));
+    } catch {
+      // Skip CIKs whose submissions payload fails to resolve
+    }
+  }
+  return {
+    companies,
+    note:
+      companies.length > 0
+        ? `No currently listed registrants found for SIC ${sicCode}; returning raw EDGAR browse results, which may include delisted or private filers with stale financials.`
+        : `EDGAR company browse returned no 10-K filers for SIC ${sicCode}.`,
+  };
+}
+
+// ── Equity Fundamentals (shares outstanding, annual EPS) ──
+// Powers the honestly-labeled computed fields in fin_get_stock_data: market
+// cap is EDGAR-reported shares × a price the caller supplies, never a quoted
+// figure from an unlicensed source.
+
+const SHARES_SOURCES: { taxonomy: "dei" | "us-gaap"; tag: string }[] = [
+  { taxonomy: "dei", tag: "EntityCommonStockSharesOutstanding" },
+  { taxonomy: "us-gaap", tag: "CommonStockSharesOutstanding" },
+];
+
+const EPS_TAGS = ["EarningsPerShareDiluted", "EarningsPerShareBasic"];
+
+export async function getEquityFundamentals(ticker: string): Promise<EquityFundamentals> {
+  const cik = await resolveTickerToCik(ticker);
+  const factsResp = await getCompanyFacts(cik);
+
+  let shares: ShareCountFact | null = null;
+  for (const src of SHARES_SOURCES) {
+    const units = factsResp.facts[src.taxonomy]?.[src.tag]?.units?.["shares"];
+    if (!units) continue;
+    const usable = [...units].filter((f) => f.end && typeof f.val === "number");
+    const latest = usable.sort((a, b) => b.end.localeCompare(a.end))[0];
+    if (latest) {
+      // A single fact is selected; multi-class issuers report cover-page
+      // share counts per class (sometimes as several facts with the same end
+      // date), so one fact may understate the total. Say so honestly.
+      const sameEnd = usable.filter((f) => f.end === latest.end).length;
+      shares = {
+        value: latest.val,
+        asOf: latest.end,
+        form: latest.form,
+        tag: `${src.taxonomy}:${src.tag}`,
+        note:
+          sameEnd > 1
+            ? `EDGAR reports ${sameEnd} share-count facts as of ${latest.end} (typically one per share class); this figure is a single fact and may cover only one class, understating the total.`
+            : "For multi-class issuers this fact may reflect a single share class, understating total shares.",
+      };
+      break;
+    }
+  }
+
+  let eps: EpsFact | null = null;
+  const gaap = factsResp.facts["us-gaap"] || {};
+  for (const tag of EPS_TAGS) {
+    const units = gaap[tag]?.units?.["USD/shares"];
+    if (!units) continue;
+    // A 10-K re-reports prior-year comparatives; the latest period end across
+    // FY facts is the fiscal year the most recent 10-K actually covers.
+    const latest = [...units]
+      .filter((f) => f.form === "10-K" && f.fp === "FY" && f.end && typeof f.val === "number")
+      .sort((a, b) => b.end.localeCompare(a.end))[0];
+    if (latest) {
+      eps = {
+        value: latest.val,
+        periodEnd: latest.end,
+        fiscalYear: latest.fy,
+        form: latest.form,
+        tag: `us-gaap:${tag}`,
+      };
+      break;
     }
   }
 
   return {
-    companies,
-    note: scanCapped
-      ? `Peer discovery stopped after ${MAX_SIC_SCAN_REQUESTS} SEC submissions lookups to respect SEC fair-access limits; results may be a partial sample of SIC ${sicCode}.`
-      : undefined,
+    cik,
+    entityName: factsResp.entityName,
+    sharesOutstanding: shares,
+    epsAnnual: eps,
   };
 }

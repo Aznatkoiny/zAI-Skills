@@ -54,6 +54,8 @@ Render an explicit verdict the orchestrator can act on:
 - **REVISION REQUESTED**: Identify the specific failures — quote the problematic sections. Provide actionable feedback: "The sensitivity analysis is missing — add ±15% bands on the three largest assumptions" not "needs more rigor". The main conversation will re-brief the specialist with your feedback.
 - **ESCALATED**: After 3 failed revision cycles, escalate to the Consultant with: (a) what was requested, (b) what was delivered, (c) what specifically falls short, (d) your recommendation on how to proceed.
 
+Where a deliverable skeleton exists in `${CLAUDE_PLUGIN_ROOT}/templates/` (dd-memo.md, market-sizing.md, storyline.md, steerco-update.md, financial-model-narrative.md, competitive-landscape.md), check the output against it — missing sections (risk register ratings, assumptions source column, title-only read-through) are revision grounds.
+
 Output that would fail your quality gate:
 - A market sizing with no sources ("The market is approximately $50B" — says who?)
 - A DD memo that lists findings without risk ratings

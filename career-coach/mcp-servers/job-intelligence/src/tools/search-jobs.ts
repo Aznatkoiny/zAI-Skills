@@ -1,17 +1,33 @@
+/**
+ * job_search_jobs — API-first aggregation.
+ *
+ * Primary sources (queried in parallel): Remotive, RemoteOK (keyless
+ * public APIs), Adzuna and USAJOBS (keyed; skipped with a note when env
+ * keys are unset), plus the matching company's public Greenhouse/Lever
+ * board when the query names a well-known company. The Indeed/LinkedIn/
+ * TrueUp scrapers run only as best-effort fallback, and are skipped
+ * entirely when the API tier already returned enough results.
+ */
+
 import { z } from "zod";
 import { searchJobsSchema } from "../schemas/inputs.js";
+import { searchAdzunaJobs } from "../services/adzuna.js";
+import { findKnownCompanyInQuery, getCompanyBoardJobs } from "../services/company-boards.js";
 import { searchIndeedJobs } from "../services/indeed.js";
 import { searchLinkedInJobs } from "../services/linkedin.js";
+import { searchRemotiveJobs } from "../services/remotive.js";
+import { searchRemoteOkJobs } from "../services/remoteok.js";
 import { searchTrueUpJobs } from "../services/trueup.js";
-import type { JobListing } from "../types.js";
-import { CHARACTER_LIMIT } from "../constants.js";
+import { searchUsaJobs } from "../services/usajobs.js";
+import type { JobListing, SourceMeta, SourceResult } from "../types.js";
+import { finalizeOutput, formatSourcesFooter } from "./sources-footer.js";
 
 type SearchJobsInput = z.infer<typeof searchJobsSchema>;
 
 const HOURS_PER_YEAR = 2080; // 40 hours/week * 52 weeks
 
 /**
- * Best-effort parse of a scraped salary string into an annualized USD maximum.
+ * Best-effort parse of a salary string into an annualized USD maximum.
  * Handles K/M suffixes ("$150K"), ranges ("$120K - $180K" -> 180000), and
  * hourly rates ("$50 - $70 an hour" -> 70 * 2080). Returns null when no
  * number can be extracted.
@@ -89,10 +105,37 @@ function sortByRelevance(listings: JobListing[], query: string): JobListing[] {
   });
 }
 
+// Remotive and RemoteOK list exclusively remote jobs; other sources need a
+// text check when the user asks for remote-only results.
+function isRemoteListing(listing: JobListing): boolean {
+  if (listing.source === "remotive" || listing.source === "remoteok") return true;
+  return /\bremote\b/i.test(`${listing.location} ${listing.title} ${listing.description}`);
+}
+
+/** Run an array of never-throwing source searches, mapping any unexpected rejection to a failed meta. */
+async function runSources(
+  calls: Array<{ name: string; tier: SourceMeta["tier"]; run: () => Promise<SourceResult<JobListing>> }>
+): Promise<SourceResult<JobListing>[]> {
+  const settled = await Promise.allSettled(calls.map((c) => c.run()));
+  return settled.map((result, i) => {
+    if (result.status === "fulfilled") return result.value;
+    return {
+      meta: {
+        source: calls[i].name,
+        tier: calls[i].tier,
+        state: "failed" as const,
+        detail: result.reason instanceof Error ? result.reason.message : String(result.reason),
+      },
+      items: [],
+    };
+  });
+}
+
 export async function handleSearchJobs(input: SearchJobsInput): Promise<string> {
   const { query, location, remote, salary_min, experience_level, limit } = input;
 
-  // Build experience level query modifier
+  // Experience-level keywords help the scrapers' full-page search but would
+  // over-constrain the APIs' term matching, so only scrapers get them.
   let enhancedQuery = query;
   if (experience_level) {
     const levelMap: Record<string, string> = {
@@ -105,37 +148,59 @@ export async function handleSearchJobs(input: SearchJobsInput): Promise<string> 
     enhancedQuery = `${query} ${levelMap[experience_level] || ""}`.trim();
   }
 
-  // Query all 3 sources in parallel
-  const results = await Promise.allSettled([
-    searchIndeedJobs(enhancedQuery, location, remote, limit),
-    searchLinkedInJobs(enhancedQuery, location, remote, limit),
-    searchTrueUpJobs(enhancedQuery, limit),
-  ]);
+  // ── Tier 1: API sources in parallel ──
+  const apiCalls: Array<{ name: string; tier: SourceMeta["tier"]; run: () => Promise<SourceResult<JobListing>> }> = [
+    { name: "Remotive", tier: "api", run: () => searchRemotiveJobs(query, limit) },
+    { name: "RemoteOK", tier: "api", run: () => searchRemoteOkJobs(query, limit) },
+    { name: "Adzuna", tier: "api", run: () => searchAdzunaJobs(query, location, salary_min, limit) },
+    { name: "USAJOBS", tier: "api", run: () => searchUsaJobs(query, location, limit) },
+  ];
 
-  const allListings: JobListing[] = [];
-  const sourceStatus: string[] = [];
-
-  // Collect results from each source
-  const sourceNames = ["Indeed", "LinkedIn", "TrueUp"];
-  for (let i = 0; i < results.length; i++) {
-    const result = results[i];
-    if (result.status === "fulfilled") {
-      const listings = result.value;
-      const errorListings = listings.filter((l) => l.error);
-      const validListings = listings.filter((l) => !l.error);
-
-      if (validListings.length > 0) {
-        allListings.push(...validListings);
-        sourceStatus.push(`${sourceNames[i]}: ${validListings.length} results`);
-      } else if (errorListings.length > 0) {
-        sourceStatus.push(`${sourceNames[i]}: error — ${errorListings[0].error}`);
-      } else {
-        sourceStatus.push(`${sourceNames[i]}: 0 results`);
-      }
-    } else {
-      sourceStatus.push(`${sourceNames[i]}: failed (${result.reason})`);
-    }
+  // If the query names a well-known company, also pull its public
+  // Greenhouse/Lever board, filtering board titles by the non-company terms.
+  const knownCompany = findKnownCompanyInQuery(query);
+  if (knownCompany) {
+    const filterTerms = query
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((t) => t && t !== knownCompany);
+    apiCalls.push({
+      name: "Company job board",
+      tier: "api",
+      run: () => getCompanyBoardJobs(knownCompany, { filterTerms, limit }),
+    });
   }
+
+  const apiResults = await runSources(apiCalls);
+
+  let apiListings = apiResults.flatMap((r) => r.items);
+  if (remote) {
+    apiListings = apiListings.filter(isRemoteListing);
+  }
+
+  // ── Tier 2: scrapers, only when the APIs did not fill the request ──
+  const scraperNames = ["Indeed", "LinkedIn", "TrueUp"];
+  let scraperResults: SourceResult<JobListing>[];
+
+  if (deduplicateListings(apiListings).length >= limit) {
+    scraperResults = scraperNames.map((name) => ({
+      meta: {
+        source: name,
+        tier: "scraper" as const,
+        state: "skipped" as const,
+        detail: "API sources already returned enough results",
+      },
+      items: [],
+    }));
+  } else {
+    scraperResults = await runSources([
+      { name: "Indeed", tier: "scraper", run: () => searchIndeedJobs(enhancedQuery, location, remote, limit) },
+      { name: "LinkedIn", tier: "scraper", run: () => searchLinkedInJobs(enhancedQuery, location, remote, limit) },
+      { name: "TrueUp", tier: "scraper", run: () => searchTrueUpJobs(enhancedQuery, limit) },
+    ]);
+  }
+
+  const allListings = [...apiListings, ...scraperResults.flatMap((r) => r.items)];
 
   // Deduplicate and sort
   let finalListings = deduplicateListings(allListings);
@@ -164,13 +229,17 @@ export async function handleSearchJobs(input: SearchJobsInput): Promise<string> 
   if (remote) lines.push(`**Remote:** Yes`);
   if (experience_level) lines.push(`**Experience Level:** ${experience_level}`);
   if (salary_min) lines.push(`**Minimum Salary:** $${salary_min.toLocaleString()}`);
-  lines.push(`**Sources:** ${sourceStatus.join(" | ")}`);
-  lines.push(`**Results:** ${finalListings.length} listings (deduplicated)`);
+  lines.push(`**Results:** ${finalListings.length} listings (deduplicated; see Sources below)`);
   lines.push("");
 
+  const footerLines = formatSourcesFooter([
+    ...apiResults.map((r) => r.meta),
+    ...scraperResults.map((r) => r.meta),
+  ]);
+
   if (finalListings.length === 0) {
-    lines.push("No job listings found matching your criteria. Try broadening your search terms or removing filters.");
-    return lines.join("\n");
+    lines.push("No job listings found matching your criteria. Try broadening your search terms or removing filters. If all sources failed, fall back to WebSearch.");
+    return finalizeOutput(lines, footerLines);
   }
 
   // Markdown table
@@ -195,7 +264,7 @@ export async function handleSearchJobs(input: SearchJobsInput): Promise<string> 
     for (let i = 0; i < detailCount; i++) {
       const job = finalListings[i];
       lines.push(`**${i + 1}. ${job.title}** at ${job.company}`);
-      if (job.description && job.description !== "View full description on LinkedIn" && job.description !== "View full description on TrueUp") {
+      if (job.description && !job.description.startsWith("View full description")) {
         const desc = job.description.length > 200 ? job.description.substring(0, 200) + "..." : job.description;
         lines.push(`> ${desc}`);
       }
@@ -205,13 +274,7 @@ export async function handleSearchJobs(input: SearchJobsInput): Promise<string> 
     }
   }
 
-  lines.push("*Data aggregated from Indeed, LinkedIn, and TrueUp. Listings may change rapidly.*");
+  lines.push("*API sources are queried first; scraper results are best-effort. Listings change rapidly.*");
 
-  // Truncate if over character limit
-  let result = lines.join("\n");
-  if (result.length > CHARACTER_LIMIT) {
-    result = result.substring(0, CHARACTER_LIMIT - 50) + "\n\n*[Output truncated due to length]*";
-  }
-
-  return result;
+  return finalizeOutput(lines, footerLines);
 }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { METRIC_KEYS } from "../constants.js";
+import { METRIC_KEYS, FILING_SECTIONS } from "../constants.js";
 
 const metricEnum = z.enum(METRIC_KEYS);
 
@@ -52,6 +52,36 @@ const filingTextBase = z.object({
 
 export const filingTextShape = filingTextBase.shape;
 export const filingTextSchema = filingTextBase.refine(
+  (d) => Boolean(d.ticker || d.cik),
+  { message: "Either ticker or cik must be provided." }
+);
+
+const filingSectionBase = z.object({
+  ticker: z.string().optional().describe("Stock ticker symbol. Provide ticker or cik."),
+  cik: z.string().optional().describe("SEC CIK number. Provide ticker or cik."),
+  section: z
+    .enum(FILING_SECTIONS)
+    .describe(
+      "Section to extract: risk_factors (Item 1A), mdna (Management's Discussion & Analysis), business (Item 1, 10-K only), legal_proceedings, financial_statements"
+    ),
+  filing_type: z
+    .enum(["10-K", "10-Q"])
+    .optional()
+    .default("10-K")
+    .describe("Filing to read the section from — the most recent filing of this type (default 10-K)"),
+  page: z
+    .number()
+    .int()
+    .min(1)
+    .optional()
+    .default(1)
+    .describe(
+      "Page of the section to return. Pages are up to 25,000 characters; each response's footer reports the total page count and the next page to request."
+    ),
+});
+
+export const filingSectionShape = filingSectionBase.shape;
+export const filingSectionSchema = filingSectionBase.refine(
   (d) => Boolean(d.ticker || d.cik),
   { message: "Either ticker or cik must be provided." }
 );

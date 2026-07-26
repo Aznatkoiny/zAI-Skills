@@ -2,6 +2,7 @@ import axios, { type AxiosInstance } from "axios";
 import { FRED_BASE_URL, RATE_LIMITS } from "../constants.js";
 import type { FredSeriesInfo, FredObservation, MacroIndicatorData } from "../types.js";
 import { RateLimiter } from "./rate-limiter.js";
+import { cachedFetch, CACHE_TTLS } from "./cache.js";
 
 const limiter = new RateLimiter(RATE_LIMITS.fred);
 
@@ -28,31 +29,40 @@ function getClient(): AxiosInstance {
   return client;
 }
 
+// Cache keys never include the API key — only the series/query parameters.
+
 export async function getSeriesInfo(seriesId: string): Promise<FredSeriesInfo> {
-  const apiKey = getApiKey();
-  await limiter.acquire();
-  const { data } = await getClient().get("/series", {
-    params: {
-      series_id: seriesId,
-      api_key: apiKey,
-      file_type: "json",
-    },
-  });
+  return cachedFetch<FredSeriesInfo>(
+    "fredSeries",
+    `series:${seriesId}`,
+    CACHE_TTLS.fredSeries,
+    async () => {
+      const apiKey = getApiKey();
+      await limiter.acquire();
+      const { data } = await getClient().get("/series", {
+        params: {
+          series_id: seriesId,
+          api_key: apiKey,
+          file_type: "json",
+        },
+      });
 
-  const s = data.seriess?.[0];
-  if (!s) {
-    throw new Error(`FRED series "${seriesId}" not found.`);
-  }
+      const s = data.seriess?.[0];
+      if (!s) {
+        throw new Error(`FRED series "${seriesId}" not found.`);
+      }
 
-  return {
-    id: s.id,
-    title: s.title,
-    units: s.units,
-    frequency: s.frequency,
-    seasonalAdjustment: s.seasonal_adjustment,
-    lastUpdated: s.last_updated,
-    notes: s.notes || "",
-  };
+      return {
+        id: s.id,
+        title: s.title,
+        units: s.units,
+        frequency: s.frequency,
+        seasonalAdjustment: s.seasonal_adjustment,
+        lastUpdated: s.last_updated,
+        notes: s.notes || "",
+      };
+    }
+  );
 }
 
 export async function getObservations(
@@ -61,27 +71,34 @@ export async function getObservations(
   endDate?: string,
   limit: number = 20
 ): Promise<MacroIndicatorData> {
-  const apiKey = getApiKey();
   const series = await getSeriesInfo(seriesId);
 
-  await limiter.acquire();
-  const params: Record<string, string | number> = {
-    series_id: seriesId,
-    api_key: apiKey,
-    file_type: "json",
-    sort_order: "desc",
-    limit,
-  };
-  if (startDate) params.observation_start = startDate;
-  if (endDate) params.observation_end = endDate;
+  const observations = await cachedFetch<FredObservation[]>(
+    "fredSeries",
+    `obs:${seriesId}:${startDate ?? ""}:${endDate ?? ""}:${limit}`,
+    CACHE_TTLS.fredSeries,
+    async () => {
+      const apiKey = getApiKey();
+      await limiter.acquire();
+      const params: Record<string, string | number> = {
+        series_id: seriesId,
+        api_key: apiKey,
+        file_type: "json",
+        sort_order: "desc",
+        limit,
+      };
+      if (startDate) params.observation_start = startDate;
+      if (endDate) params.observation_end = endDate;
 
-  const { data } = await getClient().get("/series/observations", { params });
+      const { data } = await getClient().get("/series/observations", { params });
 
-  const observations: FredObservation[] = (data.observations || []).map(
-    (obs: { date: string; value: string }) => ({
-      date: obs.date,
-      value: obs.value === "." ? null : parseFloat(obs.value),
-    })
+      return (data.observations || []).map(
+        (obs: { date: string; value: string }) => ({
+          date: obs.date,
+          value: obs.value === "." ? null : parseFloat(obs.value),
+        })
+      );
+    }
   );
 
   return { series, observations };

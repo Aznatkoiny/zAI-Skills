@@ -3230,8 +3230,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path) {
-      let input = path;
+    function removeDotSegments(path2) {
+      let input = path2;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3483,8 +3483,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path && path !== "/" ? path : void 0;
+        const [path2, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path2 && path2 !== "/" ? path2 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -6883,12 +6883,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs, exportName) {
+    function addFormats(ajv, list, fs2, exportName) {
       var _a5;
       var _b;
       (_a5 = (_b = ajv.opts.code).formats) !== null && _a5 !== void 0 ? _a5 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs[f]);
+        ajv.addFormat(f, fs2[f]);
     }
     module2.exports = exports2 = formatsPlugin;
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -15743,11 +15743,11 @@ var require_mime_types = __commonJS({
       }
       return exts[0];
     }
-    function lookup(path) {
-      if (!path || typeof path !== "string") {
+    function lookup(path2) {
+      if (!path2 || typeof path2 !== "string") {
         return false;
       }
-      var extension2 = extname("x." + path).toLowerCase().substr(1);
+      var extension2 = extname("x." + path2).toLowerCase().substr(1);
       if (!extension2) {
         return false;
       }
@@ -16852,11 +16852,11 @@ var require_form_data = __commonJS({
     "use strict";
     var CombinedStream = require_combined_stream();
     var util5 = require("util");
-    var path = require("path");
+    var path2 = require("path");
     var http3 = require("http");
     var https2 = require("https");
     var parseUrl2 = require("url").parse;
-    var fs = require("fs");
+    var fs2 = require("fs");
     var Stream = require("stream").Stream;
     var crypto2 = require("crypto");
     var mime = require_mime_types();
@@ -16926,7 +16926,7 @@ var require_form_data = __commonJS({
         if (value.end != void 0 && value.end != Infinity && value.start != void 0) {
           callback(null, value.end + 1 - (value.start ? value.start : 0));
         } else {
-          fs.stat(value.path, function(err, stat) {
+          fs2.stat(value.path, function(err, stat) {
             if (err) {
               callback(err);
               return;
@@ -16983,11 +16983,11 @@ var require_form_data = __commonJS({
     FormData3.prototype._getContentDisposition = function(value, options) {
       var filename;
       if (typeof options.filepath === "string") {
-        filename = path.normalize(options.filepath).replace(/\\/g, "/");
+        filename = path2.normalize(options.filepath).replace(/\\/g, "/");
       } else if (options.filename || value && (value.name || value.path)) {
-        filename = path.basename(options.filename || value && (value.name || value.path));
+        filename = path2.basename(options.filename || value && (value.name || value.path));
       } else if (value && value.readable && hasOwn2(value, "httpVersion")) {
-        filename = path.basename(value.client._httpMessage.path || "");
+        filename = path2.basename(value.client._httpMessage.path || "");
       }
       if (filename) {
         return 'filename="' + escapeHeaderParam(filename) + '"';
@@ -24428,14 +24428,14 @@ var require_util2 = __commonJS({
         }
         const port = url2.port != null ? url2.port : url2.protocol === "https:" ? 443 : 80;
         let origin2 = url2.origin != null ? url2.origin : `${url2.protocol || ""}//${url2.hostname || ""}:${port}`;
-        let path = url2.path != null ? url2.path : `${url2.pathname || ""}${url2.search || ""}`;
+        let path2 = url2.path != null ? url2.path : `${url2.pathname || ""}${url2.search || ""}`;
         if (origin2[origin2.length - 1] === "/") {
           origin2 = origin2.slice(0, origin2.length - 1);
         }
-        if (path && path[0] !== "/") {
-          path = `/${path}`;
+        if (path2 && path2[0] !== "/") {
+          path2 = `/${path2}`;
         }
-        return new URL(`${origin2}${path}`);
+        return new URL(`${origin2}${path2}`);
       }
       if (!isHttpOrHttpsPrefixed(url2.origin || url2.protocol)) {
         throw new InvalidArgumentError("Invalid URL protocol: the URL must start with `http:` or `https:`.");
@@ -25256,9 +25256,9 @@ var require_diagnostics = __commonJS({
         "undici:client:sendHeaders",
         (evt) => {
           const {
-            request: { method, path, origin: origin2 }
+            request: { method, path: path2, origin: origin2 }
           } = evt;
-          debugLog("sending request to %s %s%s", method, origin2, path);
+          debugLog("sending request to %s %s%s", method, origin2, path2);
         }
       );
     }
@@ -25276,14 +25276,14 @@ var require_diagnostics = __commonJS({
         "undici:request:headers",
         (evt) => {
           const {
-            request: { method, path, origin: origin2 },
+            request: { method, path: path2, origin: origin2 },
             response: { statusCode }
           } = evt;
           debugLog(
             "received response to %s %s%s - HTTP %d",
             method,
             origin2,
-            path,
+            path2,
             statusCode
           );
         }
@@ -25292,23 +25292,23 @@ var require_diagnostics = __commonJS({
         "undici:request:trailers",
         (evt) => {
           const {
-            request: { method, path, origin: origin2 }
+            request: { method, path: path2, origin: origin2 }
           } = evt;
-          debugLog("trailers received from %s %s%s", method, origin2, path);
+          debugLog("trailers received from %s %s%s", method, origin2, path2);
         }
       );
       diagnosticsChannel.subscribe(
         "undici:request:error",
         (evt) => {
           const {
-            request: { method, path, origin: origin2 },
+            request: { method, path: path2, origin: origin2 },
             error: error2
           } = evt;
           debugLog(
             "request to %s %s%s errored - %s",
             method,
             origin2,
-            path,
+            path2,
             error2.message
           );
         }
@@ -25423,7 +25423,7 @@ var require_request = __commonJS({
     var kHandler = /* @__PURE__ */ Symbol("handler");
     var Request = class {
       constructor(origin2, {
-        path,
+        path: path2,
         method,
         body,
         headers,
@@ -25440,11 +25440,11 @@ var require_request = __commonJS({
         maxRedirections,
         typeOfService
       }, handler) {
-        if (typeof path !== "string") {
+        if (typeof path2 !== "string") {
           throw new InvalidArgumentError("path must be a string");
-        } else if (path[0] !== "/" && !(path.startsWith("http://") || path.startsWith("https://")) && method !== "CONNECT") {
+        } else if (path2[0] !== "/" && !(path2.startsWith("http://") || path2.startsWith("https://")) && method !== "CONNECT") {
           throw new InvalidArgumentError("path must be an absolute URL or start with a slash");
-        } else if (invalidPathRegex.test(path)) {
+        } else if (invalidPathRegex.test(path2)) {
           throw new InvalidArgumentError("invalid request path");
         }
         if (typeof method !== "string") {
@@ -25519,7 +25519,7 @@ var require_request = __commonJS({
         this.completed = false;
         this.aborted = false;
         this.upgrade = upgrade || null;
-        this.path = query ? serializePathWithQuery(path, query) : path;
+        this.path = query ? serializePathWithQuery(path2, query) : path2;
         this.origin = origin2;
         this.protocol = getProtocolFromUrlString(origin2);
         this.idempotent = idempotent == null ? method === "HEAD" || method === "GET" : idempotent;
@@ -30702,7 +30702,7 @@ var require_client_h1 = __commonJS({
       return method !== "GET" && method !== "HEAD" && method !== "OPTIONS" && method !== "TRACE" && method !== "CONNECT";
     }
     function writeH1(client, request) {
-      const { method, path, host, upgrade, blocking, reset } = request;
+      const { method, path: path2, host, upgrade, blocking, reset } = request;
       let { body, headers, contentLength } = request;
       const expectsPayload = method === "PUT" || method === "POST" || method === "PATCH" || method === "QUERY" || method === "PROPFIND" || method === "PROPPATCH";
       if (util5.isFormDataLike(body)) {
@@ -30780,7 +30780,7 @@ var require_client_h1 = __commonJS({
       if (socket.setTypeOfService) {
         socket.setTypeOfService(request.typeOfService);
       }
-      let header = `${method} ${path} HTTP/1.1\r
+      let header = `${method} ${path2} HTTP/1.1\r
 `;
       if (typeof host === "string") {
         header += `host: ${host}\r
@@ -31433,7 +31433,7 @@ var require_client_h2 = __commonJS({
     function writeH2(client, request) {
       const requestTimeout = request.bodyTimeout ?? client[kBodyTimeout];
       const session = client[kHTTP2Session];
-      const { method, path, host, upgrade, expectContinue, signal, protocol, headers: reqHeaders } = request;
+      const { method, path: path2, host, upgrade, expectContinue, signal, protocol, headers: reqHeaders } = request;
       let { body } = request;
       if (upgrade != null && upgrade !== "websocket") {
         util5.errorRequest(client, request, new InvalidArgumentError(`Custom upgrade "${upgrade}" not supported over HTTP/2`));
@@ -31501,7 +31501,7 @@ var require_client_h2 = __commonJS({
           }
           headers[HTTP2_HEADER_METHOD] = "CONNECT";
           headers[HTTP2_HEADER_PROTOCOL] = "websocket";
-          headers[HTTP2_HEADER_PATH] = path;
+          headers[HTTP2_HEADER_PATH] = path2;
           if (protocol === "ws:" || protocol === "wss:") {
             headers[HTTP2_HEADER_SCHEME] = protocol === "ws:" ? "http" : "https";
           } else {
@@ -31542,7 +31542,7 @@ var require_client_h2 = __commonJS({
         stream4.setTimeout(requestTimeout);
         return true;
       }
-      headers[HTTP2_HEADER_PATH] = path;
+      headers[HTTP2_HEADER_PATH] = path2;
       headers[HTTP2_HEADER_SCHEME] = protocol === "http:" ? "http" : "https";
       const expectsPayload = method === "PUT" || method === "POST" || method === "PATCH";
       if (body && typeof body.read === "function") {
@@ -33885,10 +33885,10 @@ var require_proxy_agent = __commonJS({
         };
         const {
           origin: origin2,
-          path = "/",
+          path: path2 = "/",
           headers = {}
         } = opts;
-        opts.path = origin2 + path;
+        opts.path = origin2 + path2;
         if (!("host" in headers) && !("Host" in headers)) {
           const { host } = new URL(origin2);
           headers.host = host;
@@ -35971,20 +35971,20 @@ var require_mock_utils = __commonJS({
       }
       return normalizedQp;
     }
-    function safeUrl(path) {
-      if (typeof path !== "string") {
-        return path;
+    function safeUrl(path2) {
+      if (typeof path2 !== "string") {
+        return path2;
       }
-      const pathSegments = path.split("?", 3);
+      const pathSegments = path2.split("?", 3);
       if (pathSegments.length !== 2) {
-        return path;
+        return path2;
       }
       const qp = new URLSearchParams(pathSegments.pop());
       qp.sort();
       return [...pathSegments, qp.toString()].join("?");
     }
-    function matchKey(mockDispatch2, { path, method, body, headers }) {
-      const pathMatch = matchValue(mockDispatch2.path, path);
+    function matchKey(mockDispatch2, { path: path2, method, body, headers }) {
+      const pathMatch = matchValue(mockDispatch2.path, path2);
       const methodMatch = matchValue(mockDispatch2.method, method);
       const bodyMatch = typeof mockDispatch2.body !== "undefined" ? matchValue(mockDispatch2.body, body) : true;
       const headersMatch = matchHeaders(mockDispatch2, headers);
@@ -36009,8 +36009,8 @@ var require_mock_utils = __commonJS({
       const basePath = key.query ? serializePathWithQuery(key.path, key.query) : key.path;
       const resolvedPath = typeof basePath === "string" ? safeUrl(basePath) : basePath;
       const resolvedPathWithoutTrailingSlash = removeTrailingSlash(resolvedPath);
-      let matchedMockDispatches = mockDispatches.filter(({ consumed }) => !consumed).filter(({ path, ignoreTrailingSlash }) => {
-        return ignoreTrailingSlash ? matchValue(removeTrailingSlash(safeUrl(path)), resolvedPathWithoutTrailingSlash) : matchValue(safeUrl(path), resolvedPath);
+      let matchedMockDispatches = mockDispatches.filter(({ consumed }) => !consumed).filter(({ path: path2, ignoreTrailingSlash }) => {
+        return ignoreTrailingSlash ? matchValue(removeTrailingSlash(safeUrl(path2)), resolvedPathWithoutTrailingSlash) : matchValue(safeUrl(path2), resolvedPath);
       });
       if (matchedMockDispatches.length === 0) {
         throw new MockNotMatchedError(`Mock dispatch not matched for path '${resolvedPath}'`);
@@ -36049,19 +36049,19 @@ var require_mock_utils = __commonJS({
         mockDispatches.splice(index2, 1);
       }
     }
-    function removeTrailingSlash(path) {
-      while (path.endsWith("/")) {
-        path = path.slice(0, -1);
+    function removeTrailingSlash(path2) {
+      while (path2.endsWith("/")) {
+        path2 = path2.slice(0, -1);
       }
-      if (path.length === 0) {
-        path = "/";
+      if (path2.length === 0) {
+        path2 = "/";
       }
-      return path;
+      return path2;
     }
     function buildKey(opts) {
-      const { path, method, body, headers, query } = opts;
+      const { path: path2, method, body, headers, query } = opts;
       return {
-        path,
+        path: path2,
         method,
         body,
         headers,
@@ -36751,10 +36751,10 @@ var require_pending_interceptors_formatter = __commonJS({
       }
       format(pendingInterceptors) {
         const withPrettyHeaders = pendingInterceptors.map(
-          ({ method, path, data: { statusCode }, persist, times, timesInvoked, origin: origin2 }) => ({
+          ({ method, path: path2, data: { statusCode }, persist, times, timesInvoked, origin: origin2 }) => ({
             Method: method,
             Origin: origin2,
-            Path: path,
+            Path: path2,
             "Status code": statusCode,
             Persistent: persist ? PERSISTENT : NOT_PERSISTENT,
             Invocations: timesInvoked,
@@ -36836,9 +36836,9 @@ var require_mock_agent = __commonJS({
         const acceptNonStandardSearchParameters = this[kMockAgentAcceptsNonStandardSearchParameters];
         const dispatchOpts = { ...opts };
         if (acceptNonStandardSearchParameters && dispatchOpts.path) {
-          const [path, searchParams] = dispatchOpts.path.split("?");
+          const [path2, searchParams] = dispatchOpts.path.split("?");
           const normalizedSearchParams = normalizeSearchParams(searchParams, acceptNonStandardSearchParameters);
-          dispatchOpts.path = `${path}?${normalizedSearchParams}`;
+          dispatchOpts.path = `${path2}?${normalizedSearchParams}`;
         }
         return this[kAgent].dispatch(dispatchOpts, handler);
       }
@@ -37239,12 +37239,12 @@ var require_snapshot_recorder = __commonJS({
        * @return {Promise<void>} - Resolves when snapshots are loaded
        */
       async loadSnapshots(filePath) {
-        const path = filePath || this.#snapshotPath;
-        if (!path) {
+        const path2 = filePath || this.#snapshotPath;
+        if (!path2) {
           throw new InvalidArgumentError("Snapshot path is required");
         }
         try {
-          const data2 = await readFile(resolve(path), "utf8");
+          const data2 = await readFile(resolve(path2), "utf8");
           const parsed = JSON.parse(data2);
           if (Array.isArray(parsed)) {
             this.#snapshots.clear();
@@ -37258,7 +37258,7 @@ var require_snapshot_recorder = __commonJS({
           if (error2.code === "ENOENT") {
             this.#snapshots.clear();
           } else {
-            throw new UndiciError(`Failed to load snapshots from ${path}`, { cause: error2 });
+            throw new UndiciError(`Failed to load snapshots from ${path2}`, { cause: error2 });
           }
         }
       }
@@ -37269,11 +37269,11 @@ var require_snapshot_recorder = __commonJS({
        * @returns {Promise<void>} - Resolves when snapshots are saved
        */
       async saveSnapshots(filePath) {
-        const path = filePath || this.#snapshotPath;
-        if (!path) {
+        const path2 = filePath || this.#snapshotPath;
+        if (!path2) {
           throw new InvalidArgumentError("Snapshot path is required");
         }
-        const resolvedPath = resolve(path);
+        const resolvedPath = resolve(path2);
         await mkdir(dirname(resolvedPath), { recursive: true });
         const data2 = Array.from(this.#snapshots.entries()).map(([hash, snapshot]) => ({
           hash,
@@ -37905,15 +37905,15 @@ var require_redirect_handler = __commonJS({
           return;
         }
         const { origin: origin2, pathname, search } = util5.parseURL(new URL(this.location, this.opts.origin && new URL(this.opts.path, this.opts.origin)));
-        const path = search ? `${pathname}${search}` : pathname;
-        const redirectUrlString = `${origin2}${path}`;
+        const path2 = search ? `${pathname}${search}` : pathname;
+        const redirectUrlString = `${origin2}${path2}`;
         for (const historyUrl of this.history) {
           if (historyUrl.toString() === redirectUrlString) {
             throw new InvalidArgumentError(`Redirect loop detected. Cannot redirect to ${origin2}. This typically happens when using a Client or Pool with cross-origin redirects. Use an Agent for cross-origin redirects.`);
           }
         }
         this.opts.headers = cleanRequestHeaders(this.opts.headers, statusCode === 303, this.opts.origin !== origin2);
-        this.opts.path = path;
+        this.opts.path = path2;
         this.opts.origin = origin2;
         this.opts.query = null;
       }
@@ -39682,10 +39682,10 @@ var require_cache_handler = __commonJS({
       }
       return locationUrl.pathname + locationUrl.search;
     }
-    function deleteCachedUri(store, cacheKey, path) {
+    function deleteCachedUri(store, cacheKey, path2) {
       deleteCachedValue(store, {
         ...cacheKey,
-        path
+        path: path2
       });
       for (let i = 0; i < util5.safeHTTPMethods.length; i++) {
         const method = util5.safeHTTPMethods[i];
@@ -39693,7 +39693,7 @@ var require_cache_handler = __commonJS({
           deleteCachedValue(store, {
             ...cacheKey,
             method,
-            path
+            path: path2
           });
         }
       }
@@ -39704,9 +39704,9 @@ var require_cache_handler = __commonJS({
       }
       const values = Array.isArray(headerValue) ? headerValue : [headerValue];
       for (let i = 0; i < values.length; i++) {
-        const path = getSameOriginPath(cacheKey, values[i]);
-        if (path !== void 0) {
-          deleteCachedUri(store, cacheKey, path);
+        const path2 = getSameOriginPath(cacheKey, values[i]);
+        if (path2 !== void 0) {
+          deleteCachedUri(store, cacheKey, path2);
         }
       }
     }
@@ -44584,11 +44584,11 @@ var require_fetch = __commonJS({
       function dispatch({ body }) {
         const url2 = requestCurrentURL(request);
         const agent = fetchParams.controller.dispatcher;
-        const path = url2.pathname + url2.search;
+        const path2 = url2.pathname + url2.search;
         const hasTrailingQuestionMark = url2.search.length === 0 && url2.href[url2.href.length - url2.hash.length - 1] === "?";
         return new Promise((resolve, reject) => agent.dispatch(
           {
-            path: hasTrailingQuestionMark ? `${path}?` : path,
+            path: hasTrailingQuestionMark ? `${path2}?` : path2,
             origin: url2.origin,
             method: request.method,
             body: agent.isMockActive ? request.body && (request.body.source || request.body.stream) : body,
@@ -45535,9 +45535,9 @@ var require_util5 = __commonJS({
         }
       }
     }
-    function validateCookiePath(path) {
-      for (let i = 0; i < path.length; ++i) {
-        const code = path.charCodeAt(i);
+    function validateCookiePath(path2) {
+      for (let i = 0; i < path2.length; ++i) {
+        const code = path2.charCodeAt(i);
         if (code < 32 || // exclude CTLs (0-31)
         code > 126 || // exclude DEL and non-ascii
         code === 59) {
@@ -48774,11 +48774,11 @@ var require_undici = __commonJS({
           if (typeof opts.path !== "string") {
             throw new InvalidArgumentError("invalid opts.path");
           }
-          let path = opts.path;
+          let path2 = opts.path;
           if (!opts.path.startsWith("/")) {
-            path = `/${path}`;
+            path2 = `/${path2}`;
           }
-          url2 = new URL(util5.parseOrigin(url2).origin + path);
+          url2 = new URL(util5.parseOrigin(url2).origin + path2);
         } else {
           if (!opts) {
             opts = typeof url2 === "object" ? url2 : {};
@@ -49702,8 +49702,8 @@ function getErrorMap() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data: data2, path, errorMaps, issueData } = params;
-  const fullPath = [...path, ...issueData.path || []];
+  const { data: data2, path: path2, errorMaps, issueData } = params;
+  const fullPath = [...path2, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -49819,11 +49819,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent2, value, path, key) {
+  constructor(parent2, value, path2, key) {
     this._cachedPath = [];
     this.parent = parent2;
     this.data = value;
-    this._path = path;
+    this._path = path2;
     this._key = key;
   }
   get path() {
@@ -53460,10 +53460,10 @@ function assignProp(target, prop2, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path) {
-  if (!path)
+function getElementAtPath(obj, path2) {
+  if (!path2)
     return obj;
-  return path.reduce((acc, key) => acc?.[key], obj);
+  return path2.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -53783,11 +53783,11 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path, issues) {
+function prefixIssues(path2, issues) {
   return issues.map((iss) => {
     var _a5;
     (_a5 = iss).path ?? (_a5.path = []);
-    iss.path.unshift(path);
+    iss.path.unshift(path2);
     return iss;
   });
 }
@@ -63438,6 +63438,7 @@ var StdioServerTransport = class {
 
 // src/constants.ts
 var RATE_LIMITS = {
+  // Scrapers — conservative to avoid blocks
   indeed: 0.2,
   // ~12 req/min — conservative
   linkedin: 0.1,
@@ -63446,13 +63447,22 @@ var RATE_LIMITS = {
   // ~12 req/min
   trueup: 0.5,
   // ~30 req/min — smaller site, more lenient
-  levelsfyi: 0.2
+  levelsfyi: 0.2,
   // ~12 req/min
+  // Public APIs — still polite; responses are cached (see services/cache.ts)
+  remotive: 0.5,
+  // Remotive asks integrators not to poll aggressively
+  remoteok: 0.5,
+  greenhouse: 1,
+  lever: 1,
+  adzuna: 1,
+  usajobs: 1
 };
 var CHARACTER_LIMIT = 5e4;
 var MAX_JOB_RESULTS = 25;
 var MAX_SALARY_COMPARISONS = 10;
 var USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36";
+var API_USER_AGENT = "job-intelligence-mcp/1.0 (career-coach Claude plugin; +https://github.com/Aznatkoiny/zAI-Skills)";
 
 // src/schemas/inputs.ts
 var searchJobsSchema = external_exports.object({
@@ -64444,9 +64454,9 @@ function isVisitable(thing) {
 function removeBrackets(key) {
   return utils_default.endsWith(key, "[]") ? key.slice(0, -2) : key;
 }
-function renderKey(path, key, dots) {
-  if (!path) return key;
-  return path.concat(key).map(function each2(token, i) {
+function renderKey(path2, key, dots) {
+  if (!path2) return key;
+  return path2.concat(key).map(function each2(token, i) {
     token = removeBrackets(token);
     return !dots && i ? "[" + token + "]" : token;
   }).join(dots ? "." : "");
@@ -64532,13 +64542,13 @@ function toFormData(obj, formData, options) {
       return currentValue;
     });
   }
-  function defaultVisitor(value, key, path) {
+  function defaultVisitor(value, key, path2) {
     let arr = value;
     if (utils_default.isReactNative(formData) && utils_default.isReactNativeBlob(value)) {
-      formData.append(renderKey(path, key, dots), convertValue(value));
+      formData.append(renderKey(path2, key, dots), convertValue(value));
       return false;
     }
-    if (value && !path && typeof value === "object") {
+    if (value && !path2 && typeof value === "object") {
       if (utils_default.endsWith(key, "{}")) {
         key = metaTokens ? key : key.slice(0, -2);
         value = stringifyWithDepthLimit(value, 1);
@@ -64557,7 +64567,7 @@ function toFormData(obj, formData, options) {
     if (isVisitable(value)) {
       return true;
     }
-    formData.append(renderKey(path, key, dots), convertValue(value));
+    formData.append(renderKey(path2, key, dots), convertValue(value));
     return false;
   }
   const exposedHelpers = Object.assign(predicates, {
@@ -64565,17 +64575,17 @@ function toFormData(obj, formData, options) {
     convertValue,
     isVisitable
   });
-  function build(value, path, depth = 0) {
+  function build(value, path2, depth = 0) {
     if (utils_default.isUndefined(value)) return;
     throwIfMaxDepthExceeded(depth);
     if (stack.indexOf(value) !== -1) {
-      throw new Error("Circular reference detected in " + path.join("."));
+      throw new Error("Circular reference detected in " + path2.join("."));
     }
     stack.push(value);
     utils_default.forEach(value, function each2(el, key) {
-      const result = !(utils_default.isUndefined(el) || el === null) && visitor.call(formData, el, utils_default.isString(key) ? key.trim() : key, path, exposedHelpers);
+      const result = !(utils_default.isUndefined(el) || el === null) && visitor.call(formData, el, utils_default.isString(key) ? key.trim() : key, path2, exposedHelpers);
       if (result === true) {
-        build(el, path ? path.concat(key) : [key], depth + 1);
+        build(el, path2 ? path2.concat(key) : [key], depth + 1);
       }
     });
     stack.pop();
@@ -64787,7 +64797,7 @@ var platform_default = {
 // node_modules/axios/lib/helpers/toURLEncodedForm.js
 function toURLEncodedForm(data2, options) {
   return toFormData_default(data2, new platform_default.classes.URLSearchParams(), {
-    visitor: function(value, key, path, helpers) {
+    visitor: function(value, key, path2, helpers) {
       if (platform_default.isNode && utils_default.isBuffer(value)) {
         this.append(key, value.toString("base64"));
         return false;
@@ -64809,14 +64819,14 @@ function throwIfDepthExceeded(index2) {
   }
 }
 function parsePropPath(name) {
-  const path = [];
+  const path2 = [];
   const pattern = /\w+|\[(\w*)]/g;
   let match;
   while ((match = pattern.exec(name)) !== null) {
-    throwIfDepthExceeded(path.length);
-    path.push(match[0] === "[]" ? "" : match[1] || match[0]);
+    throwIfDepthExceeded(path2.length);
+    path2.push(match[0] === "[]" ? "" : match[1] || match[0]);
   }
-  return path;
+  return path2;
 }
 function arrayToObject(arr) {
   const obj = {};
@@ -64831,12 +64841,12 @@ function arrayToObject(arr) {
   return obj;
 }
 function formDataToJSON(formData) {
-  function buildPath(path, value, target, index2) {
+  function buildPath(path2, value, target, index2) {
     throwIfDepthExceeded(index2);
-    let name = path[index2++];
+    let name = path2[index2++];
     if (name === "__proto__") return true;
     const isNumericKey = Number.isFinite(+name);
-    const isLast = index2 >= path.length;
+    const isLast = index2 >= path2.length;
     name = !name && utils_default.isArray(target) ? target.length : name;
     if (isLast) {
       if (utils_default.hasOwnProp(target, name)) {
@@ -64849,7 +64859,7 @@ function formDataToJSON(formData) {
     if (!utils_default.hasOwnProp(target, name) || !utils_default.isObject(target[name])) {
       target[name] = [];
     }
-    const result = buildPath(path, value, target[name], index2);
+    const result = buildPath(path2, value, target[name], index2);
     if (result && utils_default.isArray(target[name])) {
       target[name] = arrayToObject(target[name]);
     }
@@ -66443,9 +66453,9 @@ var http_default = isHttpAdapterSupported && function httpAdapter(config2) {
       auth = urlUsername + ":" + urlPassword;
     }
     auth && headers.delete("authorization");
-    let path;
+    let path2;
     try {
-      path = buildURL(
+      path2 = buildURL(
         parsed.pathname + parsed.search,
         own2("params"),
         own2("paramsSerializer")
@@ -66464,7 +66474,7 @@ var http_default = isHttpAdapterSupported && function httpAdapter(config2) {
       false
     );
     const options = Object.assign(/* @__PURE__ */ Object.create(null), {
-      path,
+      path: path2,
       method,
       headers: toByteStringHeaderObject(headers),
       agents: { http: httpAgent, https: httpsAgent },
@@ -66866,14 +66876,14 @@ var isURLSameOrigin_default = platform_default.hasStandardBrowserEnv ? /* @__PUR
 var cookies_default = platform_default.hasStandardBrowserEnv ? (
   // Standard browser envs support document.cookie
   {
-    write(name, value, expires, path, domain, secure, sameSite) {
+    write(name, value, expires, path2, domain, secure, sameSite) {
       if (typeof document === "undefined") return;
       const cookie = [`${name}=${encodeURIComponent(value)}`];
       if (utils_default.isNumber(expires)) {
         cookie.push(`expires=${new Date(expires).toUTCString()}`);
       }
-      if (utils_default.isString(path)) {
-        cookie.push(`path=${path}`);
+      if (utils_default.isString(path2)) {
+        cookie.push(`path=${path2}`);
       }
       if (utils_default.isString(domain)) {
         cookie.push(`domain=${domain}`);
@@ -68418,6 +68428,347 @@ var {
   mergeConfig: mergeConfig2,
   create
 } = axios_default;
+
+// src/services/cache.ts
+var import_node_crypto = require("node:crypto");
+var fs = __toESM(require("node:fs"), 1);
+var os = __toESM(require("node:os"), 1);
+var path = __toESM(require("node:path"), 1);
+var SEARCH_TTL_MS = 6 * 60 * 60 * 1e3;
+var LOOKUP_TTL_MS = 24 * 60 * 60 * 1e3;
+var CACHE_DIR = path.join(os.homedir(), ".cache", "job-intelligence");
+function cacheFilePath(source, params) {
+  const key = (0, import_node_crypto.createHash)("sha256").update(source + "\0" + JSON.stringify(params ?? {})).digest("hex");
+  return path.join(CACHE_DIR, `${key}.json`);
+}
+function cacheGet(source, params, ttlMs) {
+  try {
+    const raw = fs.readFileSync(cacheFilePath(source, params), "utf8");
+    const entry = JSON.parse(raw);
+    if (typeof entry?.storedAt !== "number") return null;
+    const ageMs = Date.now() - entry.storedAt;
+    if (ageMs < 0 || ageMs > ttlMs) return null;
+    return { value: entry.value, ageMs };
+  } catch {
+    return null;
+  }
+}
+function cacheSet(source, params, value) {
+  try {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+    const file = cacheFilePath(source, params);
+    const entry = { storedAt: Date.now(), source, value };
+    const tmp = `${file}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(entry));
+    fs.renameSync(tmp, file);
+  } catch {
+  }
+}
+async function fetchWithCache(source, params, ttlMs, fetcher) {
+  const hit = cacheGet(source, params, ttlMs);
+  if (hit) return { ok: true, value: hit.value, state: "cached", ageMs: hit.ageMs };
+  try {
+    const value = await fetcher();
+    cacheSet(source, params, value);
+    return { ok: true, value, state: "live" };
+  } catch (err) {
+    const stale = cacheGet(source, params, Number.POSITIVE_INFINITY);
+    if (stale) return { ok: true, value: stale.value, state: "stale-cache", ageMs: stale.ageMs };
+    return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+  }
+}
+function toSourceResult(source, tier, res) {
+  if (res.ok) {
+    return {
+      meta: { source, tier, state: res.state, count: res.value.length, ageMs: res.ageMs },
+      items: res.value
+    };
+  }
+  return { meta: { source, tier, state: "failed", detail: res.reason }, items: [] };
+}
+
+// src/services/rate-limiter.ts
+var RateLimiter = class {
+  intervalMs;
+  lastScheduled = 0;
+  constructor(requestsPerSecond) {
+    if (requestsPerSecond <= 0) {
+      throw new Error(`requestsPerSecond must be positive, got ${requestsPerSecond}`);
+    }
+    this.intervalMs = 1e3 / requestsPerSecond;
+  }
+  async acquire() {
+    const now = Date.now();
+    const next2 = Math.max(now, this.lastScheduled + this.intervalMs);
+    this.lastScheduled = next2;
+    const waitMs = next2 - now;
+    if (waitMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+    }
+  }
+};
+
+// src/services/text-utils.ts
+function stripHtml(html3) {
+  return html3.replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&#39;|&apos;/gi, "'").replace(/&quot;/gi, '"').replace(/\s+/g, " ").trim();
+}
+function truncate(text3, maxLen) {
+  if (text3.length <= maxLen) return text3;
+  return text3.slice(0, maxLen).trimEnd() + "...";
+}
+function formatSalaryRange(min, max) {
+  const lo = typeof min === "number" && min > 0 ? min : null;
+  const hi = typeof max === "number" && max > 0 ? max : null;
+  if (lo !== null && hi !== null && hi !== lo) {
+    return `$${Math.round(lo).toLocaleString()} - $${Math.round(hi).toLocaleString()}`;
+  }
+  const single = hi ?? lo;
+  return single !== null ? `$${Math.round(single).toLocaleString()}` : null;
+}
+
+// src/services/adzuna.ts
+var limiter = new RateLimiter(RATE_LIMITS.adzuna);
+var ADZUNA_API_URL = "https://api.adzuna.com/v1/api/jobs/us/search/1";
+async function fetchAdzunaJobs(appId, appKey, query, location, salaryMin, limit) {
+  await limiter.acquire();
+  const params = {
+    app_id: appId,
+    app_key: appKey,
+    what: query,
+    results_per_page: limit,
+    "content-type": "application/json"
+  };
+  if (location) params.where = location;
+  if (salaryMin) params.salary_min = salaryMin;
+  const response = await axios_default.get(ADZUNA_API_URL, {
+    params,
+    headers: { "User-Agent": API_USER_AGENT, Accept: "application/json" },
+    timeout: 15e3
+  });
+  const results = response.data?.results;
+  if (!Array.isArray(results)) {
+    throw new Error("unexpected Adzuna response shape (no results array)");
+  }
+  const listings = [];
+  for (const raw of results) {
+    if (!raw?.title) continue;
+    listings.push({
+      title: stripHtml(raw.title),
+      // Adzuna may embed <strong> match markers
+      company: raw.company?.display_name || "Unknown company",
+      location: raw.location?.display_name || "Not specified",
+      salary: formatSalaryRange(raw.salary_min, raw.salary_max),
+      url: raw.redirect_url || "https://www.adzuna.com",
+      description: raw.description ? truncate(stripHtml(raw.description), 300) : "No description available",
+      posted_date: raw.created || null,
+      source: "adzuna"
+    });
+  }
+  return listings;
+}
+async function searchAdzunaJobs(query, location, salaryMin, limit = 10) {
+  const appId = process.env.ADZUNA_APP_ID?.trim();
+  const appKey = process.env.ADZUNA_APP_KEY?.trim();
+  if (!appId || !appKey) {
+    return {
+      meta: {
+        source: "Adzuna",
+        tier: "api",
+        state: "skipped",
+        detail: "no API key \u2014 set ADZUNA_APP_ID and ADZUNA_APP_KEY to enable"
+      },
+      items: []
+    };
+  }
+  const res = await fetchWithCache(
+    "adzuna",
+    // Credentials are deliberately excluded from the cache key.
+    { query: query.toLowerCase().trim(), location: location || null, salaryMin: salaryMin || null, limit },
+    SEARCH_TTL_MS,
+    () => fetchAdzunaJobs(appId, appKey, query, location, salaryMin, limit)
+  );
+  return toSourceResult("Adzuna", "api", res);
+}
+
+// src/services/greenhouse.ts
+var limiter2 = new RateLimiter(RATE_LIMITS.greenhouse);
+async function fetchBoardJobs(boardSlug, companyName) {
+  await limiter2.acquire();
+  const url2 = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(boardSlug)}/jobs`;
+  const response = await axios_default.get(url2, {
+    headers: { "User-Agent": API_USER_AGENT, Accept: "application/json" },
+    timeout: 15e3,
+    validateStatus: (status) => status === 200 || status === 404
+  });
+  if (response.status === 404) {
+    throw new Error(`no public Greenhouse board named "${boardSlug}"`);
+  }
+  const jobs = response.data?.jobs;
+  if (!Array.isArray(jobs)) {
+    throw new Error("unexpected Greenhouse response shape (no jobs array)");
+  }
+  const listings = [];
+  for (const raw of jobs) {
+    if (!raw?.title) continue;
+    listings.push({
+      title: raw.title,
+      company: companyName,
+      location: raw.location?.name?.trim() || "Not specified",
+      salary: null,
+      // board API does not expose compensation
+      url: raw.absolute_url || `https://boards.greenhouse.io/${boardSlug}`,
+      description: "View full description on the company's Greenhouse board",
+      posted_date: raw.updated_at || null,
+      source: "greenhouse"
+    });
+  }
+  return listings;
+}
+async function getGreenhouseBoardJobs(boardSlug, companyName) {
+  return fetchWithCache(
+    "greenhouse",
+    { board: boardSlug },
+    SEARCH_TTL_MS,
+    () => fetchBoardJobs(boardSlug, companyName)
+  );
+}
+
+// src/services/lever.ts
+var limiter3 = new RateLimiter(RATE_LIMITS.lever);
+async function fetchPostings(companySlug, companyName) {
+  await limiter3.acquire();
+  const url2 = `https://api.lever.co/v0/postings/${encodeURIComponent(companySlug)}?mode=json`;
+  const response = await axios_default.get(url2, {
+    headers: { "User-Agent": API_USER_AGENT, Accept: "application/json" },
+    timeout: 15e3,
+    validateStatus: (status) => status === 200 || status === 404
+  });
+  if (response.status === 404) {
+    throw new Error(`no public Lever board named "${companySlug}"`);
+  }
+  if (!Array.isArray(response.data)) {
+    throw new Error("unexpected Lever response shape (not an array)");
+  }
+  const listings = [];
+  for (const raw of response.data) {
+    if (!raw?.text) continue;
+    const location = raw.categories?.location?.trim();
+    listings.push({
+      title: raw.text,
+      company: companyName,
+      location: location || (raw.workplaceType === "remote" ? "Remote" : "Not specified"),
+      salary: null,
+      // postings API does not expose compensation
+      url: raw.hostedUrl || `https://jobs.lever.co/${companySlug}`,
+      description: raw.descriptionPlain ? truncate(raw.descriptionPlain.replace(/\s+/g, " ").trim(), 300) : "View full description on the company's Lever board",
+      posted_date: raw.createdAt ? new Date(raw.createdAt).toISOString().slice(0, 10) : null,
+      source: "lever"
+    });
+  }
+  return listings;
+}
+async function getLeverBoardJobs(companySlug, companyName) {
+  return fetchWithCache(
+    "lever",
+    { board: companySlug },
+    SEARCH_TTL_MS,
+    () => fetchPostings(companySlug, companyName)
+  );
+}
+
+// src/services/company-boards.ts
+var KNOWN_BOARDS = {
+  stripe: { provider: "greenhouse", slug: "stripe" },
+  airbnb: { provider: "greenhouse", slug: "airbnb" },
+  coinbase: { provider: "greenhouse", slug: "coinbase" },
+  dropbox: { provider: "greenhouse", slug: "dropbox" },
+  gitlab: { provider: "greenhouse", slug: "gitlab" },
+  doordash: { provider: "greenhouse", slug: "doordash" },
+  instacart: { provider: "greenhouse", slug: "instacart" },
+  reddit: { provider: "greenhouse", slug: "reddit" },
+  pinterest: { provider: "greenhouse", slug: "pinterest" },
+  databricks: { provider: "greenhouse", slug: "databricks" },
+  figma: { provider: "greenhouse", slug: "figma" },
+  brex: { provider: "greenhouse", slug: "brex" },
+  gusto: { provider: "greenhouse", slug: "gusto" },
+  robinhood: { provider: "greenhouse", slug: "robinhood" },
+  lyft: { provider: "greenhouse", slug: "lyft" },
+  asana: { provider: "greenhouse", slug: "asana" },
+  anthropic: { provider: "greenhouse", slug: "anthropic" },
+  cloudflare: { provider: "greenhouse", slug: "cloudflare" },
+  datadog: { provider: "greenhouse", slug: "datadog" },
+  mongodb: { provider: "greenhouse", slug: "mongodb" },
+  okta: { provider: "greenhouse", slug: "okta" },
+  hashicorp: { provider: "greenhouse", slug: "hashicorp" },
+  vercel: { provider: "greenhouse", slug: "vercel" },
+  discord: { provider: "greenhouse", slug: "discord" },
+  duolingo: { provider: "greenhouse", slug: "duolingo" },
+  affirm: { provider: "greenhouse", slug: "affirm" },
+  flexport: { provider: "greenhouse", slug: "flexport" },
+  checkr: { provider: "greenhouse", slug: "checkr" },
+  netflix: { provider: "lever", slug: "netflix" },
+  palantir: { provider: "lever", slug: "palantir" },
+  plaid: { provider: "lever", slug: "plaid" },
+  ramp: { provider: "lever", slug: "ramp" },
+  attentive: { provider: "lever", slug: "attentive" }
+};
+function slugify(company) {
+  return company.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+function findKnownCompanyInQuery(query) {
+  const q = query.toLowerCase();
+  for (const name of Object.keys(KNOWN_BOARDS)) {
+    if (new RegExp(`\\b${name}\\b`).test(q)) return name;
+  }
+  return null;
+}
+function providerLabel(provider, slug) {
+  return provider === "greenhouse" ? `Greenhouse board (${slug})` : `Lever board (${slug})`;
+}
+async function getCompanyBoardJobs(company, opts = {}) {
+  const normalized = company.toLowerCase().trim();
+  const known = KNOWN_BOARDS[normalized];
+  const candidates = known ? [known] : [
+    { provider: "greenhouse", slug: slugify(company) },
+    { provider: "lever", slug: slugify(company) }
+  ];
+  const failures = [];
+  for (const candidate of candidates) {
+    if (!candidate.slug) continue;
+    const res = candidate.provider === "greenhouse" ? await getGreenhouseBoardJobs(candidate.slug, company) : await getLeverBoardJobs(candidate.slug, company);
+    if (res.ok) {
+      let items = res.value;
+      const terms = (opts.filterTerms || []).map((t) => t.toLowerCase()).filter(Boolean);
+      if (terms.length > 0) {
+        items = items.filter((job) => {
+          const title = job.title.toLowerCase();
+          return terms.every((t) => title.includes(t));
+        });
+      }
+      if (typeof opts.limit === "number") items = items.slice(0, opts.limit);
+      return {
+        meta: {
+          source: providerLabel(candidate.provider, candidate.slug),
+          tier: "api",
+          state: res.state,
+          count: items.length,
+          ageMs: res.ageMs
+        },
+        items
+      };
+    }
+    failures.push(res.reason);
+  }
+  return {
+    meta: {
+      source: "Company job board",
+      tier: "api",
+      state: "failed",
+      detail: `no public Greenhouse/Lever board found for "${company}" (${failures.join("; ")})`
+    },
+    items: []
+  };
+}
 
 // node_modules/cheerio/dist/esm/options.js
 var defaultOpts = {
@@ -82861,29 +83212,8 @@ var STRINGS = {
 var undici = __toESM(require_undici(), 1);
 var import_whatwg_mimetype = __toESM(require_mime_type(), 1);
 
-// src/services/rate-limiter.ts
-var RateLimiter = class {
-  intervalMs;
-  lastScheduled = 0;
-  constructor(requestsPerSecond) {
-    if (requestsPerSecond <= 0) {
-      throw new Error(`requestsPerSecond must be positive, got ${requestsPerSecond}`);
-    }
-    this.intervalMs = 1e3 / requestsPerSecond;
-  }
-  async acquire() {
-    const now = Date.now();
-    const next2 = Math.max(now, this.lastScheduled + this.intervalMs);
-    this.lastScheduled = next2;
-    const waitMs = next2 - now;
-    if (waitMs > 0) {
-      await new Promise((resolve) => setTimeout(resolve, waitMs));
-    }
-  }
-};
-
 // src/services/indeed.ts
-var limiter = new RateLimiter(RATE_LIMITS.indeed);
+var limiter4 = new RateLimiter(RATE_LIMITS.indeed);
 var INDEED_BASE_URL = "https://www.indeed.com/jobs";
 var INDEED_PAGE_SIZE = 10;
 function buildIndeedUrl(query, location, remote, start = 0) {
@@ -82936,15 +83266,15 @@ function parseIndeedListings($2) {
   }
   return listings;
 }
-async function searchIndeedJobs(query, location, remote, limit = 10) {
+async function fetchIndeedJobs(query, location, remote, limit) {
   const allListings = [];
-  try {
-    const pagesToFetch = Math.ceil(limit / INDEED_PAGE_SIZE);
-    const maxPages = Math.min(pagesToFetch, 2);
-    for (let page = 0; page < maxPages; page++) {
-      if (allListings.length >= limit) break;
-      const url2 = buildIndeedUrl(query, location, remote, page * INDEED_PAGE_SIZE);
-      await limiter.acquire();
+  const pagesToFetch = Math.ceil(limit / INDEED_PAGE_SIZE);
+  const maxPages = Math.min(pagesToFetch, 2);
+  for (let page = 0; page < maxPages; page++) {
+    if (allListings.length >= limit) break;
+    const url2 = buildIndeedUrl(query, location, remote, page * INDEED_PAGE_SIZE);
+    await limiter4.acquire();
+    try {
       const response = await axios_default.get(url2, {
         headers: {
           "User-Agent": USER_AGENT,
@@ -82959,29 +83289,29 @@ async function searchIndeedJobs(query, location, remote, limit = 10) {
       const pageListings = parseIndeedListings($2);
       if (pageListings.length === 0) break;
       allListings.push(...pageListings);
+    } catch (err) {
+      if (allListings.length > 0) break;
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`${message} \u2014 Indeed may be blocking automated requests`);
     }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("Indeed search error:", message);
-    if (allListings.length === 0) {
-      return [{
-        title: "Indeed Search Error",
-        company: "Indeed",
-        location: "N/A",
-        salary: null,
-        url: "https://www.indeed.com",
-        description: `Failed to fetch results from Indeed: ${message}. The site may be blocking automated requests or the HTML structure may have changed.`,
-        posted_date: null,
-        source: "indeed",
-        error: `Failed to fetch results from Indeed: ${message}. The site may be blocking automated requests or the HTML structure may have changed.`
-      }];
-    }
+  }
+  if (allListings.length === 0) {
+    throw new Error("no listings parsed \u2014 likely bot-blocked or the HTML structure changed");
   }
   return allListings.slice(0, limit);
 }
+async function searchIndeedJobs(query, location, remote, limit = 10) {
+  const res = await fetchWithCache(
+    "indeed",
+    { query: query.toLowerCase().trim(), location: location || null, remote: !!remote, limit },
+    SEARCH_TTL_MS,
+    () => fetchIndeedJobs(query, location, remote, limit)
+  );
+  return toSourceResult("Indeed", "scraper", res);
+}
 
 // src/services/linkedin.ts
-var limiter2 = new RateLimiter(RATE_LIMITS.linkedin);
+var limiter5 = new RateLimiter(RATE_LIMITS.linkedin);
 var LINKEDIN_JOBS_URL = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search";
 function buildLinkedInUrl(query, location, remote, start = 0) {
   const params = new URLSearchParams();
@@ -83033,15 +83363,15 @@ function parseLinkedInListings($2) {
   }
   return listings;
 }
-async function searchLinkedInJobs(query, location, remote, limit = 10) {
+async function fetchLinkedInJobs(query, location, remote, limit) {
   const allListings = [];
-  try {
-    const pagesToFetch = Math.ceil(limit / 25);
-    const maxPages = Math.min(pagesToFetch, 2);
-    for (let page = 0; page < maxPages; page++) {
-      if (allListings.length >= limit) break;
-      const url2 = buildLinkedInUrl(query, location, remote, page * 25);
-      await limiter2.acquire();
+  const pagesToFetch = Math.ceil(limit / 25);
+  const maxPages = Math.min(pagesToFetch, 2);
+  for (let page = 0; page < maxPages; page++) {
+    if (allListings.length >= limit) break;
+    const url2 = buildLinkedInUrl(query, location, remote, page * 25);
+    await limiter5.acquire();
+    try {
       const response = await axios_default.get(url2, {
         headers: {
           "User-Agent": USER_AGENT,
@@ -83056,159 +83386,383 @@ async function searchLinkedInJobs(query, location, remote, limit = 10) {
       const pageListings = parseLinkedInListings($2);
       if (pageListings.length === 0) break;
       allListings.push(...pageListings);
+    } catch (err) {
+      if (allListings.length > 0) break;
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`${message} \u2014 LinkedIn aggressively blocks automated requests`);
     }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("LinkedIn search error:", message);
-    if (allListings.length === 0) {
-      return [{
-        title: "LinkedIn Search Error",
-        company: "LinkedIn",
-        location: "N/A",
-        salary: null,
-        url: "https://www.linkedin.com/jobs",
-        description: `Failed to fetch results from LinkedIn: ${message}. LinkedIn aggressively blocks automated requests.`,
-        posted_date: null,
-        source: "linkedin",
-        error: `Failed to fetch results from LinkedIn: ${message}. LinkedIn aggressively blocks automated requests.`
-      }];
-    }
+  }
+  if (allListings.length === 0) {
+    throw new Error("no listings parsed \u2014 likely bot-blocked or the HTML structure changed");
   }
   return allListings.slice(0, limit);
 }
+async function searchLinkedInJobs(query, location, remote, limit = 10) {
+  const res = await fetchWithCache(
+    "linkedin",
+    { query: query.toLowerCase().trim(), location: location || null, remote: !!remote, limit },
+    SEARCH_TTL_MS,
+    () => fetchLinkedInJobs(query, location, remote, limit)
+  );
+  return toSourceResult("LinkedIn", "scraper", res);
+}
+
+// src/services/remotive.ts
+var limiter6 = new RateLimiter(RATE_LIMITS.remotive);
+var REMOTIVE_API_URL = "https://remotive.com/api/remote-jobs";
+var FETCH_CAP = 100;
+function matchesAllTerms(job, terms) {
+  const haystack = [
+    job.title,
+    job.company_name,
+    (job.tags || []).join(" "),
+    job.description
+  ].filter(Boolean).join(" ").toLowerCase();
+  return terms.every((t) => haystack.includes(t));
+}
+async function fetchRemotiveJobs(query) {
+  await limiter6.acquire();
+  const response = await axios_default.get(REMOTIVE_API_URL, {
+    params: { search: query, limit: FETCH_CAP },
+    headers: { "User-Agent": API_USER_AGENT, Accept: "application/json" },
+    timeout: 15e3
+  });
+  const jobs = response.data?.jobs;
+  if (!Array.isArray(jobs)) {
+    throw new Error("unexpected Remotive response shape (no jobs array)");
+  }
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const listings = [];
+  for (const raw of jobs) {
+    if (!raw?.title || !raw.company_name) continue;
+    if (!matchesAllTerms(raw, terms)) continue;
+    listings.push({
+      title: raw.title,
+      company: raw.company_name,
+      location: raw.candidate_required_location ? `Remote (${raw.candidate_required_location})` : "Remote",
+      salary: raw.salary?.trim() || null,
+      url: raw.url || "https://remotive.com",
+      description: raw.description ? truncate(stripHtml(raw.description), 300) : "No description available",
+      posted_date: raw.publication_date || null,
+      source: "remotive"
+    });
+  }
+  return listings;
+}
+async function searchRemotiveJobs(query, limit = 10) {
+  const res = await fetchWithCache(
+    "remotive",
+    { query: query.toLowerCase().trim() },
+    SEARCH_TTL_MS,
+    () => fetchRemotiveJobs(query)
+  );
+  if (res.ok) {
+    const items = res.value.slice(0, limit);
+    return {
+      meta: { source: "Remotive", tier: "api", state: res.state, count: items.length, ageMs: res.ageMs },
+      items
+    };
+  }
+  return toSourceResult("Remotive", "api", res);
+}
+
+// src/services/remoteok.ts
+var limiter7 = new RateLimiter(RATE_LIMITS.remoteok);
+var REMOTEOK_API_URL = "https://remoteok.com/api";
+async function fetchRemoteOkFeed() {
+  await limiter7.acquire();
+  const response = await axios_default.get(REMOTEOK_API_URL, {
+    headers: { "User-Agent": API_USER_AGENT, Accept: "application/json" },
+    timeout: 15e3
+  });
+  if (!Array.isArray(response.data)) {
+    throw new Error("unexpected RemoteOK response shape (not an array)");
+  }
+  return response.data.filter((p) => p?.position && p.company);
+}
+function toListing(post) {
+  return {
+    title: post.position || "Unknown role",
+    company: post.company || "Unknown company",
+    location: post.location?.trim() || "Remote",
+    salary: formatSalaryRange(post.salary_min, post.salary_max),
+    url: post.url || "https://remoteok.com",
+    description: post.description ? truncate(stripHtml(post.description), 300) : "No description available",
+    posted_date: post.date || null,
+    source: "remoteok"
+  };
+}
+async function searchRemoteOkJobs(query, limit = 10) {
+  const res = await fetchWithCache("remoteok", { feed: "all" }, SEARCH_TTL_MS, fetchRemoteOkFeed);
+  if (!res.ok) {
+    return { meta: { source: "RemoteOK", tier: "api", state: "failed", detail: res.reason }, items: [] };
+  }
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const items = res.value.filter((post) => {
+    const haystack = [
+      post.position,
+      post.company,
+      (post.tags || []).join(" "),
+      post.location,
+      post.description
+    ].filter(Boolean).join(" ").toLowerCase();
+    return terms.every((t) => haystack.includes(t));
+  }).slice(0, limit).map(toListing);
+  return {
+    meta: { source: "RemoteOK", tier: "api", state: res.state, count: items.length, ageMs: res.ageMs },
+    items
+  };
+}
 
 // src/services/trueup.ts
-var limiter3 = new RateLimiter(RATE_LIMITS.trueup);
+var limiter8 = new RateLimiter(RATE_LIMITS.trueup);
 var TRUEUP_BASE_URL = "https://www.trueup.io";
 var TRUEUP_SEARCH_URL = `${TRUEUP_BASE_URL}/jobs`;
 var TRUEUP_TRENDING_URL = `${TRUEUP_BASE_URL}/trending`;
-async function searchTrueUpJobs(query, limit = 10) {
+async function fetchTrueUpJobs(query, limit) {
   const listings = [];
-  try {
-    const params = new URLSearchParams();
-    params.set("search", query);
-    const url2 = `${TRUEUP_SEARCH_URL}?${params.toString()}`;
-    await limiter3.acquire();
-    const response = await axios_default.get(url2, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9"
-      },
-      timeout: 15e3,
-      maxRedirects: 5
-    });
-    const $2 = load(response.data);
-    $2("[class*='job-card'], [class*='JobCard'], .job-listing, tr[class*='job'], a[href*='/jobs/']").each((_index, element) => {
-      if (listings.length >= limit) return;
-      try {
-        const el = $2(element);
-        const titleEl = el.find("h3, h4, [class*='title'], [class*='Title']").first();
-        const title = titleEl.text().trim() || el.find("a").first().text().trim();
-        const companyEl = el.find("[class*='company'], [class*='Company'], span:first-child").first();
-        const company = companyEl.text().trim();
-        const locationEl = el.find("[class*='location'], [class*='Location']").first();
-        const location = locationEl.text().trim();
-        const linkEl = el.is("a") ? el : el.find("a[href*='/jobs/']").first();
-        const relativeUrl = linkEl.attr("href") || "";
-        const jobUrl = relativeUrl.startsWith("http") ? relativeUrl : `${TRUEUP_BASE_URL}${relativeUrl}`;
-        const salaryEl = el.find("[class*='salary'], [class*='Salary'], [class*='comp']").first();
-        const salary = salaryEl.length > 0 ? salaryEl.text().trim() : null;
-        if (title && company) {
-          listings.push({
-            title,
-            company,
-            location: location || "Not specified",
-            salary,
-            url: jobUrl,
-            description: "View full description on TrueUp",
-            posted_date: null,
-            source: "trueup"
-          });
-        }
-      } catch (innerErr) {
-        console.error("Error parsing individual TrueUp listing:", innerErr);
+  const params = new URLSearchParams();
+  params.set("search", query);
+  const url2 = `${TRUEUP_SEARCH_URL}?${params.toString()}`;
+  await limiter8.acquire();
+  const response = await axios_default.get(url2, {
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9"
+    },
+    timeout: 15e3,
+    maxRedirects: 5
+  });
+  const $2 = load(response.data);
+  $2("[class*='job-card'], [class*='JobCard'], .job-listing, tr[class*='job'], a[href*='/jobs/']").each((_index, element) => {
+    if (listings.length >= limit) return;
+    try {
+      const el = $2(element);
+      const titleEl = el.find("h3, h4, [class*='title'], [class*='Title']").first();
+      const title = titleEl.text().trim() || el.find("a").first().text().trim();
+      const companyEl = el.find("[class*='company'], [class*='Company'], span:first-child").first();
+      const company = companyEl.text().trim();
+      const locationEl = el.find("[class*='location'], [class*='Location']").first();
+      const location = locationEl.text().trim();
+      const linkEl = el.is("a") ? el : el.find("a[href*='/jobs/']").first();
+      const relativeUrl = linkEl.attr("href") || "";
+      const jobUrl = relativeUrl.startsWith("http") ? relativeUrl : `${TRUEUP_BASE_URL}${relativeUrl}`;
+      const salaryEl = el.find("[class*='salary'], [class*='Salary'], [class*='comp']").first();
+      const salary = salaryEl.length > 0 ? salaryEl.text().trim() : null;
+      if (title && company) {
+        listings.push({
+          title,
+          company,
+          location: location || "Not specified",
+          salary,
+          url: jobUrl,
+          description: "View full description on TrueUp",
+          posted_date: null,
+          source: "trueup"
+        });
       }
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("TrueUp search error:", message);
-    if (listings.length === 0) {
-      return [{
-        title: "TrueUp Search Error",
-        company: "TrueUp",
-        location: "N/A",
-        salary: null,
-        url: TRUEUP_SEARCH_URL,
-        description: `Failed to fetch results from TrueUp: ${message}. The site structure may have changed.`,
-        posted_date: null,
-        source: "trueup",
-        error: `Failed to fetch results from TrueUp: ${message}. The site structure may have changed.`
-      }];
+    } catch (innerErr) {
+      console.error("Error parsing individual TrueUp listing:", innerErr);
     }
+  });
+  if (listings.length === 0) {
+    throw new Error("no listings parsed \u2014 the site structure may have changed");
   }
   return listings.slice(0, limit);
 }
-async function getTrueUpTrendingRoles(industry) {
+async function searchTrueUpJobs(query, limit = 10) {
+  const res = await fetchWithCache(
+    "trueup-jobs",
+    { query: query.toLowerCase().trim(), limit },
+    SEARCH_TTL_MS,
+    () => fetchTrueUpJobs(query, limit)
+  );
+  return toSourceResult("TrueUp", "scraper", res);
+}
+async function fetchTrendingRoles(industry) {
   const roles = [];
-  try {
-    const url2 = industry ? `${TRUEUP_TRENDING_URL}?industry=${encodeURIComponent(industry)}` : TRUEUP_TRENDING_URL;
-    await limiter3.acquire();
-    const response = await axios_default.get(url2, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9"
-      },
-      timeout: 15e3,
-      maxRedirects: 5
-    });
-    const $2 = load(response.data);
-    $2("[class*='trending'], [class*='Trending'], [class*='role-card'], table tbody tr, .card").each((_index, element) => {
-      try {
-        const el = $2(element);
-        const titleEl = el.find("h3, h4, td:first-child, [class*='title'], [class*='role']").first();
-        const title = titleEl.text().trim();
-        const companiesText = el.find("[class*='companies'], [class*='Companies'], td:nth-child(2)").first().text().trim();
-        const companies_hiring = companiesText ? companiesText.split(/[,|]/).map((c) => c.trim()).filter(Boolean) : [];
-        const growthEl = el.find("[class*='growth'], [class*='Growth'], td:nth-child(3)").first();
-        const growth_rate = growthEl.length > 0 ? growthEl.text().trim() : null;
-        const salaryEl = el.find("[class*='salary'], [class*='Salary'], [class*='comp'], td:nth-child(4)").first();
-        const avg_salary = salaryEl.length > 0 ? salaryEl.text().trim() : null;
-        const demandEl = el.find("[class*='demand'], [class*='Demand'], td:nth-child(5)").first();
-        const demandText = demandEl.text().trim().toLowerCase();
-        let demand_level = null;
-        if (demandText.includes("high")) demand_level = "high";
-        else if (demandText.includes("medium") || demandText.includes("moderate")) demand_level = "medium";
-        else if (demandText.includes("low")) demand_level = "low";
-        if (title) {
-          roles.push({
-            title,
-            companies_hiring,
-            growth_rate,
-            avg_salary,
-            demand_level
-          });
-        }
-      } catch (innerErr) {
-        console.error("Error parsing individual TrueUp trending role:", innerErr);
+  const url2 = industry ? `${TRUEUP_TRENDING_URL}?industry=${encodeURIComponent(industry)}` : TRUEUP_TRENDING_URL;
+  await limiter8.acquire();
+  const response = await axios_default.get(url2, {
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9"
+    },
+    timeout: 15e3,
+    maxRedirects: 5
+  });
+  const $2 = load(response.data);
+  $2("[class*='trending'], [class*='Trending'], [class*='role-card'], table tbody tr, .card").each((_index, element) => {
+    try {
+      const el = $2(element);
+      const titleEl = el.find("h3, h4, td:first-child, [class*='title'], [class*='role']").first();
+      const title = titleEl.text().trim();
+      const companiesText = el.find("[class*='companies'], [class*='Companies'], td:nth-child(2)").first().text().trim();
+      const companies_hiring = companiesText ? companiesText.split(/[,|]/).map((c) => c.trim()).filter(Boolean) : [];
+      const growthEl = el.find("[class*='growth'], [class*='Growth'], td:nth-child(3)").first();
+      const growth_rate = growthEl.length > 0 ? growthEl.text().trim() : null;
+      const salaryEl = el.find("[class*='salary'], [class*='Salary'], [class*='comp'], td:nth-child(4)").first();
+      const avg_salary = salaryEl.length > 0 ? salaryEl.text().trim() : null;
+      const demandEl = el.find("[class*='demand'], [class*='Demand'], td:nth-child(5)").first();
+      const demandText = demandEl.text().trim().toLowerCase();
+      let demand_level = null;
+      if (demandText.includes("high")) demand_level = "high";
+      else if (demandText.includes("medium") || demandText.includes("moderate")) demand_level = "medium";
+      else if (demandText.includes("low")) demand_level = "low";
+      if (title) {
+        roles.push({
+          title,
+          companies_hiring,
+          growth_rate,
+          avg_salary,
+          demand_level
+        });
       }
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("TrueUp trending roles error:", message);
-    if (roles.length === 0) {
-      return [{
-        title: "TrueUp Trending Error",
-        companies_hiring: [],
-        growth_rate: null,
-        avg_salary: null,
-        demand_level: null,
-        error: `Failed to fetch trending roles from TrueUp: ${message}. The site may be temporarily unavailable or its structure may have changed.`
-      }];
+    } catch (innerErr) {
+      console.error("Error parsing individual TrueUp trending role:", innerErr);
     }
+  });
+  if (roles.length === 0) {
+    throw new Error("no trending roles parsed \u2014 the site may be unavailable or its structure changed");
   }
   return roles;
+}
+async function getTrueUpTrendingRoles(industry) {
+  const res = await fetchWithCache(
+    "trueup-trending",
+    { industry: industry?.toLowerCase().trim() || null },
+    SEARCH_TTL_MS,
+    () => fetchTrendingRoles(industry)
+  );
+  return toSourceResult("TrueUp", "scraper", res);
+}
+
+// src/services/usajobs.ts
+var limiter9 = new RateLimiter(RATE_LIMITS.usajobs);
+var USAJOBS_API_URL = "https://data.usajobs.gov/api/search";
+function formatRemuneration(rem) {
+  if (!rem) return null;
+  const min = parseFloat(rem.MinimumRange || "");
+  const max = parseFloat(rem.MaximumRange || "");
+  if (isNaN(min) && isNaN(max)) return null;
+  const fmt = (n) => `$${Math.round(n).toLocaleString()}`;
+  let range;
+  if (!isNaN(min) && !isNaN(max) && max !== min) range = `${fmt(min)} - ${fmt(max)}`;
+  else range = fmt(!isNaN(max) ? max : min);
+  if (rem.RateIntervalCode === "PH") return `${range} an hour`;
+  return range;
+}
+async function fetchUsaJobs(apiKey, email2, query, location, limit) {
+  await limiter9.acquire();
+  const params = {
+    Keyword: query,
+    ResultsPerPage: limit
+  };
+  if (location) params.LocationName = location;
+  const response = await axios_default.get(USAJOBS_API_URL, {
+    params,
+    headers: {
+      "Authorization-Key": apiKey,
+      // USAJOBS requires the registered email address as the User-Agent.
+      "User-Agent": email2,
+      Accept: "application/json"
+    },
+    timeout: 15e3
+  });
+  const items = response.data?.SearchResult?.SearchResultItems;
+  if (!Array.isArray(items)) {
+    throw new Error("unexpected USAJOBS response shape (no SearchResultItems)");
+  }
+  const listings = [];
+  for (const item of items) {
+    const d = item?.MatchedObjectDescriptor;
+    if (!d?.PositionTitle) continue;
+    listings.push({
+      title: d.PositionTitle,
+      company: d.OrganizationName || "US Federal Government",
+      location: d.PositionLocationDisplay || "Not specified",
+      salary: formatRemuneration(d.PositionRemuneration?.[0]),
+      url: d.PositionURI || "https://www.usajobs.gov",
+      description: d.UserArea?.Details?.JobSummary ? truncate(stripHtml(d.UserArea.Details.JobSummary), 300) : "View full description on USAJOBS",
+      posted_date: d.PublicationStartDate || null,
+      source: "usajobs"
+    });
+  }
+  return listings;
+}
+async function searchUsaJobs(query, location, limit = 10) {
+  const apiKey = process.env.USAJOBS_API_KEY?.trim();
+  const email2 = process.env.USAJOBS_EMAIL?.trim();
+  if (!apiKey || !email2) {
+    return {
+      meta: {
+        source: "USAJOBS",
+        tier: "api",
+        state: "skipped",
+        detail: "no API key \u2014 set USAJOBS_API_KEY and USAJOBS_EMAIL to enable"
+      },
+      items: []
+    };
+  }
+  const res = await fetchWithCache(
+    "usajobs",
+    // Credentials are deliberately excluded from the cache key.
+    { query: query.toLowerCase().trim(), location: location || null, limit },
+    SEARCH_TTL_MS,
+    () => fetchUsaJobs(apiKey, email2, query, location, limit)
+  );
+  return toSourceResult("USAJOBS", "api", res);
+}
+
+// src/tools/sources-footer.ts
+function formatAge(ageMs) {
+  const minutes = Math.round(ageMs / 6e4);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 6) / 10;
+  return `${hours}h ago`;
+}
+function formatSourceLine(meta) {
+  switch (meta.state) {
+    case "live":
+      return `- ${meta.source}: live \u2014 ${meta.count ?? 0} result${meta.count === 1 ? "" : "s"}`;
+    case "cached":
+      return `- ${meta.source}: cached \u2014 ${meta.count ?? 0} result${meta.count === 1 ? "" : "s"}${meta.ageMs !== void 0 ? ` (fetched ${formatAge(meta.ageMs)})` : ""}`;
+    case "stale-cache":
+      return `- ${meta.source}: cached (stale) \u2014 ${meta.count ?? 0} result${meta.count === 1 ? "" : "s"}${meta.ageMs !== void 0 ? ` from ${formatAge(meta.ageMs)}` : ""}; live fetch failed`;
+    case "skipped":
+      return `- ${meta.source}: skipped (${meta.detail || "disabled"})`;
+    case "failed":
+      return `- ${meta.source}: failed (${meta.detail || "unknown error"})`;
+  }
+}
+function formatSourcesFooter(metas) {
+  const lines = ["### Sources", ""];
+  const api = metas.filter((m) => m.tier === "api");
+  const scrapers = metas.filter((m) => m.tier === "scraper");
+  if (api.length > 0 && scrapers.length > 0) {
+    lines.push("**APIs (primary):**");
+    lines.push(...api.map(formatSourceLine));
+    lines.push("");
+    lines.push("**Scrapers (best-effort):**");
+    lines.push(...scrapers.map(formatSourceLine));
+  } else {
+    lines.push(...metas.map(formatSourceLine));
+  }
+  return lines;
+}
+function finalizeOutput(bodyLines, footerLines) {
+  const footer = footerLines.join("\n");
+  let body = bodyLines.join("\n");
+  const budget = CHARACTER_LIMIT - footer.length - 60;
+  if (body.length > budget) {
+    body = body.substring(0, Math.max(0, budget)) + "\n\n*[Output truncated due to length]*";
+  }
+  return `${body}
+
+${footer}`;
 }
 
 // src/tools/search-jobs.ts
@@ -83259,6 +83813,25 @@ function sortByRelevance(listings, query) {
     return bSalary - aSalary;
   });
 }
+function isRemoteListing(listing) {
+  if (listing.source === "remotive" || listing.source === "remoteok") return true;
+  return /\bremote\b/i.test(`${listing.location} ${listing.title} ${listing.description}`);
+}
+async function runSources(calls) {
+  const settled = await Promise.allSettled(calls.map((c) => c.run()));
+  return settled.map((result, i) => {
+    if (result.status === "fulfilled") return result.value;
+    return {
+      meta: {
+        source: calls[i].name,
+        tier: calls[i].tier,
+        state: "failed",
+        detail: result.reason instanceof Error ? result.reason.message : String(result.reason)
+      },
+      items: []
+    };
+  });
+}
 async function handleSearchJobs(input) {
   const { query, location, remote, salary_min, experience_level, limit } = input;
   let enhancedQuery = query;
@@ -83272,32 +83845,46 @@ async function handleSearchJobs(input) {
     };
     enhancedQuery = `${query} ${levelMap[experience_level] || ""}`.trim();
   }
-  const results = await Promise.allSettled([
-    searchIndeedJobs(enhancedQuery, location, remote, limit),
-    searchLinkedInJobs(enhancedQuery, location, remote, limit),
-    searchTrueUpJobs(enhancedQuery, limit)
-  ]);
-  const allListings = [];
-  const sourceStatus = [];
-  const sourceNames = ["Indeed", "LinkedIn", "TrueUp"];
-  for (let i = 0; i < results.length; i++) {
-    const result2 = results[i];
-    if (result2.status === "fulfilled") {
-      const listings = result2.value;
-      const errorListings = listings.filter((l) => l.error);
-      const validListings = listings.filter((l) => !l.error);
-      if (validListings.length > 0) {
-        allListings.push(...validListings);
-        sourceStatus.push(`${sourceNames[i]}: ${validListings.length} results`);
-      } else if (errorListings.length > 0) {
-        sourceStatus.push(`${sourceNames[i]}: error \u2014 ${errorListings[0].error}`);
-      } else {
-        sourceStatus.push(`${sourceNames[i]}: 0 results`);
-      }
-    } else {
-      sourceStatus.push(`${sourceNames[i]}: failed (${result2.reason})`);
-    }
+  const apiCalls = [
+    { name: "Remotive", tier: "api", run: () => searchRemotiveJobs(query, limit) },
+    { name: "RemoteOK", tier: "api", run: () => searchRemoteOkJobs(query, limit) },
+    { name: "Adzuna", tier: "api", run: () => searchAdzunaJobs(query, location, salary_min, limit) },
+    { name: "USAJOBS", tier: "api", run: () => searchUsaJobs(query, location, limit) }
+  ];
+  const knownCompany = findKnownCompanyInQuery(query);
+  if (knownCompany) {
+    const filterTerms = query.toLowerCase().split(/\s+/).filter((t) => t && t !== knownCompany);
+    apiCalls.push({
+      name: "Company job board",
+      tier: "api",
+      run: () => getCompanyBoardJobs(knownCompany, { filterTerms, limit })
+    });
   }
+  const apiResults = await runSources(apiCalls);
+  let apiListings = apiResults.flatMap((r) => r.items);
+  if (remote) {
+    apiListings = apiListings.filter(isRemoteListing);
+  }
+  const scraperNames = ["Indeed", "LinkedIn", "TrueUp"];
+  let scraperResults;
+  if (deduplicateListings(apiListings).length >= limit) {
+    scraperResults = scraperNames.map((name) => ({
+      meta: {
+        source: name,
+        tier: "scraper",
+        state: "skipped",
+        detail: "API sources already returned enough results"
+      },
+      items: []
+    }));
+  } else {
+    scraperResults = await runSources([
+      { name: "Indeed", tier: "scraper", run: () => searchIndeedJobs(enhancedQuery, location, remote, limit) },
+      { name: "LinkedIn", tier: "scraper", run: () => searchLinkedInJobs(enhancedQuery, location, remote, limit) },
+      { name: "TrueUp", tier: "scraper", run: () => searchTrueUpJobs(enhancedQuery, limit) }
+    ]);
+  }
+  const allListings = [...apiListings, ...scraperResults.flatMap((r) => r.items)];
   let finalListings = deduplicateListings(allListings);
   finalListings = sortByRelevance(finalListings, query);
   if (salary_min) {
@@ -83317,12 +83904,15 @@ async function handleSearchJobs(input) {
   if (remote) lines.push(`**Remote:** Yes`);
   if (experience_level) lines.push(`**Experience Level:** ${experience_level}`);
   if (salary_min) lines.push(`**Minimum Salary:** $${salary_min.toLocaleString()}`);
-  lines.push(`**Sources:** ${sourceStatus.join(" | ")}`);
-  lines.push(`**Results:** ${finalListings.length} listings (deduplicated)`);
+  lines.push(`**Results:** ${finalListings.length} listings (deduplicated; see Sources below)`);
   lines.push("");
+  const footerLines = formatSourcesFooter([
+    ...apiResults.map((r) => r.meta),
+    ...scraperResults.map((r) => r.meta)
+  ]);
   if (finalListings.length === 0) {
-    lines.push("No job listings found matching your criteria. Try broadening your search terms or removing filters.");
-    return lines.join("\n");
+    lines.push("No job listings found matching your criteria. Try broadening your search terms or removing filters. If all sources failed, fall back to WebSearch.");
+    return finalizeOutput(lines, footerLines);
   }
   lines.push("| # | Title | Company | Location | Salary | Source |");
   lines.push("|---|-------|---------|----------|--------|--------|");
@@ -83340,7 +83930,7 @@ async function handleSearchJobs(input) {
     for (let i = 0; i < detailCount; i++) {
       const job = finalListings[i];
       lines.push(`**${i + 1}. ${job.title}** at ${job.company}`);
-      if (job.description && job.description !== "View full description on LinkedIn" && job.description !== "View full description on TrueUp") {
+      if (job.description && !job.description.startsWith("View full description")) {
         const desc = job.description.length > 200 ? job.description.substring(0, 200) + "..." : job.description;
         lines.push(`> ${desc}`);
       }
@@ -83349,125 +83939,101 @@ async function handleSearchJobs(input) {
       lines.push("");
     }
   }
-  lines.push("*Data aggregated from Indeed, LinkedIn, and TrueUp. Listings may change rapidly.*");
-  let result = lines.join("\n");
-  if (result.length > CHARACTER_LIMIT) {
-    result = result.substring(0, CHARACTER_LIMIT - 50) + "\n\n*[Output truncated due to length]*";
-  }
-  return result;
+  lines.push("*API sources are queried first; scraper results are best-effort. Listings change rapidly.*");
+  return finalizeOutput(lines, footerLines);
 }
 
 // src/services/glassdoor.ts
-var limiter4 = new RateLimiter(RATE_LIMITS.glassdoor);
+var limiter10 = new RateLimiter(RATE_LIMITS.glassdoor);
 var GLASSDOOR_BASE_URL = "https://www.glassdoor.com";
-async function getGlassdoorCompanyInfo(company) {
-  try {
-    const searchUrl = `${GLASSDOOR_BASE_URL}/Search/results.htm?keyword=${encodeURIComponent(company)}&typedKeyword=${encodeURIComponent(company)}&sc.keyword=${encodeURIComponent(company)}`;
-    await limiter4.acquire();
-    const searchResponse = await axios_default.get(searchUrl, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9"
-      },
-      timeout: 15e3,
-      maxRedirects: 5
-    });
-    const $search = load(searchResponse.data);
-    const companyLink = $search("a[href*='/Overview/'], a[data-test='employer-short-name']").first().attr("href");
-    const overviewUrl = companyLink ? companyLink.startsWith("http") ? companyLink : `${GLASSDOOR_BASE_URL}${companyLink}` : null;
-    if (!overviewUrl) {
-      return {
-        name: company,
-        industry: null,
-        size: null,
-        rating: null,
-        culture_ratings: null,
-        interview_process: null,
-        headquarters: null,
-        founded: null,
-        revenue: null,
-        error: `Glassdoor search returned no overview page for "${company}" (status ${searchResponse.status}) \u2014 likely bot-blocked or the company is not listed; fall back to WebSearch.`
-      };
-    }
-    await limiter4.acquire();
-    const overviewResponse = await axios_default.get(overviewUrl, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9"
-      },
-      timeout: 15e3,
-      maxRedirects: 5,
-      validateStatus: (status) => status < 500
-    });
-    if (overviewResponse.status >= 400) {
-      console.error(`Glassdoor company info returned status ${overviewResponse.status} for ${company}`);
-      return {
-        name: company,
-        industry: null,
-        size: null,
-        rating: null,
-        culture_ratings: null,
-        interview_process: null,
-        headquarters: null,
-        founded: null,
-        revenue: null,
-        error: `Glassdoor returned ${overviewResponse.status} \u2014 likely bot-blocked; fall back to WebSearch.`
-      };
-    }
-    const $2 = load(overviewResponse.data);
-    const name = $2("[data-test='employer-name'], h1.employer-name, h1").first().text().trim() || company;
-    let rating = null;
-    const ratingText = $2("[data-test='rating-info'] .rating, .ratingNum, [class*='rating'] .num, [class*='Rating'] span").first().text().trim();
-    if (ratingText) {
-      const parsed = parseFloat(ratingText);
-      if (!isNaN(parsed)) rating = parsed;
-    }
-    const industry = extractDetail($2, "Industry", "Type");
-    const size = extractDetail($2, "Size", "Employees");
-    const headquarters = extractDetail($2, "Headquarters", "Location");
-    const founded = extractDetail($2, "Founded", "Year");
-    const revenue = extractDetail($2, "Revenue", "Annual");
-    const culture_ratings = {};
-    $2("[class*='culture'] [class*='rating-row'], [data-test*='culture'] div, .subRatings div").each((_i, el) => {
-      try {
-        const label = $2(el).find("[class*='label'], span:first-child").first().text().trim();
-        const val2 = $2(el).find("[class*='value'], span:last-child").first().text().trim();
-        if (label && val2) {
-          const num = parseFloat(val2);
-          if (!isNaN(num)) culture_ratings[label] = num;
-        }
-      } catch {
+async function fetchCompanyInfo(company) {
+  const searchUrl = `${GLASSDOOR_BASE_URL}/Search/results.htm?keyword=${encodeURIComponent(company)}&typedKeyword=${encodeURIComponent(company)}&sc.keyword=${encodeURIComponent(company)}`;
+  await limiter10.acquire();
+  const searchResponse = await axios_default.get(searchUrl, {
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9"
+    },
+    timeout: 15e3,
+    maxRedirects: 5
+  });
+  const $search = load(searchResponse.data);
+  const companyLink = $search("a[href*='/Overview/'], a[data-test='employer-short-name']").first().attr("href");
+  const overviewUrl = companyLink ? companyLink.startsWith("http") ? companyLink : `${GLASSDOOR_BASE_URL}${companyLink}` : null;
+  if (!overviewUrl) {
+    throw new Error(
+      `Glassdoor search returned no overview page for "${company}" (status ${searchResponse.status}) \u2014 likely bot-blocked or the company is not listed`
+    );
+  }
+  await limiter10.acquire();
+  const overviewResponse = await axios_default.get(overviewUrl, {
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9"
+    },
+    timeout: 15e3,
+    maxRedirects: 5,
+    validateStatus: (status) => status < 500
+  });
+  if (overviewResponse.status >= 400) {
+    throw new Error(`Glassdoor returned ${overviewResponse.status} \u2014 likely bot-blocked`);
+  }
+  const $2 = load(overviewResponse.data);
+  const name = $2("[data-test='employer-name'], h1.employer-name, h1").first().text().trim() || company;
+  let rating = null;
+  const ratingText = $2("[data-test='rating-info'] .rating, .ratingNum, [class*='rating'] .num, [class*='Rating'] span").first().text().trim();
+  if (ratingText) {
+    const parsed = parseFloat(ratingText);
+    if (!isNaN(parsed)) rating = parsed;
+  }
+  const industry = extractDetail($2, "Industry", "Type");
+  const size = extractDetail($2, "Size", "Employees");
+  const headquarters = extractDetail($2, "Headquarters", "Location");
+  const founded = extractDetail($2, "Founded", "Year");
+  const revenue = extractDetail($2, "Revenue", "Annual");
+  const culture_ratings = {};
+  $2("[class*='culture'] [class*='rating-row'], [data-test*='culture'] div, .subRatings div").each((_i, el) => {
+    try {
+      const label = $2(el).find("[class*='label'], span:first-child").first().text().trim();
+      const val2 = $2(el).find("[class*='value'], span:last-child").first().text().trim();
+      if (label && val2) {
+        const num = parseFloat(val2);
+        if (!isNaN(num)) culture_ratings[label] = num;
       }
-    });
+    } catch {
+    }
+  });
+  return {
+    name,
+    industry,
+    size,
+    rating,
+    culture_ratings: Object.keys(culture_ratings).length > 0 ? culture_ratings : null,
+    interview_process: null,
+    headquarters,
+    founded,
+    revenue
+  };
+}
+async function getGlassdoorCompanyInfo(company) {
+  const res = await fetchWithCache(
+    "glassdoor-company",
+    { company: company.toLowerCase().trim() },
+    LOOKUP_TTL_MS,
+    () => fetchCompanyInfo(company)
+  );
+  if (res.ok) {
     return {
-      name,
-      industry,
-      size,
-      rating,
-      culture_ratings: Object.keys(culture_ratings).length > 0 ? culture_ratings : null,
-      interview_process: null,
-      headquarters,
-      founded,
-      revenue
-    };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("Glassdoor company info error:", message);
-    return {
-      name: company,
-      industry: null,
-      size: null,
-      rating: null,
-      culture_ratings: null,
-      interview_process: null,
-      headquarters: null,
-      founded: null,
-      revenue: null,
-      error: `Error fetching company info from Glassdoor: ${message}. The site may be bot-blocked; fall back to WebSearch.`
+      meta: { source: "Glassdoor", tier: "scraper", state: res.state, count: 1, ageMs: res.ageMs },
+      info: res.value
     };
   }
+  return {
+    meta: { source: "Glassdoor", tier: "scraper", state: "failed", detail: res.reason },
+    info: null
+  };
 }
 function extractDetail($2, ...labels) {
   for (const label of labels) {
@@ -83482,340 +84048,342 @@ function extractDetail($2, ...labels) {
   }
   return null;
 }
-async function getGlassdoorSalaries(role, company) {
+async function fetchSalaries(role, company) {
   const salaries = [];
-  try {
-    const searchQuery = company ? `${role} ${company}` : role;
-    const searchUrl = `${GLASSDOOR_BASE_URL}/Salaries/know-your-worth.htm?keyword=${encodeURIComponent(searchQuery)}`;
-    await limiter4.acquire();
-    const response = await axios_default.get(searchUrl, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9"
-      },
-      timeout: 15e3,
-      maxRedirects: 5,
-      validateStatus: (status) => status < 500
-    });
-    const $2 = load(response.data);
-    $2("[data-test='salaries-list'] li, [class*='SalaryCard'], [class*='salary-card'], .salaryList .salary-row, table tbody tr").each((_index, element) => {
-      try {
-        const el = $2(element);
-        const roleText = el.find("[class*='title'], h3, td:first-child, [data-test='salary-title']").first().text().trim() || role;
-        const companyText = el.find("[class*='company'], [data-test='company-name'], td:nth-child(2)").first().text().trim() || company || null;
-        const payText = el.find("[class*='pay'], [class*='salary'], [data-test='salary-amount'], td:nth-child(3)").first().text().trim();
-        const baseMatch = payText.match(/\$?([\d,]+)/);
-        const base = baseMatch ? parseInt(baseMatch[1].replace(/,/g, ""), 10) : null;
-        const bonusText = el.find("[class*='bonus'], [class*='additional']").first().text().trim();
-        const bonusMatch = bonusText.match(/\$?([\d,]+)/);
-        const bonus = bonusMatch ? parseInt(bonusMatch[1].replace(/,/g, ""), 10) : null;
-        const total_comp = base && bonus ? base + bonus : base;
-        if (roleText) {
-          salaries.push({
-            role: roleText,
-            company: companyText,
-            location: null,
-            base,
-            equity: null,
-            bonus,
-            total_comp,
-            level: null,
-            source: "glassdoor"
-          });
-        }
-      } catch (innerErr) {
-        console.error("Error parsing individual Glassdoor salary:", innerErr);
-      }
-    });
-  } catch (err) {
-    console.error("Glassdoor salary error:", err instanceof Error ? err.message : String(err));
-    if (salaries.length === 0) {
-      return [{
-        role,
-        company: company || null,
-        location: null,
-        base: null,
-        equity: null,
-        bonus: null,
-        total_comp: null,
-        level: null,
-        source: "glassdoor"
-      }];
-    }
-  }
-  return salaries;
-}
-async function getGlassdoorInterviews(company, role) {
-  const experiences = [];
-  try {
-    const searchQuery = role ? `${company} ${role} interview` : `${company} interview`;
-    const searchUrl = `${GLASSDOOR_BASE_URL}/Interview/index.htm?sc.keyword=${encodeURIComponent(searchQuery)}`;
-    await limiter4.acquire();
-    const response = await axios_default.get(searchUrl, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9"
-      },
-      timeout: 15e3,
-      maxRedirects: 5,
-      validateStatus: (status) => status < 500
-    });
-    const $2 = load(response.data);
-    $2("[class*='InterviewCard'], [class*='interview-card'], .interview, [data-test='interview-review']").each((_index, element) => {
-      try {
-        const el = $2(element);
-        const roleText = el.find("[class*='role'], [class*='title'], h3").first().text().trim() || role || null;
-        const difficultyText = el.find("[class*='difficulty'], [data-test='difficulty']").first().text().trim();
-        const difficulty = difficultyText || null;
-        const experienceText = el.find("[class*='experience'], [data-test='experience']").first().text().trim().toLowerCase();
-        let experience = null;
-        if (experienceText.includes("positive")) experience = "positive";
-        else if (experienceText.includes("negative")) experience = "negative";
-        else if (experienceText.includes("neutral") || experienceText.includes("mixed")) experience = "neutral";
-        const questions = [];
-        el.find("[class*='question'], li, [data-test='interview-question']").each((_qi, qEl) => {
-          const q = $2(qEl).text().trim();
-          if (q && q.length > 10 && q.length < 500) {
-            questions.push(q);
-          }
-        });
-        const processText = el.find("[class*='process'], [class*='description'], [data-test='interview-process'], p").first().text().trim();
-        const process3 = processText || null;
-        const offerText = el.find("[class*='offer'], [data-test='offer']").first().text().trim().toLowerCase();
-        let offer = null;
-        if (offerText.includes("accepted") || offerText.includes("received") || offerText.includes("yes")) offer = true;
-        else if (offerText.includes("declined") || offerText.includes("rejected") || offerText.includes("no")) offer = false;
-        const dateText = el.find("[class*='date'], time").first().text().trim();
-        const date3 = dateText || null;
-        experiences.push({
-          company,
+  const searchQuery = company ? `${role} ${company}` : role;
+  const searchUrl = `${GLASSDOOR_BASE_URL}/Salaries/know-your-worth.htm?keyword=${encodeURIComponent(searchQuery)}`;
+  await limiter10.acquire();
+  const response = await axios_default.get(searchUrl, {
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9"
+    },
+    timeout: 15e3,
+    maxRedirects: 5,
+    validateStatus: (status) => status < 500
+  });
+  const $2 = load(response.data);
+  $2("[data-test='salaries-list'] li, [class*='SalaryCard'], [class*='salary-card'], .salaryList .salary-row, table tbody tr").each((_index, element) => {
+    try {
+      const el = $2(element);
+      const roleText = el.find("[class*='title'], h3, td:first-child, [data-test='salary-title']").first().text().trim() || role;
+      const companyText = el.find("[class*='company'], [data-test='company-name'], td:nth-child(2)").first().text().trim() || company || null;
+      const payText = el.find("[class*='pay'], [class*='salary'], [data-test='salary-amount'], td:nth-child(3)").first().text().trim();
+      const baseMatch = payText.match(/\$?([\d,]+)/);
+      const base = baseMatch ? parseInt(baseMatch[1].replace(/,/g, ""), 10) : null;
+      const bonusText = el.find("[class*='bonus'], [class*='additional']").first().text().trim();
+      const bonusMatch = bonusText.match(/\$?([\d,]+)/);
+      const bonus = bonusMatch ? parseInt(bonusMatch[1].replace(/,/g, ""), 10) : null;
+      const total_comp = base && bonus ? base + bonus : base;
+      if (roleText) {
+        salaries.push({
           role: roleText,
-          difficulty,
-          experience,
-          questions,
-          process: process3,
-          offer,
-          date: date3
+          company: companyText,
+          location: null,
+          base,
+          equity: null,
+          bonus,
+          total_comp,
+          level: null,
+          source: "glassdoor"
         });
-      } catch (innerErr) {
-        console.error("Error parsing individual Glassdoor interview:", innerErr);
       }
-    });
-  } catch (err) {
-    console.error("Glassdoor interview error:", err instanceof Error ? err.message : String(err));
-    if (experiences.length === 0) {
-      return [{
-        company,
-        role: role || null,
-        difficulty: null,
-        experience: null,
-        questions: [],
-        process: `Error fetching interview experiences: ${err instanceof Error ? err.message : String(err)}`,
-        offer: null,
-        date: null
-      }];
+    } catch (innerErr) {
+      console.error("Error parsing individual Glassdoor salary:", innerErr);
     }
+  });
+  const withData = salaries.filter((s) => s.base !== null || s.total_comp !== null || s.bonus !== null);
+  if (withData.length === 0) {
+    throw new Error("no salary entries parsed \u2014 likely bot-blocked or the HTML structure changed");
+  }
+  return withData;
+}
+async function getGlassdoorSalaries(role, company) {
+  const res = await fetchWithCache(
+    "glassdoor-salaries",
+    { role: role.toLowerCase().trim(), company: company?.toLowerCase().trim() || null },
+    LOOKUP_TTL_MS,
+    () => fetchSalaries(role, company)
+  );
+  return toSourceResult("Glassdoor", "scraper", res);
+}
+async function fetchInterviews(company, role) {
+  const experiences = [];
+  const searchQuery = role ? `${company} ${role} interview` : `${company} interview`;
+  const searchUrl = `${GLASSDOOR_BASE_URL}/Interview/index.htm?sc.keyword=${encodeURIComponent(searchQuery)}`;
+  await limiter10.acquire();
+  const response = await axios_default.get(searchUrl, {
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9"
+    },
+    timeout: 15e3,
+    maxRedirects: 5,
+    validateStatus: (status) => status < 500
+  });
+  const $2 = load(response.data);
+  $2("[class*='InterviewCard'], [class*='interview-card'], .interview, [data-test='interview-review']").each((_index, element) => {
+    try {
+      const el = $2(element);
+      const roleText = el.find("[class*='role'], [class*='title'], h3").first().text().trim() || role || null;
+      const difficultyText = el.find("[class*='difficulty'], [data-test='difficulty']").first().text().trim();
+      const difficulty = difficultyText || null;
+      const experienceText = el.find("[class*='experience'], [data-test='experience']").first().text().trim().toLowerCase();
+      let experience = null;
+      if (experienceText.includes("positive")) experience = "positive";
+      else if (experienceText.includes("negative")) experience = "negative";
+      else if (experienceText.includes("neutral") || experienceText.includes("mixed")) experience = "neutral";
+      const questions = [];
+      el.find("[class*='question'], li, [data-test='interview-question']").each((_qi, qEl) => {
+        const q = $2(qEl).text().trim();
+        if (q && q.length > 10 && q.length < 500) {
+          questions.push(q);
+        }
+      });
+      const processText = el.find("[class*='process'], [class*='description'], [data-test='interview-process'], p").first().text().trim();
+      const process3 = processText || null;
+      const offerText = el.find("[class*='offer'], [data-test='offer']").first().text().trim().toLowerCase();
+      let offer = null;
+      if (offerText.includes("accepted") || offerText.includes("received") || offerText.includes("yes")) offer = true;
+      else if (offerText.includes("declined") || offerText.includes("rejected") || offerText.includes("no")) offer = false;
+      const dateText = el.find("[class*='date'], time").first().text().trim();
+      const date3 = dateText || null;
+      experiences.push({
+        company,
+        role: roleText,
+        difficulty,
+        experience,
+        questions,
+        process: process3,
+        offer,
+        date: date3
+      });
+    } catch (innerErr) {
+      console.error("Error parsing individual Glassdoor interview:", innerErr);
+    }
+  });
+  if (experiences.length === 0) {
+    throw new Error("no interview experiences parsed \u2014 likely bot-blocked or the company has no reviews");
   }
   return experiences;
 }
+async function getGlassdoorInterviews(company, role) {
+  const res = await fetchWithCache(
+    "glassdoor-interviews",
+    { company: company.toLowerCase().trim(), role: role?.toLowerCase().trim() || null },
+    LOOKUP_TTL_MS,
+    () => fetchInterviews(company, role)
+  );
+  return toSourceResult("Glassdoor", "scraper", res);
+}
 
 // src/tools/company-info.ts
+var MAX_OPEN_ROLES_SHOWN = 10;
 async function handleCompanyInfo(input) {
   const { company_name } = input;
-  const info = await getGlassdoorCompanyInfo(company_name);
+  const [glassdoor, board] = await Promise.all([
+    getGlassdoorCompanyInfo(company_name),
+    getCompanyBoardJobs(company_name)
+  ]);
+  const info = glassdoor.info;
   const lines = [
     `## Company Profile: ${info?.name || company_name}`,
     ""
   ];
-  if (!info) {
-    lines.push(`No company information found for "${company_name}". The company may not be listed on Glassdoor or the search returned no results.`);
-    return lines.join("\n");
-  }
-  if (info.error) {
-    lines.push(`**Error:** ${info.error}`);
+  const footerLines = formatSourcesFooter([board.meta, glassdoor.meta]);
+  if (info) {
+    lines.push("### Overview");
     lines.push("");
-    lines.push("No company data could be retrieved from Glassdoor. Consider using WebSearch to look up this company instead.");
-    return lines.join("\n");
-  }
-  lines.push("### Overview");
-  lines.push("");
-  lines.push("| Detail | Value |");
-  lines.push("|--------|-------|");
-  lines.push(`| Company | ${info.name} |`);
-  lines.push(`| Industry | ${info.industry || "Not available"} |`);
-  lines.push(`| Size | ${info.size || "Not available"} |`);
-  lines.push(`| Headquarters | ${info.headquarters || "Not available"} |`);
-  lines.push(`| Founded | ${info.founded || "Not available"} |`);
-  lines.push(`| Revenue | ${info.revenue || "Not available"} |`);
-  lines.push("");
-  lines.push("### Ratings");
-  lines.push("");
-  if (info.rating !== null) {
-    lines.push(`**Overall Rating:** ${info.rating.toFixed(1)} / 5.0`);
+    lines.push("| Detail | Value |");
+    lines.push("|--------|-------|");
+    lines.push(`| Company | ${info.name} |`);
+    lines.push(`| Industry | ${info.industry || "Not available"} |`);
+    lines.push(`| Size | ${info.size || "Not available"} |`);
+    lines.push(`| Headquarters | ${info.headquarters || "Not available"} |`);
+    lines.push(`| Founded | ${info.founded || "Not available"} |`);
+    lines.push(`| Revenue | ${info.revenue || "Not available"} |`);
     lines.push("");
-    const filledStars = Math.round(info.rating);
-    const emptyStars = 5 - filledStars;
-    lines.push(`Rating: ${"*".repeat(filledStars)}${"_".repeat(emptyStars)}`);
+    lines.push("### Ratings");
+    lines.push("");
+    if (info.rating !== null) {
+      lines.push(`**Overall Rating:** ${info.rating.toFixed(1)} / 5.0`);
+      lines.push("");
+      const filledStars = Math.round(info.rating);
+      const emptyStars = 5 - filledStars;
+      lines.push(`Rating: ${"*".repeat(filledStars)}${"_".repeat(emptyStars)}`);
+      lines.push("");
+    } else {
+      lines.push("Overall rating not available.");
+      lines.push("");
+    }
+    if (info.culture_ratings && Object.keys(info.culture_ratings).length > 0) {
+      lines.push("#### Culture & Values Ratings");
+      lines.push("");
+      lines.push("| Category | Rating |");
+      lines.push("|----------|--------|");
+      for (const [category, rating] of Object.entries(info.culture_ratings)) {
+        lines.push(`| ${category} | ${rating.toFixed(1)} / 5.0 |`);
+      }
+      lines.push("");
+    }
+    lines.push("### Interview Process");
+    lines.push("");
+    if (info.interview_process) {
+      lines.push(info.interview_process);
+    } else {
+      lines.push("Interview process information not available from this source. Use the `job_get_interview_experiences` tool for detailed interview data.");
+    }
     lines.push("");
   } else {
-    lines.push("Overall rating not available.");
+    lines.push(`No Glassdoor profile could be retrieved for "${company_name}" (see Sources below). Consider using WebSearch for company background.`);
     lines.push("");
   }
-  if (info.culture_ratings && Object.keys(info.culture_ratings).length > 0) {
-    lines.push("#### Culture & Values Ratings");
+  if (board.items.length > 0) {
+    const total = board.items.length;
+    lines.push(`### Open Roles (${board.meta.source})`);
     lines.push("");
-    lines.push("| Category | Rating |");
-    lines.push("|----------|--------|");
-    for (const [category, rating] of Object.entries(info.culture_ratings)) {
-      lines.push(`| ${category} | ${rating.toFixed(1)} / 5.0 |`);
+    lines.push(`${total} open role${total === 1 ? "" : "s"} on the company's public job board:`);
+    lines.push("");
+    for (const job of board.items.slice(0, MAX_OPEN_ROLES_SHOWN)) {
+      lines.push(`- [${job.title}](${job.url}) \u2014 ${job.location}`);
+    }
+    if (total > MAX_OPEN_ROLES_SHOWN) {
+      lines.push(`- ...and ${total - MAX_OPEN_ROLES_SHOWN} more (use job_search_jobs with the company name to explore)`);
     }
     lines.push("");
   }
-  lines.push("### Interview Process");
-  lines.push("");
-  if (info.interview_process) {
-    lines.push(info.interview_process);
-  } else {
-    lines.push("Interview process information not available from this source. Use the `job_get_interview_experiences` tool for detailed interview data.");
-  }
-  lines.push("");
-  lines.push("*Data source: Glassdoor. Information may not reflect the most current state of the company.*");
-  let result = lines.join("\n");
-  if (result.length > CHARACTER_LIMIT) {
-    result = result.substring(0, CHARACTER_LIMIT - 50) + "\n\n*[Output truncated due to length]*";
-  }
-  return result;
+  lines.push("*Ratings/culture data come from Glassdoor and may lag; open roles come from the company's own job board. See Sources for per-source status.*");
+  return finalizeOutput(lines, footerLines);
 }
 
 // src/services/levelsfyi.ts
-var limiter5 = new RateLimiter(RATE_LIMITS.levelsfyi);
+var limiter11 = new RateLimiter(RATE_LIMITS.levelsfyi);
 var LEVELS_BASE_URL = "https://www.levels.fyi";
-async function getLevelsSalaryData(role, company, location) {
+async function fetchLevelsSalaryData(role, company, location) {
   const salaries = [];
-  try {
-    let searchPath = "/t";
-    const roleLower = role.toLowerCase();
-    if (roleLower.includes("software engineer")) {
-      searchPath = "/t/software-engineer";
-    } else if (roleLower.includes("product manager")) {
-      searchPath = "/t/product-manager";
-    } else if (roleLower.includes("data scientist")) {
-      searchPath = "/t/data-scientist";
-    } else if (roleLower.includes("designer") || roleLower.includes("ux")) {
-      searchPath = "/t/product-designer";
-    } else if (roleLower.includes("devops") || roleLower.includes("sre")) {
-      searchPath = "/t/devops";
-    } else if (roleLower.includes("data engineer")) {
-      searchPath = "/t/data-engineer";
-    } else if (roleLower.includes("machine learning") || roleLower.includes("ml")) {
-      searchPath = "/t/machine-learning-engineer";
-    } else if (roleLower.includes("frontend") || roleLower.includes("front-end")) {
-      searchPath = "/t/front-end-engineer";
-    } else if (roleLower.includes("backend") || roleLower.includes("back-end")) {
-      searchPath = "/t/back-end-engineer";
-    } else if (roleLower.includes("mobile") || roleLower.includes("ios") || roleLower.includes("android")) {
-      searchPath = "/t/mobile-developer";
-    } else if (roleLower.includes("security")) {
-      searchPath = "/t/security-engineer";
-    } else if (roleLower.includes("engineering manager")) {
-      searchPath = "/t/engineering-manager";
-    } else {
-      const slug = role.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-      searchPath = `/t/${slug}`;
-    }
-    if (company) {
-      const companySlug = company.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-      searchPath += `/c/${companySlug}`;
-    }
-    if (location) {
-      const locationSlug = location.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-      searchPath += `/l/${locationSlug}`;
-    }
-    const url2 = `${LEVELS_BASE_URL}${searchPath}`;
-    await limiter5.acquire();
-    const response = await axios_default.get(url2, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9"
-      },
-      timeout: 15e3,
-      maxRedirects: 5,
-      validateStatus: (status) => status < 500
-    });
-    const $2 = load(response.data);
-    $2("[class*='CompRow'], [class*='comp-row'], [class*='SalaryRow'], table tbody tr, [class*='entry']").each((_index, element) => {
-      try {
-        const el = $2(element);
-        const companyText = el.find("[class*='company'], [class*='Company'], td:nth-child(1) a, [data-test='company']").first().text().trim() || company || null;
-        const levelText = el.find("[class*='level'], [class*='Level'], td:nth-child(2), [data-test='level']").first().text().trim() || null;
-        const locationText = el.find("[class*='location'], [class*='Location'], td:nth-child(3), [data-test='location']").first().text().trim() || location || null;
-        const totalText = el.find("[class*='total'], [class*='Total'], td:nth-child(4), [data-test='total-comp']").first().text().trim();
-        const baseText = el.find("[class*='base'], [class*='Base'], td:nth-child(5), [data-test='base']").first().text().trim();
-        const stockText = el.find("[class*='stock'], [class*='Stock'], [class*='equity'], td:nth-child(6), [data-test='stock']").first().text().trim();
-        const bonusText = el.find("[class*='bonus'], [class*='Bonus'], td:nth-child(7), [data-test='bonus']").first().text().trim();
-        const total_comp = parseDollarAmount(totalText);
-        const base = parseDollarAmount(baseText);
-        const equity = parseDollarAmount(stockText);
-        const bonus = parseDollarAmount(bonusText);
-        if (total_comp || base || companyText) {
-          salaries.push({
-            role,
-            company: companyText,
-            location: locationText,
-            base,
-            equity,
-            bonus,
-            total_comp: total_comp || (base && equity && bonus ? base + equity + bonus : base),
-            level: levelText,
-            source: "levelsfyi"
-          });
-        }
-      } catch (innerErr) {
-        console.error("Error parsing individual Levels.fyi salary entry:", innerErr);
+  let searchPath = "/t";
+  const roleLower = role.toLowerCase();
+  if (roleLower.includes("software engineer")) {
+    searchPath = "/t/software-engineer";
+  } else if (roleLower.includes("product manager")) {
+    searchPath = "/t/product-manager";
+  } else if (roleLower.includes("data scientist")) {
+    searchPath = "/t/data-scientist";
+  } else if (roleLower.includes("designer") || roleLower.includes("ux")) {
+    searchPath = "/t/product-designer";
+  } else if (roleLower.includes("devops") || roleLower.includes("sre")) {
+    searchPath = "/t/devops";
+  } else if (roleLower.includes("data engineer")) {
+    searchPath = "/t/data-engineer";
+  } else if (roleLower.includes("machine learning") || roleLower.includes("ml")) {
+    searchPath = "/t/machine-learning-engineer";
+  } else if (roleLower.includes("frontend") || roleLower.includes("front-end")) {
+    searchPath = "/t/front-end-engineer";
+  } else if (roleLower.includes("backend") || roleLower.includes("back-end")) {
+    searchPath = "/t/back-end-engineer";
+  } else if (roleLower.includes("mobile") || roleLower.includes("ios") || roleLower.includes("android")) {
+    searchPath = "/t/mobile-developer";
+  } else if (roleLower.includes("security")) {
+    searchPath = "/t/security-engineer";
+  } else if (roleLower.includes("engineering manager")) {
+    searchPath = "/t/engineering-manager";
+  } else {
+    const slug = role.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+    searchPath = `/t/${slug}`;
+  }
+  if (company) {
+    const companySlug = company.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+    searchPath += `/c/${companySlug}`;
+  }
+  if (location) {
+    const locationSlug = location.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+    searchPath += `/l/${locationSlug}`;
+  }
+  const url2 = `${LEVELS_BASE_URL}${searchPath}`;
+  await limiter11.acquire();
+  const response = await axios_default.get(url2, {
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9"
+    },
+    timeout: 15e3,
+    maxRedirects: 5,
+    validateStatus: (status) => status < 500
+  });
+  const $2 = load(response.data);
+  $2("[class*='CompRow'], [class*='comp-row'], [class*='SalaryRow'], table tbody tr, [class*='entry']").each((_index, element) => {
+    try {
+      const el = $2(element);
+      const companyText = el.find("[class*='company'], [class*='Company'], td:nth-child(1) a, [data-test='company']").first().text().trim() || company || null;
+      const levelText = el.find("[class*='level'], [class*='Level'], td:nth-child(2), [data-test='level']").first().text().trim() || null;
+      const locationText = el.find("[class*='location'], [class*='Location'], td:nth-child(3), [data-test='location']").first().text().trim() || location || null;
+      const totalText = el.find("[class*='total'], [class*='Total'], td:nth-child(4), [data-test='total-comp']").first().text().trim();
+      const baseText = el.find("[class*='base'], [class*='Base'], td:nth-child(5), [data-test='base']").first().text().trim();
+      const stockText = el.find("[class*='stock'], [class*='Stock'], [class*='equity'], td:nth-child(6), [data-test='stock']").first().text().trim();
+      const bonusText = el.find("[class*='bonus'], [class*='Bonus'], td:nth-child(7), [data-test='bonus']").first().text().trim();
+      const total_comp = parseDollarAmount(totalText);
+      const base = parseDollarAmount(baseText);
+      const equity = parseDollarAmount(stockText);
+      const bonus = parseDollarAmount(bonusText);
+      if (total_comp || base) {
+        salaries.push({
+          role,
+          company: companyText,
+          location: locationText,
+          base,
+          equity,
+          bonus,
+          total_comp: total_comp || (base && equity && bonus ? base + equity + bonus : base),
+          level: levelText,
+          source: "levelsfyi"
+        });
       }
-    });
-    if (salaries.length === 0) {
-      try {
-        const summaryTotal = $2("[class*='median'], [class*='Median'], [class*='avg'], [class*='average']").first().text().trim();
-        const summaryBase = $2("[class*='baseMedian'], [class*='basePay']").first().text().trim();
-        const summaryStock = $2("[class*='stockMedian'], [class*='stockPay']").first().text().trim();
-        const summaryBonus = $2("[class*='bonusMedian'], [class*='bonusPay']").first().text().trim();
-        if (summaryTotal || summaryBase) {
-          salaries.push({
-            role,
-            company: company || "Aggregate",
-            location: location || null,
-            base: parseDollarAmount(summaryBase),
-            equity: parseDollarAmount(summaryStock),
-            bonus: parseDollarAmount(summaryBonus),
-            total_comp: parseDollarAmount(summaryTotal),
-            level: "Median",
-            source: "levelsfyi"
-          });
-        }
-      } catch {
-      }
+    } catch (innerErr) {
+      console.error("Error parsing individual Levels.fyi salary entry:", innerErr);
     }
-  } catch (err) {
-    console.error("Levels.fyi salary error:", err instanceof Error ? err.message : String(err));
-    if (salaries.length === 0) {
-      return [{
-        role,
-        company: company || null,
-        location: location || null,
-        base: null,
-        equity: null,
-        bonus: null,
-        total_comp: null,
-        level: null,
-        source: "levelsfyi"
-      }];
+  });
+  if (salaries.length === 0) {
+    try {
+      const summaryTotal = $2("[class*='median'], [class*='Median'], [class*='avg'], [class*='average']").first().text().trim();
+      const summaryBase = $2("[class*='baseMedian'], [class*='basePay']").first().text().trim();
+      const summaryStock = $2("[class*='stockMedian'], [class*='stockPay']").first().text().trim();
+      const summaryBonus = $2("[class*='bonusMedian'], [class*='bonusPay']").first().text().trim();
+      if (summaryTotal || summaryBase) {
+        salaries.push({
+          role,
+          company: company || "Aggregate",
+          location: location || null,
+          base: parseDollarAmount(summaryBase),
+          equity: parseDollarAmount(summaryStock),
+          bonus: parseDollarAmount(summaryBonus),
+          total_comp: parseDollarAmount(summaryTotal),
+          level: "Median",
+          source: "levelsfyi"
+        });
+      }
+    } catch {
     }
   }
+  if (salaries.length === 0) {
+    throw new Error("no compensation entries parsed \u2014 likely bot-blocked or no data for this role");
+  }
   return salaries;
+}
+async function getLevelsSalaryData(role, company, location) {
+  const res = await fetchWithCache(
+    "levelsfyi",
+    {
+      role: role.toLowerCase().trim(),
+      company: company?.toLowerCase().trim() || null,
+      location: location?.toLowerCase().trim() || null
+    },
+    LOOKUP_TTL_MS,
+    () => fetchLevelsSalaryData(role, company, location)
+  );
+  return toSourceResult("Levels.fyi", "scraper", res);
 }
 function parseDollarAmount(text3) {
   if (!text3) return null;
@@ -83844,29 +84412,12 @@ function formatDollar(amount) {
 }
 async function handleSalaryData(input) {
   const { role, company, location } = input;
-  const results = await Promise.allSettled([
+  const [glassdoor, levels] = await Promise.all([
     getGlassdoorSalaries(role, company),
     getLevelsSalaryData(role, company, location)
   ]);
-  const allSalaries = [];
-  const sourceStatus = [];
-  const sourceNames = ["Glassdoor", "Levels.fyi"];
-  for (let i = 0; i < results.length; i++) {
-    const result2 = results[i];
-    if (result2.status === "fulfilled") {
-      const data2 = result2.value;
-      const validData = data2.filter((s) => s.base !== null || s.total_comp !== null || s.equity !== null);
-      if (validData.length > 0) {
-        allSalaries.push(...validData);
-        sourceStatus.push(`${sourceNames[i]}: ${validData.length} entries`);
-      } else {
-        allSalaries.push(...data2);
-        sourceStatus.push(`${sourceNames[i]}: no data found`);
-      }
-    } else {
-      sourceStatus.push(`${sourceNames[i]}: failed (${result2.reason})`);
-    }
-  }
+  const allSalaries = [...glassdoor.items, ...levels.items];
+  const footerLines = formatSourcesFooter([glassdoor.meta, levels.meta]);
   const displaySalaries = allSalaries.slice(0, MAX_SALARY_COMPARISONS);
   const lines = [
     `## Salary Data: ${role}`,
@@ -83874,12 +84425,11 @@ async function handleSalaryData(input) {
   ];
   if (company) lines.push(`**Company:** ${company}`);
   if (location) lines.push(`**Location:** ${location}`);
-  lines.push(`**Sources:** ${sourceStatus.join(" | ")}`);
-  lines.push(`**Entries:** ${allSalaries.length} total`);
+  lines.push(`**Entries:** ${allSalaries.length} total (see Sources below)`);
   lines.push("");
-  if (displaySalaries.length === 0 || displaySalaries.every((s) => s.base === null && s.total_comp === null)) {
-    lines.push(`No salary data found for "${role}"${company ? ` at ${company}` : ""}. Try broadening your search (e.g., remove the company filter or use a more common role title).`);
-    return lines.join("\n");
+  if (displaySalaries.length === 0) {
+    lines.push(`No salary data found for "${role}"${company ? ` at ${company}` : ""}. Try broadening your search (e.g., remove the company filter or use a more common role title), or fall back to WebSearch.`);
+    return finalizeOutput(lines, footerLines);
   }
   lines.push("### Compensation Breakdown");
   lines.push("");
@@ -83918,18 +84468,16 @@ async function handleSalaryData(input) {
       lines.push("");
     }
   }
-  lines.push("*Data aggregated from Glassdoor and Levels.fyi. Compensation figures are self-reported and may not reflect current offers.*");
-  let result = lines.join("\n");
-  if (result.length > CHARACTER_LIMIT) {
-    result = result.substring(0, CHARACTER_LIMIT - 50) + "\n\n*[Output truncated due to length]*";
-  }
-  return result;
+  lines.push("*Data aggregated from Glassdoor and Levels.fyi (scraper-backed, cached up to 24h). Compensation figures are self-reported and may not reflect current offers.*");
+  return finalizeOutput(lines, footerLines);
 }
 
 // src/tools/interview-experiences.ts
 async function handleInterviewExperiences(input) {
   const { company_name, role } = input;
-  const experiences = await getGlassdoorInterviews(company_name, role);
+  const result = await getGlassdoorInterviews(company_name, role);
+  const experiences = result.items;
+  const footerLines = formatSourcesFooter([result.meta]);
   const lines = [
     `## Interview Experiences: ${company_name}`,
     ""
@@ -83938,15 +84486,14 @@ async function handleInterviewExperiences(input) {
   lines.push(`**Experiences Found:** ${experiences.length}`);
   lines.push("");
   if (experiences.length === 0) {
-    lines.push(`No interview experiences found for "${company_name}"${role ? ` (${role})` : ""}. The company may not have interview reviews on Glassdoor.`);
-    return lines.join("\n");
-  }
-  const hasRealData = experiences.some((e) => e.difficulty || e.experience || e.questions.length > 0 || e.process && !e.process.startsWith("Error"));
-  if (!hasRealData && experiences.length === 1 && experiences[0].process?.startsWith("Error")) {
-    lines.push(`Could not retrieve interview data: ${experiences[0].process}`);
-    lines.push("");
-    lines.push("Try searching on Glassdoor directly for the latest interview experiences.");
-    return lines.join("\n");
+    if (result.meta.state === "failed") {
+      lines.push(`Could not retrieve interview data from Glassdoor: ${result.meta.detail || "unknown error"}`);
+      lines.push("");
+      lines.push("Fall back to WebSearch or visit Glassdoor directly for the latest interview experiences.");
+    } else {
+      lines.push(`No interview experiences found for "${company_name}"${role ? ` (${role})` : ""}. The company may not have interview reviews on Glassdoor.`);
+    }
+    return finalizeOutput(lines, footerLines);
   }
   const difficulties = experiences.map((e) => e.difficulty).filter(Boolean);
   const sentiments = experiences.map((e) => e.experience).filter(Boolean);
@@ -83986,7 +84533,7 @@ async function handleInterviewExperiences(input) {
       lines.push(meta.join(" | "));
       lines.push("");
     }
-    if (exp.process && !exp.process.startsWith("Error")) {
+    if (exp.process) {
       lines.push("**Interview Process:**");
       lines.push(`> ${exp.process}`);
       lines.push("");
@@ -83999,18 +84546,16 @@ async function handleInterviewExperiences(input) {
       lines.push("");
     }
   }
-  lines.push("*Data source: Glassdoor. Interview experiences are self-reported and individual results may vary.*");
-  let result = lines.join("\n");
-  if (result.length > CHARACTER_LIMIT) {
-    result = result.substring(0, CHARACTER_LIMIT - 50) + "\n\n*[Output truncated due to length]*";
-  }
-  return result;
+  lines.push("*Data source: Glassdoor (scraper-backed, cached up to 24h). Interview experiences are self-reported and individual results may vary.*");
+  return finalizeOutput(lines, footerLines);
 }
 
 // src/tools/trending-roles.ts
 async function handleTrendingRoles(input) {
   const { industry } = input;
-  const roles = await getTrueUpTrendingRoles(industry);
+  const result = await getTrueUpTrendingRoles(industry);
+  const roles = result.items;
+  const footerLines = formatSourcesFooter([result.meta]);
   const lines = [
     `## Trending Roles${industry ? ` in ${industry}` : ""}`,
     ""
@@ -84020,14 +84565,14 @@ async function handleTrendingRoles(input) {
   lines.push(`**Roles Found:** ${roles.length}`);
   lines.push("");
   if (roles.length === 0) {
-    lines.push(`No trending roles found${industry ? ` for "${industry}"` : ""}. TrueUp may not have data for this industry or the site structure may have changed.`);
-    return lines.join("\n");
-  }
-  if (roles.length === 1 && roles[0].error) {
-    lines.push(`Could not retrieve trending roles data: ${roles[0].error}`);
-    lines.push("");
-    lines.push("Try visiting https://www.trueup.io/trending directly for the latest data.");
-    return lines.join("\n");
+    if (result.meta.state === "failed") {
+      lines.push(`Could not retrieve trending roles data: ${result.meta.detail || "unknown error"}`);
+      lines.push("");
+      lines.push("Try visiting https://www.trueup.io/trending directly, or fall back to WebSearch for market-trend data.");
+    } else {
+      lines.push(`No trending roles found${industry ? ` for "${industry}"` : ""}. TrueUp may not have data for this industry.`);
+    }
+    return finalizeOutput(lines, footerLines);
   }
   lines.push("| # | Role | Companies Hiring | Growth Rate | Avg Salary | Demand |");
   lines.push("|---|------|-----------------|-------------|------------|--------|");
@@ -84072,12 +84617,8 @@ async function handleTrendingRoles(input) {
     }
     lines.push("");
   }
-  lines.push("*Data source: TrueUp. Trending data reflects current market activity and may change frequently.*");
-  let result = lines.join("\n");
-  if (result.length > CHARACTER_LIMIT) {
-    result = result.substring(0, CHARACTER_LIMIT - 50) + "\n\n*[Output truncated due to length]*";
-  }
-  return result;
+  lines.push("*Data source: TrueUp (scraper-backed, cached up to 6h). Trending data reflects current market activity and may change frequently.*");
+  return finalizeOutput(lines, footerLines);
 }
 function parseSalaryEstimate(text3) {
   if (!text3) return 0;
@@ -84109,7 +84650,7 @@ var server = new McpServer({
 });
 server.tool(
   "job_search_jobs",
-  "Search for job listings across Indeed, LinkedIn, and TrueUp. Aggregates and deduplicates results from multiple sources. Scraper-backed: sites may bot-block, so results can be partial \u2014 fall back to WebSearch if sources fail.",
+  "Search job listings, API-first: Remotive and RemoteOK (keyless public APIs), Adzuna and USAJOBS (only when API keys are configured \u2014 otherwise skipped with a note), and the company's public Greenhouse/Lever board when the query names a well-known company. Indeed/LinkedIn/TrueUp scrapers run as best-effort fallback and may be bot-blocked. Results are deduplicated, cached (~6h), and every response ends with a per-source status footer (live / cached / skipped / failed). Fall back to WebSearch if all sources fail.",
   searchJobsSchema.shape,
   async (input) => {
     try {
@@ -84125,7 +84666,7 @@ server.tool(
 );
 server.tool(
   "job_get_company_info",
-  "Get company overview, ratings, culture scores, and interview process from Glassdoor (Glassdoor is the only source \u2014 no LinkedIn data). Includes industry, size, headquarters, and employee ratings. Scraper-backed: Glassdoor may bot-block, so results can be partial \u2014 fall back to WebSearch if it fails.",
+  "Get company overview, ratings, culture scores, and interview process from Glassdoor (scraper \u2014 may bot-block), plus live open roles from the company's public Greenhouse/Lever job board when one exists (API). Results are cached (~24h) and the response ends with a per-source status footer \u2014 fall back to WebSearch if sources fail.",
   companyInfoSchema.shape,
   async (input) => {
     try {
@@ -84141,7 +84682,7 @@ server.tool(
 );
 server.tool(
   "job_get_salary_data",
-  "Get salary and total compensation data from Glassdoor and Levels.fyi. Includes base pay, equity, bonus, and total comp breakdowns by level. Scraper-backed: sites may bot-block, so results can be partial \u2014 fall back to WebSearch if sources fail.",
+  "Get salary and total compensation data from Glassdoor and Levels.fyi. Includes base pay, equity, bonus, and total comp breakdowns by level. Scraper-backed: sites may bot-block, so results can be partial. Results are cached (~24h) and the response ends with a per-source status footer \u2014 fall back to WebSearch if sources fail.",
   salaryDataSchema.shape,
   async (input) => {
     try {
@@ -84157,7 +84698,7 @@ server.tool(
 );
 server.tool(
   "job_get_interview_experiences",
-  "Get interview experiences from Glassdoor including difficulty ratings, questions asked, interview process descriptions, and offer outcomes. Scraper-backed: Glassdoor may bot-block, so results can be partial \u2014 fall back to WebSearch if it fails.",
+  "Get interview experiences from Glassdoor including difficulty ratings, questions asked, interview process descriptions, and offer outcomes. Scraper-backed: Glassdoor may bot-block, so results can be partial. Results are cached (~24h) and the response ends with a per-source status footer \u2014 fall back to WebSearch if it fails.",
   interviewExperiencesSchema.shape,
   async (input) => {
     try {
@@ -84173,7 +84714,7 @@ server.tool(
 );
 server.tool(
   "job_search_trending_roles",
-  "Discover trending job roles from TrueUp with growth rates, average salaries, demand levels, and which companies are hiring. Results are global (TrueUp has no location filter). Scraper-backed: the site may bot-block, so results can be partial \u2014 fall back to WebSearch if it fails.",
+  "Discover trending job roles from TrueUp with growth rates, average salaries, demand levels, and which companies are hiring. Results are global (TrueUp has no location filter). Scraper-backed: the site may bot-block, so results can be partial. Results are cached (~6h) and the response ends with a per-source status footer \u2014 fall back to WebSearch if it fails.",
   trendingRolesSchema.shape,
   async (input) => {
     try {

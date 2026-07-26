@@ -1,0 +1,52 @@
+{
+  "_schema": {
+    "_about": "Portfolio file consumed by /portfolio, /exit-analysis, and the portfolio-reviewer agent. Copy this template to portfolio.json in your working directory and replace the example entries. All dollar amounts are numbers (no $ or commas); rates are decimals (0.065 = 6.5%); dates are YYYY-MM-DD.",
+    "as_of": "Date the figures were last updated (YYYY-MM-DD)",
+    "properties[].property": "Street address or short identifier (required)",
+    "properties[].type": "One of: SFR, multifamily, commercial, STR (optional but recommended)",
+    "properties[].acquired": "Acquisition date YYYY-MM-DD (optional; enables vintage analysis)",
+    "properties[].basis": "Tax basis: purchase price + capital improvements (required)",
+    "properties[].accumulated_depreciation": "Depreciation taken to date (optional; needed for /exit-analysis)",
+    "properties[].debt": "Current loan balance (required; 0 if free and clear)",
+    "properties[].rate": "Current loan interest rate as a decimal (required if debt > 0)",
+    "properties[].maturity": "Loan maturity date YYYY-MM-DD (required if debt > 0)",
+    "properties[].rent": "Current gross monthly rent (required)",
+    "properties[].noi": "Current annual net operating income (required)",
+    "properties[].value": "Current market value estimate (required)",
+    "properties[].value_source": "Where the value came from: appraisal | AVM | user estimate (optional)",
+    "properties[].notes": "Free text: tenant situation, planned capex, sale plans, etc. (optional)"
+  },
+  "as_of": "2026-01-01",
+  "properties": [
+    {
+      "property": "123 Example St, Austin, TX 78701",
+      "type": "SFR",
+      "acquired": "2019-06-15",
+      "basis": 310000,
+      "accumulated_depreciation": 62000,
+      "debt": 224000,
+      "rate": 0.0375,
+      "maturity": "2049-07-01",
+      "rent": 2450,
+      "noi": 17600,
+      "value": 415000,
+      "value_source": "AVM",
+      "notes": "Long-term tenant, rent ~8% under market; roof due ~2028"
+    },
+    {
+      "property": "456 Sample Ave, Nashville, TN 37206",
+      "type": "multifamily",
+      "acquired": "2022-03-01",
+      "basis": 780000,
+      "accumulated_depreciation": 84000,
+      "debt": 585000,
+      "rate": 0.0625,
+      "maturity": "2032-04-01",
+      "rent": 6400,
+      "noi": 46000,
+      "value": 865000,
+      "value_source": "user estimate",
+      "notes": "4-plex; loan balloons 2032 — refi risk to track"
+    }
+  ]
+}

@@ -159,14 +159,34 @@ print(f"Best params: {study.best_params}")
 
 ## Core Workflow
 
-1. **Define the environment** - Use Gymnasium API, validate spaces
-2. **Select algorithm** - Based on action space and requirements
-3. **Start simple** - Default hyperparameters, short training
-4. **Monitor training** - TensorBoard, check reward curves
-5. **Debug issues** - Use the debugging playbook
-6. **Tune hyperparameters** - Optuna for systematic search
-7. **Evaluate properly** - Separate eval env, multiple seeds
-8. **Deploy** - Export to ONNX/TorchScript
+1. **Define the environment** - Use Gymnasium API
+2. **Validate the environment** - Run `python scripts/validate_env.py <env>` (API compliance, spaces, determinism, NaN guards)
+3. **Select algorithm** - Based on action space and requirements
+4. **Pre-training sanity check** - Run `python scripts/pretrain_check.py <env>` (random-policy baseline, distribution stats, actionable warnings)
+5. **Start simple** - Default hyperparameters, short training
+6. **Monitor training** - TensorBoard, check reward curves
+7. **Debug issues** - Use the debugging playbook
+8. **Tune hyperparameters** - Optuna for systematic search
+9. **Evaluate properly** - Run `python scripts/eval_report.py <env> --model <model.zip>` (separate eval env, per-episode success tracking, Markdown report)
+10. **Deploy** - Export to ONNX/TorchScript
+
+## Bundled Scripts (run these instead of re-deriving snippets)
+
+The validation and evaluation patterns from the reference files are packaged as
+runnable, self-contained CLIs in `scripts/`. Run them directly rather than
+re-implementing the inline snippets:
+
+| Script | When to run | Usage |
+|--------|-------------|-------|
+| `scripts/validate_env.py` | After defining or changing an environment, before any training | `python scripts/validate_env.py CartPole-v1` or `python scripts/validate_env.py my_pkg.envs:CustomEnv` |
+| `scripts/pretrain_check.py` | After validation passes, before launching training | `python scripts/pretrain_check.py CartPole-v1 --episodes 20` |
+| `scripts/eval_report.py` | After training, to produce a Markdown evaluation report | `python scripts/eval_report.py CartPole-v1 --model ppo_cartpole.zip --algo ppo --episodes 100 --output eval_report.md` |
+
+All three accept either a registered Gymnasium id (`CartPole-v1`) or a
+`module.path:EnvClass` spec for unregistered custom environments. `validate_env.py`
+exits nonzero on any failed check, so it works as a CI gate. `eval_report.py`
+without `--model` evaluates a random policy - useful as a baseline and for
+testing the report pipeline.
 
 ## Reference Files
 

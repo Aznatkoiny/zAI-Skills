@@ -33,7 +33,10 @@ Before relying on user-supplied assumptions, pull supporting data from the `real
 - `mcp__real-estate-data__get_attom_property` / `mcp__real-estate-data__get_attom_valuation` — property details and AVM value vs. purchase price (require `ATTOM_API_KEY`, paid)
 - `mcp__real-estate-data__get_mashvisor_property` — STR/LTR income estimates and neighborhood score (requires `MASHVISOR_API_KEY`, paid)
 - `mcp__real-estate-data__get_census_demographics` — area income, rent, and vacancy context (requires `CENSUS_API_KEY` — the key is free to obtain)
-- `mcp__real-estate-data__get_redfin_market_data` — Redfin market tracker download URLs and column guide (no key needed)
+- `mcp__real-estate-data__get_redfin_market_snapshot` — parsed Redfin market snapshot (median sale price, inventory, days on market) for the property's metro (no key needed)
+- `mcp__real-estate-data__get_redfin_market_data` — Redfin market tracker download URLs and column guide for deeper/bulk analysis (no key needed)
+
+**Prefill financing assumptions**: before asking the user for an interest rate, pull the current 30-year mortgage rate via `mcp__real-estate-data__get_fred_series` with `series_id` `MORTGAGE30US` (requires `FRED_API_KEY` — free to obtain) and offer it as the default (investor loans typically price 50-100 bps above it). If the tool errors or the key is missing, ask the user for their quoted rate.
 
 **Fallback chain:** if a tool is unavailable or returns a missing-key error, fall back to WebSearch for the same data point; if that fails or the user prefers, ask the user for manual input via AskUserQuestion. Always tell the user which source each number came from.
 

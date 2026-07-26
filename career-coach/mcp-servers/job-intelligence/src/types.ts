@@ -6,9 +6,46 @@ export interface JobListing {
   url: string;
   description: string;
   posted_date: string | null;
-  source: "indeed" | "linkedin" | "trueup";
+  source:
+    | "indeed"
+    | "linkedin"
+    | "trueup"
+    | "remotive"
+    | "remoteok"
+    | "greenhouse"
+    | "lever"
+    | "adzuna"
+    | "usajobs";
   /** Set when this entry is an error placeholder rather than a real listing. */
   error?: string;
+}
+
+// ── Per-source status reporting ──
+//
+// Every data service returns its items alongside a SourceMeta so tools can
+// render an honest "Sources" footer: live / cached / skipped (no key) /
+// failed (reason). "stale-cache" means the live fetch failed and an expired
+// cache entry was served as graceful degradation.
+
+export type SourceState = "live" | "cached" | "stale-cache" | "skipped" | "failed";
+
+export interface SourceMeta {
+  /** Display name, e.g. "Remotive" or "Greenhouse board (stripe)". */
+  source: string;
+  /** APIs are primary sources; scrapers are best-effort fallback. */
+  tier: "api" | "scraper";
+  state: SourceState;
+  /** Items contributed (meaningful for live/cached/stale-cache). */
+  count?: number;
+  /** Cache entry age when state is cached/stale-cache. */
+  ageMs?: number;
+  /** Human-readable detail: skip reason or failure cause. */
+  detail?: string;
+}
+
+export interface SourceResult<T> {
+  meta: SourceMeta;
+  items: T[];
 }
 
 export interface CompanyInfo {

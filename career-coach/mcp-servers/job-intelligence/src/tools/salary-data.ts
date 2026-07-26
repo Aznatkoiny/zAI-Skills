@@ -1,9 +1,16 @@
+/**
+ * job_get_salary_data — aggregates Glassdoor and Levels.fyi (both scraper
+ * tier, cached 24h). Each source degrades independently and the response
+ * ends with an honest Sources footer.
+ */
+
 import { z } from "zod";
 import { salaryDataSchema } from "../schemas/inputs.js";
 import { getGlassdoorSalaries } from "../services/glassdoor.js";
 import { getLevelsSalaryData } from "../services/levelsfyi.js";
 import type { SalaryData } from "../types.js";
-import { CHARACTER_LIMIT, MAX_SALARY_COMPARISONS } from "../constants.js";
+import { MAX_SALARY_COMPARISONS } from "../constants.js";
+import { finalizeOutput, formatSourcesFooter } from "./sources-footer.js";
 
 type SalaryDataInput = z.infer<typeof salaryDataSchema>;
 
@@ -17,33 +24,14 @@ function formatDollar(amount: number | null): string {
 export async function handleSalaryData(input: SalaryDataInput): Promise<string> {
   const { role, company, location } = input;
 
-  // Query both sources in parallel
-  const results = await Promise.allSettled([
+  // Query both sources in parallel — services never throw; failures land in meta.
+  const [glassdoor, levels] = await Promise.all([
     getGlassdoorSalaries(role, company),
     getLevelsSalaryData(role, company, location),
   ]);
 
-  const allSalaries: SalaryData[] = [];
-  const sourceStatus: string[] = [];
-
-  const sourceNames = ["Glassdoor", "Levels.fyi"];
-  for (let i = 0; i < results.length; i++) {
-    const result = results[i];
-    if (result.status === "fulfilled") {
-      const data = result.value;
-      // Filter out error placeholder entries (those with all null compensation)
-      const validData = data.filter((s) => s.base !== null || s.total_comp !== null || s.equity !== null);
-      if (validData.length > 0) {
-        allSalaries.push(...validData);
-        sourceStatus.push(`${sourceNames[i]}: ${validData.length} entries`);
-      } else {
-        allSalaries.push(...data); // Include placeholder entries so user sees the error
-        sourceStatus.push(`${sourceNames[i]}: no data found`);
-      }
-    } else {
-      sourceStatus.push(`${sourceNames[i]}: failed (${result.reason})`);
-    }
-  }
+  const allSalaries: SalaryData[] = [...glassdoor.items, ...levels.items];
+  const footerLines = formatSourcesFooter([glassdoor.meta, levels.meta]);
 
   // Trim to max comparisons
   const displaySalaries = allSalaries.slice(0, MAX_SALARY_COMPARISONS);
@@ -56,13 +44,12 @@ export async function handleSalaryData(input: SalaryDataInput): Promise<string> 
 
   if (company) lines.push(`**Company:** ${company}`);
   if (location) lines.push(`**Location:** ${location}`);
-  lines.push(`**Sources:** ${sourceStatus.join(" | ")}`);
-  lines.push(`**Entries:** ${allSalaries.length} total`);
+  lines.push(`**Entries:** ${allSalaries.length} total (see Sources below)`);
   lines.push("");
 
-  if (displaySalaries.length === 0 || displaySalaries.every((s) => s.base === null && s.total_comp === null)) {
-    lines.push(`No salary data found for "${role}"${company ? ` at ${company}` : ""}. Try broadening your search (e.g., remove the company filter or use a more common role title).`);
-    return lines.join("\n");
+  if (displaySalaries.length === 0) {
+    lines.push(`No salary data found for "${role}"${company ? ` at ${company}` : ""}. Try broadening your search (e.g., remove the company filter or use a more common role title), or fall back to WebSearch.`);
+    return finalizeOutput(lines, footerLines);
   }
 
   // Comparison table
@@ -116,13 +103,7 @@ export async function handleSalaryData(input: SalaryDataInput): Promise<string> 
     }
   }
 
-  lines.push("*Data aggregated from Glassdoor and Levels.fyi. Compensation figures are self-reported and may not reflect current offers.*");
+  lines.push("*Data aggregated from Glassdoor and Levels.fyi (scraper-backed, cached up to 24h). Compensation figures are self-reported and may not reflect current offers.*");
 
-  // Truncate if over character limit
-  let result = lines.join("\n");
-  if (result.length > CHARACTER_LIMIT) {
-    result = result.substring(0, CHARACTER_LIMIT - 50) + "\n\n*[Output truncated due to length]*";
-  }
-
-  return result;
+  return finalizeOutput(lines, footerLines);
 }
