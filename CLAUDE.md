@@ -20,6 +20,10 @@ longer form.
 
 ## MCP servers
 
+- Declare servers in the plugin's `.mcp.json`, NEVER in an inline `mcpServers` block in
+  plugin.json. `claude plugin validate` accepts the inline form, but the harness does not
+  register it — `claude plugin details <plugin>` reported "MCP servers (0)" for
+  real-estate-investment until its server moved to `.mcp.json` (fixed in 1.3.1).
 - The Node server bundles (`dist/index.cjs` in `career-coach/mcp-servers/job-intelligence`
   and `consulting-toolkit/mcp-servers/financial-intelligence`) are COMMITTED so plugins
   work immediately after install. Any `src/` edit MUST include a rebuild (`npm run build`)

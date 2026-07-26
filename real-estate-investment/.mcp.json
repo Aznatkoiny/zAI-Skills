@@ -1,0 +1,14 @@
+{
+  "real-estate-data": {
+    "command": "bash",
+    "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-servers/real-estate-data/run.sh"],
+    "env": {
+      "MASHVISOR_API_KEY": "${MASHVISOR_API_KEY:-}",
+      "AIRDNA_API_KEY": "${AIRDNA_API_KEY:-}",
+      "ATTOM_API_KEY": "${ATTOM_API_KEY:-}",
+      "RENTCAST_API_KEY": "${RENTCAST_API_KEY:-}",
+      "CENSUS_API_KEY": "${CENSUS_API_KEY:-}",
+      "FRED_API_KEY": "${FRED_API_KEY:-}"
+    }
+  }
+}

@@ -182,6 +182,14 @@ for plugin in plugins:
     pj = plugin_json_by_name.get(plugin["name"], {})
     inline = pj.get("mcpServers")
     if isinstance(inline, dict):
+        # The harness does not register inline declarations even though
+        # `claude plugin validate` accepts them: real-estate-investment showed
+        # "MCP servers (0)" in `claude plugin details` until its server moved
+        # to .mcp.json.
+        fail(
+            f"{plugin['name']}: plugin.json declares mcpServers inline — "
+            f"move it to {rel(plugin['dir'] / '.mcp.json')} or the harness will not register it"
+        )
         servers.update(inline)
     mcp_configs[plugin["name"]] = servers
 
