@@ -74,7 +74,7 @@
     },
     {
       "name": "career-coach",
-      "description": "AI-powered career coaching with 8 commands covering the full pipeline — job search, ATS checks, mock interviews, offer comparison, follow-ups — plus an API-first job intelligence MCP server and LaTeX resume rendering.",
+      "description": "AI-powered career coaching with 8 commands covering the full pipeline \u2014 job search, ATS checks, mock interviews, offer comparison, follow-ups \u2014 plus an API-first job intelligence MCP server and LaTeX resume rendering.",
       "version": "1.3.0",
       "source": "./career-coach",
       "author": {
@@ -96,7 +96,7 @@
     {
       "name": "plugin-forge",
       "description": "Eval-first plugin builder: primitive decision records, generated eval suites with arming gates, sha256-frozen contracts, goal-loop builds in isolated worktrees, verified ships. The suite is the contract; green is the definition of done.",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "source": {
         "source": "github",
         "repo": "Aznatkoiny/plugin-forge"
