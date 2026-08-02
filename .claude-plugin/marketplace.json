@@ -1,6 +1,6 @@
 {
   "name": "zAI-Skills",
-  "description": "Development marketplace for AI-Toolkit, consulting-toolkit, real-estate-investment, and career-coach plugins",
+  "description": "Development marketplace for AI-Toolkit, consulting-toolkit, real-estate-investment, career-coach, and plugin-forge plugins",
   "owner": {
     "name": "Antony Zaki",
     "email": "zaki.antony@gmail.com",
@@ -91,6 +91,29 @@
         "latex-resume"
       ],
       "homepage": "https://github.com/Aznatkoiny/zAI-Skills",
+      "license": "MIT"
+    },
+    {
+      "name": "plugin-forge",
+      "description": "Eval-first plugin builder: primitive decision records, generated eval suites with arming gates, sha256-frozen contracts, goal-loop builds in isolated worktrees, verified ships. The suite is the contract; green is the definition of done.",
+      "version": "0.1.0",
+      "source": {
+        "source": "github",
+        "repo": "Aznatkoiny/plugin-forge"
+      },
+      "author": {
+        "name": "Antony Zaki"
+      },
+      "category": "development",
+      "keywords": [
+        "plugin-builder",
+        "evals",
+        "eval-driven-development",
+        "primitive-selection",
+        "goal-loop",
+        "claude-code"
+      ],
+      "homepage": "https://github.com/Aznatkoiny/plugin-forge",
       "license": "MIT"
     }
   ]
