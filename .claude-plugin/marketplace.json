@@ -96,7 +96,7 @@
     {
       "name": "plugin-forge",
       "description": "Eval-first plugin builder: primitive decision records, generated eval suites with arming gates, sha256-frozen contracts, goal-loop builds in isolated worktrees, verified ships. The suite is the contract; green is the definition of done.",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "source": {
         "source": "github",
         "repo": "Aznatkoiny/plugin-forge"
