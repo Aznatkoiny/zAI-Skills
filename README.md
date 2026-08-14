@@ -1,6 +1,8 @@
+
+
 # zAI-Skills
 
-A Claude Code plugin marketplace with four plugins.
+A Claude Code plugin marketplace with five plugins.
 
 ## Installation
 
