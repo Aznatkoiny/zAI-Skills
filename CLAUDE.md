@@ -50,3 +50,9 @@ longer form.
 
 Run `python3 scripts/validate_marketplace.py`. For MCP server changes, also run
 `bash scripts/smoke_servers.sh` and `bash scripts/check_bundle_freshness.sh`.
+
+<!-- ontology:map:begin -->
+## Map (generated from the work ontology — edit entities there, then `ont sync`)
+- Project `project:zai-skills` · state **dormant** · `~/Documents/projects/zAI-Skills` · git, remote `github.com/Aznatkoiny/zAI-Skills (branch master)`
+- More: `ont show project:zai-skills` · `ont impact <id>` · record facts/friction: `ont note --about project:zai-skills "..."`
+<!-- ontology:map:end -->
