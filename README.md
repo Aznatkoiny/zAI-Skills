@@ -21,6 +21,7 @@ npx skills add Aznatkoiny/zAI-Skills
 /plugin install consulting-toolkit@zAI-Skills
 /plugin install real-estate-investment@zAI-Skills
 /plugin install career-coach@zAI-Skills
+/plugin install plugin-forge@zAI-Skills
 ```
 
 Then restart Claude Code.
@@ -86,6 +87,19 @@ AI-powered career coaching and job search plugin with resume building, interview
 | **Industry Styles** | Software Engineering, AI/ML, Sales, Consulting formatting references (extensible — drop `.md` files to add more) |
 | **Templates** | 6 LaTeX resume templates (modern-professional, technical-clean, jakes-resume, deedy, altacv, awesome-cv) |
 | **Hooks** | Auto-compile LaTeX/Markdown resumes to PDF; career-profile validation with achievement quality gate |
+
+### [plugin-forge](https://github.com/Aznatkoiny/plugin-forge)
+
+Eval-first plugin builder — the eval suite is the contract; green is the definition of done. Hosted in its own repo; installed through this marketplace via a GitHub source.
+
+| Component | Details |
+|-----------|---------|
+| **Pipeline** | `/forge` state machine: interview → contract → evals → armed → building → smoke → verify → ship |
+| **Skills** | `forge` `write-contract` `build-evals` `arm-evals` `build-loop` `verify` `ship` + primitive-catalog (12 decision cards) and generation-standards knowledge decks |
+| **Agents** | spec-critic (read-only three-lens design gate), triage (agent-error / grader-error / task-ambiguity classifier) |
+| **Hooks** | Eval-freeze guards (Edit/Write + Bash) and a Stop-hook sha256 sweep — the frozen suite is un-editable during builds |
+| **Harness** | `forge-eval` / `forge-build` CLIs; stdlib-only runner vendored into generated plugins; pass^k, RED baselines, judge calibration, holdout tranches, `--max-cost-usd` |
+| **Dogfood** | Self-verifying regression suite (8/8, zero-token, CI-ready) |
 
 ---
 
