@@ -6,14 +6,22 @@ references/financial-metrics.md. Builds a year-by-year cash flow projection
 (GPR -> vacancy -> EGI -> OpEx -> NOI -> debt service -> net cash flow), models
 the exit sale, and computes IRR, equity multiple, NPV, cap rate, CoC, and DSCR.
 
-Expense handling (corrected): the Year-1 OpEx base equals Year-1 EGI times
-``opex_ratio``; from Year 2 on it escalates at ``expense_growth`` only —
-operating expenses are NOT re-derived from grown revenue.
+Conventions:
+- Expenses: the Year-1 OpEx base equals Year-1 EGI times ``opex_ratio``; from
+  Year 2 on it escalates at ``expense_growth`` only (it is not re-derived from
+  grown revenue).
+- Debt: monthly amortization, as lenders quote it. Annual debt service is 12
+  monthly payments; balances are after year x 12 payments. ltv 0 means an
+  all-cash purchase.
+- Cash invested at Year 0: down payment + closing_costs + upfront_capex (both
+  optional, default 0). Closing costs typically run 2-5% of price; leaving
+  them out overstates every return.
 
-Example invocation:
-    python pro_forma.py --sample-input > inputs.json
-    python pro_forma.py --input inputs.json --table
-    python pro_forma.py --input inputs.json --output results.json
+Example invocation (the plugin's MCP venv has numpy and numpy-financial):
+    PY=${CLAUDE_PLUGIN_ROOT}/mcp-servers/real-estate-data/.venv/bin/python
+    $PY pro_forma.py --sample-input > inputs.json
+    $PY pro_forma.py --input inputs.json --table
+    $PY pro_forma.py --input inputs.json --output results.json
 
 Requirements: numpy, numpy-financial
 """
@@ -32,6 +40,8 @@ SAMPLE_INPUT = {
         "other_income_pct": 0.03,
         "vacancy_rate": 0.05,
         "opex_ratio": 0.40,
+        "closing_costs": 100000,
+        "upfront_capex": 0,
     },
     "loan": {
         "ltv": 0.75,
@@ -56,7 +66,8 @@ class RealEstateProForma:
     ----------
     property_params : dict
         purchase_price, other_income_pct, vacancy_rate, opex_ratio, and either
-        (units and annual_rent_per_unit) or annual_gross_rent.
+        (units and annual_rent_per_unit) or annual_gross_rent. Optional:
+        closing_costs and upfront_capex (dollars paid at acquisition).
     loan_params : dict
         ltv, interest_rate (annual), amortization_years.
     assumptions : dict
@@ -70,7 +81,11 @@ class RealEstateProForma:
         self.assumptions = assumptions
 
         self.loan_amount = property_params["purchase_price"] * loan_params["ltv"]
-        self.equity_investment = property_params["purchase_price"] - self.loan_amount
+        self.down_payment = property_params["purchase_price"] - self.loan_amount
+        self.closing_costs = property_params.get("closing_costs", 0) or 0
+        self.upfront_capex = property_params.get("upfront_capex", 0) or 0
+        # Total cash in at Year 0, the base for CoC, IRR and equity multiple.
+        self.equity_investment = self.down_payment + self.closing_costs + self.upfront_capex
 
         if "annual_gross_rent" in property_params:
             self.base_rent = property_params["annual_gross_rent"]
@@ -84,28 +99,28 @@ class RealEstateProForma:
 
     # ------------------------------------------------------------------ core
 
-    def annual_debt_service(self):
-        """Annual P&I payment (positive number)."""
-        return -npf.pmt(
-            self.loan_params["interest_rate"],
-            self.loan_params["amortization_years"],
+    def _monthly_payment(self):
+        """Monthly P&I as npf returns it (a negative outflow)."""
+        if self.loan_amount <= 0:
+            return 0.0
+        return npf.pmt(
+            self.loan_params["interest_rate"] / 12,
+            self.loan_params["amortization_years"] * 12,
             self.loan_amount,
         )
+
+    def annual_debt_service(self):
+        """Annual P&I: 12 monthly payments (positive number)."""
+        return -12 * self._monthly_payment()
 
     def calculate_loan_balance(self, year):
-        """Remaining loan balance after `year` annual payments.
-
-        npf.pmt returns a negative outflow — pass it to npf.fv as-is.
-        """
-        annual_payment = npf.pmt(
-            self.loan_params["interest_rate"],
-            self.loan_params["amortization_years"],
-            self.loan_amount,
-        )
+        """Remaining loan balance after `year` x 12 monthly payments."""
+        if self.loan_amount <= 0:
+            return 0.0
         return -npf.fv(
-            self.loan_params["interest_rate"],
-            year,
-            annual_payment,
+            self.loan_params["interest_rate"] / 12,
+            year * 12,
+            self._monthly_payment(),
             self.loan_amount,
         )
 
@@ -189,6 +204,9 @@ class RealEstateProForma:
         return {
             "purchase_price": self.property_params["purchase_price"],
             "equity_investment": self.equity_investment,
+            "down_payment": self.down_payment,
+            "closing_costs": self.closing_costs,
+            "upfront_capex": self.upfront_capex,
             "loan_amount": self.loan_amount,
             "ltv": self.loan_params["ltv"],
             "purchase_cap_rate": year1["net_operating_income"]
@@ -196,7 +214,8 @@ class RealEstateProForma:
             "year_1_noi": year1["net_operating_income"],
             "year_1_cash_flow": year1["net_cash_flow"],
             "year_1_cash_on_cash": year1["net_cash_flow"] / self.equity_investment,
-            "year_1_dscr": year1["net_operating_income"] / year1["debt_service"],
+            "year_1_dscr": (year1["net_operating_income"] / year1["debt_service"]
+                            if year1["debt_service"] else None),
             "irr": float(irr),
             "equity_multiple": equity_multiple,
             "npv_8": float(npf.npv(0.08, cash_flows)),
@@ -224,10 +243,15 @@ class RealEstateProForma:
         w("=" * 78 + "\n\n")
         w(f"Purchase Price:           ${m['purchase_price']:>15,.0f}\n")
         w(f"Loan Amount (LTV {m['ltv']:.1%}):  ${m['loan_amount']:>15,.0f}\n")
-        w(f"Equity Investment:        ${m['equity_investment']:>15,.0f}\n\n")
+        w(f"Cash Invested:            ${m['equity_investment']:>15,.0f}\n")
+        w(f"  down payment {m['down_payment']:,.0f} + closing {m['closing_costs']:,.0f}"
+          f" + upfront capex {m['upfront_capex']:,.0f}\n\n")
         w(f"Purchase Cap Rate:        {m['purchase_cap_rate']:>15.2%}\n")
         w(f"Year 1 Cash-on-Cash:      {m['year_1_cash_on_cash']:>15.2%}\n")
-        w(f"Year 1 DSCR:              {m['year_1_dscr']:>15.2f}x\n\n")
+        if m["year_1_dscr"] is None:
+            w(f"Year 1 DSCR:              {'n/a (no loan)':>15}\n\n")
+        else:
+            w(f"Year 1 DSCR:              {m['year_1_dscr']:>15.2f}x\n\n")
         w(f"Levered IRR:              {m['irr']:>15.2%}\n")
         w(f"Equity Multiple:          {m['equity_multiple']:>15.2f}x\n\n")
         w(f"NPV @ 8%:                 ${m['npv_8']:>15,.0f}\n")

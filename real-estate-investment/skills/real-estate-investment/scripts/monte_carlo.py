@@ -8,10 +8,11 @@ projection with a terminal sale, then reports the IRR/NPV distribution:
 mean, median, standard deviation, 5th/95th percentiles, value-at-risk,
 probability of loss, and probability of clearing target IRRs.
 
-Example invocation:
-    python monte_carlo.py --sample-input > mc_inputs.json
-    python monte_carlo.py --input mc_inputs.json --table
-    python monte_carlo.py --input mc_inputs.json --simulations 20000 --seed 42
+Example invocation (the plugin's MCP venv has numpy and numpy-financial):
+    PY=${CLAUDE_PLUGIN_ROOT}/mcp-servers/real-estate-data/.venv/bin/python
+    $PY monte_carlo.py --sample-input > mc_inputs.json
+    $PY monte_carlo.py --input mc_inputs.json --table
+    $PY monte_carlo.py --input mc_inputs.json --simulations 20000 --seed 42
 
 Requirements: numpy, numpy-financial
 """

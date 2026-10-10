@@ -27,13 +27,19 @@ venv_python() {
     fi
 }
 
-# --- Find a Python interpreter --------------------------------------------
-if command -v python3 >/dev/null 2>&1; then
-    PYTHON="python3"
-elif command -v python >/dev/null 2>&1; then
-    PYTHON="python"
-else
-    log "ERROR: neither 'python3' nor 'python' was found on PATH."
+# --- Find a Python 3.10+ interpreter ----------------------------------------
+# The mcp package needs Python 3.10 or newer, and some systems' default
+# python3 is older, so try versioned names first.
+PYTHON=""
+for candidate in python3.13 python3.12 python3.11 python3.10 python3 python; do
+    if command -v "$candidate" >/dev/null 2>&1 \
+        && "$candidate" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; then
+        PYTHON="$candidate"
+        break
+    fi
+done
+if [ -z "$PYTHON" ]; then
+    log "ERROR: no Python 3.10 or newer was found on PATH."
     log "Install Python 3.10+ (https://www.python.org/downloads/), make sure it is on PATH, then restart Claude Code."
     exit 1
 fi

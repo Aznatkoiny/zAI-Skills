@@ -179,7 +179,7 @@ def calculate_irr(cash_flows):
 # Example: 5-year hold
 cash_flows = [-1000000, 120000, 120000, 120000, 120000, 1320000]
 irr = calculate_irr(cash_flows)
-print(f"IRR: {irr:.2%}")  # 15.24%
+print(f"IRR: {irr:.2%}")  # 14.97%
 
 # XIRR for irregular dates
 from scipy.optimize import newton
@@ -577,25 +577,28 @@ exit sale, and reports IRR, equity multiple, NPV @ 8/10/12%, purchase cap
 rate, year-1 cash-on-cash, and year-1 DSCR.
 
 ```bash
-pip install numpy numpy-financial   # one-time
-
-python scripts/pro_forma.py --sample-input > inputs.json    # JSON input template
-python scripts/pro_forma.py --input inputs.json --table     # human-readable summary
-python scripts/pro_forma.py --input inputs.json --output results.json   # full JSON
+# Run with the plugin's MCP venv, which has numpy and numpy-financial
+# (see SKILL.md "Running the scripts" for fallbacks):
+PY="${CLAUDE_PLUGIN_ROOT}/mcp-servers/real-estate-data/.venv/bin/python"
+S="${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts"
+"$PY" "$S/pro_forma.py" --sample-input > inputs.json    # JSON input template
+"$PY" "$S/pro_forma.py" --input inputs.json --table     # human-readable summary
+"$PY" "$S/pro_forma.py" --input inputs.json --output results.json   # full JSON
 ```
 
 Input schema (three top-level keys, see `--sample-input` for a filled example):
 
 | Key | Fields |
 |-----|--------|
-| `property` | `purchase_price`, `units` + `annual_rent_per_unit` (or `annual_gross_rent`), `other_income_pct`, `vacancy_rate`, `opex_ratio` |
-| `loan` | `ltv`, `interest_rate` (annual), `amortization_years` |
+| `property` | `purchase_price`, `units` + `annual_rent_per_unit` (or `annual_gross_rent`), `other_income_pct`, `vacancy_rate`, `opex_ratio`; optional `closing_costs`, `upfront_capex` (dollars, added to Year-0 cash invested) |
+| `loan` | `ltv` (0 for all cash), `interest_rate` (annual), `amortization_years` |
 | `assumptions` | `holding_period`, `rent_growth`, `expense_growth`, `capex_pct`, `exit_cap_rate`, `selling_costs_pct` |
 
 Model mechanics worth knowing (all implemented in the script):
 
 - **Expense handling (corrected):** the Year-1 OpEx base equals Year-1 EGI × `opex_ratio`; from Year 2 on it escalates at `expense_growth` only — OpEx is never re-derived from grown revenue, so rent growth and expense growth stay independent.
-- **Loan balance:** `npf.pmt` returns a negative outflow; it is passed to `npf.fv` as-is and the result negated: `balance = -npf.fv(rate, year, payment, loan_amount)`.
+- **Debt:** monthly amortization, as lenders quote it. Annual debt service = 12 × `npf.pmt(rate/12, years*12, loan)`; the balance after year *n* is `-npf.fv(rate/12, n*12, monthly_payment, loan)` (`npf.pmt` returns a negative outflow, passed to `npf.fv` as-is).
+- **Cash invested:** down payment + `closing_costs` + `upfront_capex`. CoC, IRR and equity multiple all use this base, so leaving closing costs out overstates every return.
 - **Exit:** sale value = final-year NOI / `exit_cap_rate`, less selling costs and the remaining loan balance; the final year's total cash flow adds net sale proceeds.
 - **Cash flow vector:** index 0 is `-equity` at acquisition, 1..N are annual equity cash flows; IRR, NPV, and equity multiple all run off this dated vector.
 

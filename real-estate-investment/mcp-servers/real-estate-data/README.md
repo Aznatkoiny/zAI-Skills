@@ -1,166 +1,119 @@
 # Real Estate Data MCP Server
 
-A Python MCP server that provides tools for accessing multiple real estate data APIs.
+A Python MCP server with 13 tools across 7 real estate data providers. The
+`real-estate-investment` plugin starts it automatically; this file is for
+anyone working on the server itself.
 
-## Features
+## Tools
 
-This server exposes 13 tools across 7 different real estate data providers:
+### Redfin Data Center (free, no key)
+- `get_redfin_market_snapshot(region_name, region_type="metro", months=24)`: market
+  time series (median sale price and its year-over-year change, price per sq ft,
+  homes sold, new listings, inventory, months of supply, median days on market,
+  sale-to-list ratio) for one or more regions, newest first. Pass several regions
+  separated by `" | "` to read the file once for all of them. `region_type` is
+  `metro`, `county`, `place` (cities), `zip`, `state`, or `national`. Metro,
+  county, state and national data are monthly; city and ZIP data are mostly
+  rolling 3-month periods, and the response's `period_type` says which.
+  The server streams Redfin's public CSV for that level row by row (metro ~46 MB,
+  county ~150 MB, place ~1.1 GB, zip ~1.3 GB), keeps only the matching rows, and
+  caches them for 24 hours. No-match errors list example region names.
+- `get_redfin_market_data(region_type="metro")`: the download URL and column guide
+  for a whole Redfin file, for analysis across many regions at once.
 
-### Census Bureau (Free - requires API key)
-- `get_census_demographics(state_fips, county_fips="", tract="", year=0)` - Population, income, rent, and housing statistics
-- `get_census_housing_stats(state_fips, county_fips="", year=0)` - Median home value and housing age distribution
+### Census Bureau ACS (free key)
+- `get_census_demographics(state_fips, county_fips="", tract="", year=0)`: population,
+  median household income, median gross rent, housing units, occupancy and tenure.
+- `get_census_housing_stats(state_fips, county_fips="", year=0)`: median home value
+  and housing units by year built. From the 2021 vintage the newest bins are
+  `2020_or_later` and `2010_to_2019`; earlier vintages use `2014_or_later` and
+  `2010_to_2013`.
 
-Both tools accept an optional `year` (ACS 5-year vintage, e.g., `2023`). When
-omitted, the server uses the latest likely vintage (current year minus 2) and
-automatically falls back one more year if that vintage is not yet published.
-The vintage actually used is returned as `acs_vintage` in the JSON result.
-Inputs are validated: `state_fips` must be 2 digits, `county_fips` 3 digits,
-`tract` 6 digits, and `tract` requires `county_fips`.
+`year` picks the ACS 5-year vintage; by default the server tries the current year
+minus 2 and falls back a year if that isn't published. The vintage used is
+returned as `acs_vintage`. Census "no estimate" codes (-666666666 and similar)
+come back as `null`.
 
-### Redfin Data Center (Free - no auth)
-- `get_redfin_market_snapshot(region_name, region_type="metro", months=24)` - Live
-  monthly market time series (median sale price, homes sold, inventory, median DOM,
-  months of supply) for one region, streamed line-by-line from Redfin's public
-  gzipped TSVs on S3 without loading the whole file. `region_type` is one of
-  `metro`, `county`, `place` (cities), or `zip`. The first uncached call streams
-  the whole file (metro ~110 MB, county ~240 MB, place ~1 GB, zip ~1.5 GB
-  compressed); the filtered slice is then cached for 24 hours, so repeat calls
-  are instant. No-match errors list valid region examples and sample region
-  names from the file. This is the plugin's zero-key live-data path.
-- `get_redfin_market_data(region_type="metro")` - Market data file URLs and usage guidance
-  (points to `get_redfin_market_snapshot` for ready-parsed data).
-  Valid `region_type` values: `national`, `metro`, `city`, `zip`, `neighborhood`.
-  Invalid values return an error listing the accepted options.
+### FRED (free key)
+- `get_fred_series(series_id, observations=24)`: recent observations, newest first.
+  Useful series: `MORTGAGE30US` (30-year mortgage rate, weekly), `DGS10` (10-year
+  Treasury, daily), `RRVRUSQ156N` (US rental vacancy rate, quarterly).
 
-### FRED (Free - requires API key)
-- `get_fred_series(series_id, observations=24)` - Recent observations for any FRED
-  series, newest first. Recommended macro series for underwriting:
-  `MORTGAGE30US` (30-year fixed mortgage rate, weekly), `DGS10` (10-year Treasury
-  yield, daily), `RRVRUSQ156N` (US rental vacancy rate, quarterly).
+### Rentcast (50 free calls a month, then billed per call)
+- `estimate_rent(address)`: long-term rent estimate with a low-high range and the
+  comparable listings used. No separate confidence score.
+- `get_rentcast_market_data(zip_code)`: sale and rental listing statistics for a ZIP
+  (averages, medians, days on market, listing counts, by property type and
+  bedrooms, with monthly history). No vacancy rate.
 
-### Rentcast (Free tier: 50/month - requires API key)
-- `estimate_rent(address)` - Rent estimates with comparable rentals
-- `get_rentcast_market_data(zip_code)` - ZIP code market statistics (ZIP must be 5 digits)
+Responses are cached for 24 hours (cache hits cost nothing) and carry a
+`rentcast_quota` note from a monthly counter. At 50 calls the server stops making
+live calls unless `RENTCAST_ALLOW_OVERAGE=1` is set, because Rentcast bills each
+extra request.
 
-Both Rentcast tools cache responses for 24 hours (cache hits cost no quota) and
-append a `rentcast_quota` note ("N/50 free-tier calls used this month") backed by
-a persistent monthly counter, with a warning once usage reaches 45.
+### Paid providers (unverified)
+These follow each provider's published docs but haven't been run against a live
+key, so their responses carry an `unverified_integration` note and pass the
+provider's JSON through unchanged.
 
-### Mashvisor (Paid - requires API key)
-- `get_mashvisor_property(address, state, city, zip_code)` - Property details with STR/LTR estimates
-- `get_mashvisor_neighborhood(city, state, zip_code="")` - Neighborhood investment analysis
+- Mashvisor (`MASHVISOR_API_KEY`):
+  - `get_mashvisor_property(address, state, city, zip_code)`: the property record
+    (rental estimates live on another Mashvisor endpoint this tool doesn't call).
+  - `get_mashvisor_neighborhood(city, state, neighborhood="", neighborhood_id="")`:
+    lists a city's neighborhoods with IDs, then fetches the overview for one.
+- AirDNA Enterprise API (`AIRDNA_API_KEY`, issued by AirDNA's sales team):
+  - `get_airdna_rentalizer(address, bedrooms, bathrooms)`: one property's STR
+    revenue estimate.
+  - `get_airdna_market_stats(city, state)`: finds the market, then fetches its
+    occupancy, ADR and average revenue.
+- ATTOM (`ATTOM_API_KEY`):
+  - `get_attom_property(address)`: property facts.
+  - `get_attom_valuation(address)`: AVM value, high-low range and confidence
+    score (`scr`); no comparable sales.
 
-### AirDNA (Paid - requires API key)
-- `get_airdna_rentalizer(address, bedrooms, bathrooms)` - Short-term rental revenue projections.
-  Sent as a POST with a JSON body to AirDNA's Rentalizer estimate endpoint;
-  `bedrooms` (int) and `bathrooms` (float, e.g., `2.5`) are required.
-- `get_airdna_market_stats(city, state)` - Market-level STR statistics
+  ATTOM wants the street and the city/state/zip separately, so pass an address
+  with a comma between them: `"123 Main St, Los Angeles, CA 90001"`.
 
-### ATTOM (Paid - requires API key)
-- `get_attom_property(address)` - Detailed property information
-- `get_attom_valuation(address)` - Automated valuation model (AVM) estimates
+## Setup
 
-ATTOM requires the street and the city/state/zip as separate `address1` /
-`address2` query parameters. The server splits the address on the first comma,
-so pass a full address like `"123 Main St, Los Angeles, CA 90001"`. Addresses
-without a comma return a clear error instead of a failed API call.
+The plugin launches the server through `run.sh`, which finds Python 3.10 or newer,
+creates a `.venv` next to `server.py` on first run, and installs
+`requirements.txt` into it (re-installing only when that file changes). Setup
+messages go to stderr because stdout carries the MCP protocol. The same venv has
+numpy and numpy-financial for the plugin's calculation scripts.
 
-## Installation
+API keys are read from the environment. Set the ones you have in your shell
+profile or under `env` in `~/.claude/settings.json`, then restart Claude Code:
 
-When installed as part of the `real-estate-investment` plugin, no manual setup
-is needed: the plugin launches the server through `run.sh`, which on first run
-creates a `.venv` next to `server.py` and installs `requirements.txt` into it
-(progress is printed to stderr). Later runs reuse the venv and re-install only
-if `requirements.txt` changes.
-
-Set up API keys as environment variables before starting Claude Code:
 ```bash
-export CENSUS_API_KEY="your_key_here"
-export FRED_API_KEY="your_key_here"
-export RENTCAST_API_KEY="your_key_here"
-export MASHVISOR_API_KEY="your_key_here"
-export AIRDNA_API_KEY="your_key_here"
-export ATTOM_API_KEY="your_key_here"
+export CENSUS_API_KEY="..."     # https://api.census.gov/data/key_signup.html
+export FRED_API_KEY="..."       # https://fred.stlouisfed.org/docs/api/api_key.html
+export RENTCAST_API_KEY="..."   # https://app.rentcast.io/app/api
+export MASHVISOR_API_KEY="..."  # https://www.mashvisor.com/data-api
+export AIRDNA_API_KEY="..."     # from AirDNA sales
+export ATTOM_API_KEY="..."      # https://api.developer.attomdata.com/
 ```
 
-No key is needed for the Redfin tools.
+Redfin needs no key.
 
-## Running the Server
+## Caching
 
-Via the launcher (recommended - creates/reuses the local venv automatically):
-```bash
-bash run.sh
-```
+Responses are cached under `~/.cache/real-estate-data/` (override with
+`REAL_ESTATE_DATA_CACHE_DIR`): Census for 7 days; Rentcast, FRED and Redfin
+region series for 24 hours. An unwritable cache directory just turns caching
+off. The Rentcast counter lives in the same directory (`rentcast-usage.json`).
 
-Or manually with your own environment:
-```bash
-pip install -r requirements.txt
-python server.py
-```
+## Development
 
-Both use the MCP stdio transport, so all diagnostics go to stderr and stdout is
-reserved for the protocol.
-
-## Caching and Quota Guarding
-
-Responses from slow or quota-limited sources are cached on disk under
-`~/.cache/real-estate-data/` (override with `REAL_ESTATE_DATA_CACHE_DIR`):
-
-- Census ACS responses: 7 days
-- Rentcast and FRED responses: 24 hours
-- Filtered Redfin market-tracker slices: 24 hours
-
-Caching is best-effort: an unwritable cache directory just disables it and
-never breaks a tool call. Rentcast free-tier usage is tracked with a
-persistent monthly counter (`rentcast-usage.json` in the cache dir); every
-Rentcast response reports usage and warns as the 50-call limit approaches.
-
-## API Key Resources
-
-- **Census Bureau**: Free API key at https://api.census.gov/data/key_signup.html
-- **FRED**: Free API key at https://fred.stlouisfed.org/docs/api/api_key.html
-- **Rentcast**: Sign up at https://app.rentcast.io/app/api
-- **Mashvisor**: Sign up at https://www.mashvisor.com/api
-- **AirDNA**: Sign up at https://www.airdna.co/vacation-rental-data
-- **ATTOM**: Sign up at https://api.developer.attomdata.com/
-
-## Implementation Notes
-
-- Uses **only Python standard library** for HTTP requests (`urllib.request`)
-- Single dependency: `mcp>=1.0.0`
-- Graceful error handling for missing API keys and network errors
-- Input validation for FIPS codes and ZIP codes with clear error messages
-- All tools return JSON-formatted strings
-- `get_redfin_market_snapshot` streams gzipped TSVs incrementally (constant memory)
-- Best-effort disk caching plus a persistent Rentcast monthly-quota counter
-- Offline unit checks in `test_server.py` (stubbed `mcp` and network):
-  `python3 -m unittest test_server`
-
-## Example Usage
+- HTTP uses only the standard library (`urllib`); the one server dependency is `mcp`.
+- Offline tests, with `mcp` and the network stubbed:
+  `.venv/bin/python -m unittest test_server` (or `bash scripts/smoke_servers.sh`
+  from the repo root).
 
 ```python
-# Get demographics for Los Angeles County, CA (latest vintage, auto-detected)
-get_census_demographics(state_fips="06", county_fips="037")
-
-# Pin a specific ACS vintage
-get_census_demographics(state_fips="06", county_fips="037", year=2022)
-
-# Live Redfin monthly market snapshot (no API key needed)
-get_redfin_market_snapshot(region_name="Boise", region_type="metro", months=12)
-get_redfin_market_snapshot(region_name="90210", region_type="zip")
-
-# Macro context from FRED (30-year mortgage rate, last 24 weekly readings)
-get_fred_series(series_id="MORTGAGE30US")
-
-# Estimate rent for a property
-estimate_rent(address="123 Main St, Los Angeles, CA 90001")
-
-# Project STR revenue for a 3 bed / 2 bath property
-get_airdna_rentalizer(address="123 Main St, Los Angeles, CA 90001", bedrooms=3, bathrooms=2)
-
-# ATTOM property detail (comma between street and city/state/zip is required)
-get_attom_property(address="123 Main St, Los Angeles, CA 90001")
-
-# Get neighborhood analysis
-get_mashvisor_neighborhood(city="Los Angeles", state="CA", zip_code="90001")
+get_redfin_market_snapshot("Austin, TX metro area | Nashville, TN metro area", "metro", 12)
+get_redfin_market_snapshot("78704", "zip")
+get_census_demographics(state_fips="48", county_fips="453")
+get_fred_series("MORTGAGE30US")
+estimate_rent("123 Main St, Austin, TX 78704")
 ```

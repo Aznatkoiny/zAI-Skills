@@ -54,8 +54,8 @@
     },
     {
       "name": "real-estate-investment",
-      "description": "End-to-end real estate investment analysis with financial modeling, 4 agents, 9 commands, MCP server (13 tools across 7 APIs incl. keyless Redfin snapshots and FRED), tested finance scripts, and tax-aware structuring for all property types.",
-      "version": "1.3.1",
+      "description": "Real estate investment analysis: deal analysis and screening, pro formas from tested scripts, BRRRR, STR, market comparison, waterfalls, portfolio and exit planning, and real estate tax strategy. 4 agents, 9 commands, and an MCP server with 13 tools across 7 data sources (Redfin needs no key; Census and FRED keys are free).",
+      "version": "1.4.0",
       "source": "./real-estate-investment",
       "author": {
         "name": "Antony Zaki"

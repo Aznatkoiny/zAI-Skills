@@ -9,7 +9,6 @@ Redfin streaming snapshot parser, and the FRED tool.
 Run with:  python3 -m unittest test_server -v
 """
 
-import gzip
 import io
 import json
 import os
@@ -142,58 +141,183 @@ class TestRentcastQuota(CacheDirTestCase):
             self.assertEqual(m.call_count, 1)
 
 
-def _gz(tsv: str) -> io.BytesIO:
-    return io.BytesIO(gzip.compress(tsv.encode()))
+class TestRentcastOverageGate(CacheDirTestCase):
+    def _fill_quota(self):
+        for _ in range(server.RENTCAST_FREE_TIER_LIMIT):
+            server._rentcast_usage(increment=True)
+
+    def test_blocks_at_limit(self):
+        self._fill_quota()
+        env = {k: v for k, v in os.environ.items() if k != "RENTCAST_ALLOW_OVERAGE"}
+        env["RENTCAST_API_KEY"] = "k"
+        with mock.patch.dict(os.environ, env, clear=True), \
+                mock.patch.object(server.urllib.request, "urlopen") as m:
+            result = json.loads(server.get_rentcast_market_data("90210"))
+            self.assertEqual(m.call_count, 0)
+        self.assertIn("free-tier limit reached", result["error"])
+
+    def test_overage_opt_in(self):
+        self._fill_quota()
+        body = json.dumps({"rent": 2450}).encode()
+        with mock.patch.dict(os.environ, {"RENTCAST_API_KEY": "k",
+                                          "RENTCAST_ALLOW_OVERAGE": "1"}), \
+                mock.patch.object(server.urllib.request, "urlopen",
+                                  return_value=io.BytesIO(body)) as m:
+            result = json.loads(server.get_rentcast_market_data("90210"))
+            self.assertEqual(m.call_count, 1)
+        self.assertEqual(result["rent"], 2450)
 
 
-_REDFIN_HEADER = ("period_begin\tperiod_end\tperiod_duration\tregion_type\t"
-                  "region\tis_seasonally_adjusted\tproperty_type\t"
-                  "median_sale_price\thomes_sold\tinventory\tmedian_dom\t"
-                  "months_of_supply\n")
+class _Resp(io.BytesIO):
+    pass
 
 
-def _redfin_row(begin, end, region, price, sold="10", inv="20", dom="30",
-                supply="2.5", ptype="All Residential", adj="f", dur="30"):
-    return (f"{begin}\t{end}\t{dur}\tzip\t{region}\t{adj}\t{ptype}\t"
-            f"{price}\t{sold}\t{inv}\t{dom}\t{supply}\n")
+def _json_resp(obj):
+    return _Resp(json.dumps(obj).encode())
+
+
+class TestPaidProviders(unittest.TestCase):
+    def test_airdna_two_step(self):
+        responses = [_json_resp({"payload": {"results": [{"id": "airdna-163", "name": "Austin"},
+                                                         {"id": "airdna-9", "name": "Austin West"}]}})]
+        responses += [_json_resp({"metric": m}) for m in server.AIRDNA_MARKET_METRICS]
+        with mock.patch.dict(os.environ, {"AIRDNA_API_KEY": "k"}), \
+                mock.patch.object(server.urllib.request, "urlopen", side_effect=responses) as m:
+            result = json.loads(server.get_airdna_market_stats("Austin", "tx"))
+        first = m.call_args_list[0].args[0]
+        self.assertTrue(first.full_url.endswith("/api/enterprise/v2/market/search"))
+        self.assertEqual(json.loads(first.data), {"search_term": "Austin, TX"})
+        self.assertIn("/market/airdna-163/metrics/occupancy", m.call_args_list[1].args[0].full_url)
+        self.assertEqual(result["market"]["id"], "airdna-163")
+        self.assertEqual(result["metrics"]["adr"], {"metric": "adr"})
+
+    def test_mashvisor_lookup_then_overview(self):
+        responses = [_json_resp({"content": {"results": [{"id": 101, "name": "Silver Lake"},
+                                                         {"id": 102, "name": "Echo Park"}]}}),
+                     _json_resp({"content": {"occupancy": 0.6}})]
+        with mock.patch.dict(os.environ, {"MASHVISOR_API_KEY": "k"}), \
+                mock.patch.object(server.urllib.request, "urlopen", side_effect=responses) as m:
+            result = json.loads(server.get_mashvisor_neighborhood("Los Angeles", "ca", "silver lake"))
+        self.assertIn("/city/neighborhoods/CA/Los%20Angeles", m.call_args_list[0].args[0].full_url)
+        self.assertIn("/neighborhood/101/bar?state=CA", m.call_args_list[1].args[0].full_url)
+        self.assertEqual(result["neighborhood_id"], "101")
+
+    def test_mashvisor_lists_when_ambiguous(self):
+        responses = [_json_resp({"content": [{"id": 1, "name": "Downtown"}, {"id": 2, "name": "Midtown"}]})]
+        with mock.patch.dict(os.environ, {"MASHVISOR_API_KEY": "k"}), \
+                mock.patch.object(server.urllib.request, "urlopen", side_effect=responses):
+            result = json.loads(server.get_mashvisor_neighborhood("Austin", "TX"))
+        self.assertEqual([h["id"] for h in result["neighborhoods"]], [1, 2])
+
+    def test_attom_avm_endpoint(self):
+        with mock.patch.dict(os.environ, {"ATTOM_API_KEY": "k"}), \
+                mock.patch.object(server.urllib.request, "urlopen",
+                                  return_value=_json_resp({"property": []})) as m:
+            server.get_attom_valuation("123 Main St, Austin, TX 78704")
+        req = m.call_args.args[0]
+        self.assertIn("/propertyapi/v1.0.0/attomavm/detail?address1=123+Main+St", req.full_url)
+        self.assertEqual(req.get_header("Apikey"), "k")
+
+    def test_missing_key_message(self):
+        env = {k: v for k, v in os.environ.items() if k != "ATTOM_API_KEY"}
+        with mock.patch.dict(os.environ, env, clear=True):
+            result = json.loads(server.get_attom_property("1 A St, B, TX 78704"))
+        self.assertIn("ATTOM_API_KEY not configured", result["error"])
+        self.assertIn("settings.json", result["info"])
+
+
+class TestCensusParsing(unittest.TestCase):
+    def test_sentinels_become_none(self):
+        self.assertIsNone(server._acs_int("-666666666"))
+        self.assertIsNone(server._acs_int("-999999999"))
+        self.assertIsNone(server._acs_int(None))
+        self.assertEqual(server._acs_int("1234"), 1234)
+        self.assertEqual(server._acs_int("-5"), -5)
+
+    def test_year_built_labels_follow_vintage(self):
+        row = ["500000"] + ["10"] * 11 + ["06"]
+        with mock.patch.dict(os.environ, {"CENSUS_API_KEY": "k"}), \
+                mock.patch.object(server, "_fetch_acs", return_value=([["h"], row], 2024)):
+            new = json.loads(server.get_census_housing_stats("06"))
+        self.assertIn("2020_or_later", new["year_built_distribution"])
+        with mock.patch.dict(os.environ, {"CENSUS_API_KEY": "k"}), \
+                mock.patch.object(server, "_fetch_acs", return_value=([["h"], row], 2019)):
+            old = json.loads(server.get_census_housing_stats("06", year=2019))
+        self.assertIn("2014_or_later", old["year_built_distribution"])
+
+
+_REDFIN_HEADER = ('"LAST UPDATED","FREQUENCY","PERIOD BEGIN","PERIOD END","REGION ID",'
+                  '"REGION TYPE","REGION NAME","HOMES SOLD","MEDIAN SALE PRICE NSA ($)",'
+                  '"MEDIAN SALE PRICE NSA YOY (%)","MEDIAN DAYS ON MARKET (DAYS)",'
+                  '"AVERAGE SALE TO LIST RATIO (%)","NEW LISTINGS","INVENTORY",'
+                  '"MEDIAN SALE PRICE PER SQ.FT. ($)","MONTHS OF SUPPLY"\n')
+
+
+def _redfin_row(begin, end, region, price, freq="Monthly", sold="10", inv="20",
+                dom="30", supply="2.5", rtype="Zip Code"):
+    return (f'"2026-08-15","{freq}","{begin}","{end}","1","{rtype}","{region}",'
+            f'{sold},{price},4.1,{dom},99.2,12,{inv},410,{supply}\n')
+
+
+def _csv(text: str) -> io.BytesIO:
+    return io.BytesIO(text.encode())
 
 
 class TestRedfinSnapshot(CacheDirTestCase):
     def _fake_file(self):
-        tsv = _REDFIN_HEADER
-        tsv += _redfin_row("2026-05-01", "2026-05-31", "Zip Code: 90210", "3500000")
-        tsv += _redfin_row("2026-06-01", "2026-06-30", "Zip Code: 90210", "3600000.0")
-        # Rows that must be filtered out:
-        tsv += _redfin_row("2026-06-01", "2026-06-30", "Zip Code: 90210", "9999999",
-                           ptype="Condo/Co-op")
-        tsv += _redfin_row("2026-06-01", "2026-06-30", "Zip Code: 90210", "8888888",
-                           adj="t")
-        tsv += _redfin_row("2026-06-01", "2026-06-30", "Zip Code: 10001", "1200000")
-        return _gz(tsv)
+        csv_text = _REDFIN_HEADER
+        csv_text += _redfin_row("2026-05-01", "2026-05-31", "90210", "3500000")
+        csv_text += _redfin_row("2026-06-01", "2026-06-30", "90210", "3600000.0")
+        # Rolling 3-month rows are ignored when monthly rows exist.
+        csv_text += _redfin_row("2026-04-01", "2026-06-30", "90210", "9999999",
+                                freq="Rolling 3 Months")
+        csv_text += _redfin_row("2026-06-01", "2026-06-30", "10001", "1200000")
+        return _csv(csv_text)
 
     def test_filters_and_orders_rows(self):
         with mock.patch.object(server.urllib.request, "urlopen",
                                return_value=self._fake_file()):
             result = json.loads(server.get_redfin_market_snapshot("90210", "zip", 24))
-        self.assertEqual(result["region"], "Zip Code: 90210")
-        self.assertEqual(result["months_returned"], 2)
+        self.assertEqual(result["region"], "90210")
+        self.assertEqual(result["period_type"], "Monthly")
+        self.assertEqual(result["periods_returned"], 2)
+        self.assertEqual(result["latest_period_end"], "2026-06-30")
         self.assertFalse(result["served_from_cache"])
-        newest = result["monthly"][0]
+        newest = result["periods"][0]
         self.assertEqual(newest["period_begin"], "2026-06-01")
         self.assertEqual(newest["median_sale_price"], 3600000)  # whole float -> int
         self.assertEqual(newest["months_of_supply"], 2.5)
-        self.assertEqual(result["monthly"][1]["median_sale_price"], 3500000)
+        self.assertEqual(newest["median_sale_price_per_sqft"], 410)
+        self.assertEqual(result["periods"][1]["median_sale_price"], 3500000)
+
+    def test_rolling_fallback_and_na(self):
+        csv_text = _REDFIN_HEADER
+        csv_text += _redfin_row("2026-04-01", "2026-06-30", "78704", "NA",
+                                freq="Rolling 3 Months")
+        with mock.patch.object(server.urllib.request, "urlopen",
+                               return_value=_csv(csv_text)):
+            result = json.loads(server.get_redfin_market_snapshot("78704", "zip"))
+        self.assertEqual(result["period_type"], "Rolling 3 Months")
+        self.assertIsNone(result["periods"][0]["median_sale_price"])
 
     def test_months_slice_and_cache_hit(self):
         with mock.patch.object(server.urllib.request, "urlopen",
                                return_value=self._fake_file()) as m:
             server.get_redfin_market_snapshot("90210", "zip", 24)
-            # Different months value must hit the cached slice, not the network.
+            # Different months value must hit the cached series, not the network.
             result = json.loads(server.get_redfin_market_snapshot("90210", "zip", 1))
             self.assertEqual(m.call_count, 1)
         self.assertTrue(result["served_from_cache"])
-        self.assertEqual(result["months_returned"], 1)
-        self.assertEqual(result["monthly"][0]["period_begin"], "2026-06-01")
+        self.assertEqual(result["periods_returned"], 1)
+        self.assertEqual(result["periods"][0]["period_begin"], "2026-06-01")
+
+    def test_multiple_regions_one_download(self):
+        with mock.patch.object(server.urllib.request, "urlopen",
+                               return_value=self._fake_file()) as m:
+            result = json.loads(server.get_redfin_market_snapshot("90210 | 10001", "zip"))
+            self.assertEqual(m.call_count, 1)
+        regions = [r["region"] for r in result["results"]]
+        self.assertEqual(regions, ["90210", "10001"])
 
     def test_no_match_lists_examples(self):
         with mock.patch.object(server.urllib.request, "urlopen",
@@ -201,14 +325,14 @@ class TestRedfinSnapshot(CacheDirTestCase):
             result = json.loads(server.get_redfin_market_snapshot("00000", "zip"))
         self.assertIn("error", result)
         self.assertIn("region_name_examples", result)
-        self.assertIn("Zip Code: 90210", result["sample_regions_in_file"])
+        self.assertIn("90210", result["sample_regions_in_file"])
 
     def test_ambiguous_match_lists_candidates(self):
-        tsv = _REDFIN_HEADER
-        tsv += _redfin_row("2026-06-01", "2026-06-30", "Springfield, IL", "200000")
-        tsv += _redfin_row("2026-06-01", "2026-06-30", "Springfield, MO", "210000")
+        csv_text = _REDFIN_HEADER
+        csv_text += _redfin_row("2026-06-01", "2026-06-30", "Springfield, IL", "200000", rtype="City")
+        csv_text += _redfin_row("2026-06-01", "2026-06-30", "Springfield, MO", "210000", rtype="City")
         with mock.patch.object(server.urllib.request, "urlopen",
-                               return_value=_gz(tsv)):
+                               return_value=_csv(csv_text)):
             result = json.loads(
                 server.get_redfin_market_snapshot("Springfield", "place"))
         self.assertIn("error", result)
@@ -216,49 +340,31 @@ class TestRedfinSnapshot(CacheDirTestCase):
                          ["Springfield, IL", "Springfield, MO"])
 
     def test_exact_match_wins_over_substring(self):
-        tsv = _REDFIN_HEADER
-        tsv += _redfin_row("2026-06-01", "2026-06-30", "Los Angeles, CA", "900000")
-        tsv += _redfin_row("2026-06-01", "2026-06-30", "East Los Angeles, CA", "600000")
+        csv_text = _REDFIN_HEADER
+        csv_text += _redfin_row("2026-06-01", "2026-06-30", "Los Angeles, CA", "900000", rtype="City")
+        csv_text += _redfin_row("2026-06-01", "2026-06-30", "East Los Angeles, CA", "600000", rtype="City")
         with mock.patch.object(server.urllib.request, "urlopen",
-                               return_value=_gz(tsv)):
+                               return_value=_csv(csv_text)):
             result = json.loads(
                 server.get_redfin_market_snapshot("Los Angeles, CA", "place"))
         self.assertEqual(result["region"], "Los Angeles, CA")
-        self.assertEqual(result["monthly"][0]["median_sale_price"], 900000)
+        self.assertEqual(result["periods"][0]["median_sale_price"], 900000)
+
+    def test_missing_column_is_reported(self):
+        with mock.patch.object(server.urllib.request, "urlopen",
+                               return_value=_csv('"REGION NAME","FREQUENCY"\n"x","Monthly"\n')):
+            result = json.loads(server.get_redfin_market_snapshot("x", "metro"))
+        self.assertIn("missing expected columns", result["error"])
 
     def test_invalid_region_type(self):
         result = json.loads(server.get_redfin_market_snapshot("90210", "galaxy"))
         self.assertIn("error", result)
         self.assertEqual(result["valid_region_types"],
-                         ["county", "metro", "place", "zip"])
+                         ["county", "metro", "national", "place", "state", "zip"])
 
     def test_invalid_zip(self):
         result = json.loads(server.get_redfin_market_snapshot("Beverly Hills", "zip"))
         self.assertIn("5-digit", result["error"])
-
-
-class TestRedfinRealFileFormat(CacheDirTestCase):
-    """The live S3 files use quoted UPPERCASE headers, quoted string values,
-    and true/false for IS_SEASONALLY_ADJUSTED."""
-
-    def test_real_style_header_and_values(self):
-        header = ('"PERIOD_BEGIN"\t"PERIOD_END"\t"PERIOD_DURATION"\t'
-                  '"REGION_TYPE"\t"IS_SEASONALLY_ADJUSTED"\t"REGION"\t'
-                  '"PROPERTY_TYPE"\t"MEDIAN_SALE_PRICE"\t"HOMES_SOLD"\t'
-                  '"INVENTORY"\t"MEDIAN_DOM"\t"MONTHS_OF_SUPPLY"\n')
-        row = ('"2026-05-01"\t"2026-05-31"\t30\t"metro"\tfalse\t'
-               '"Boise City, ID metro area"\t"All Residential"\t'
-               '512000\t900\t1800\t21\t2\n')
-        adj_row = ('"2026-05-01"\t"2026-05-31"\t30\t"metro"\ttrue\t'
-                   '"Boise City, ID metro area"\t"All Residential"\t'
-                   '999999\t900\t1800\t21\t2\n')
-        with mock.patch.object(server.urllib.request, "urlopen",
-                               return_value=_gz(header + row + adj_row)):
-            result = json.loads(
-                server.get_redfin_market_snapshot("Boise", "metro", 12))
-        self.assertEqual(result["region"], "Boise City, ID metro area")
-        self.assertEqual(result["months_returned"], 1)
-        self.assertEqual(result["monthly"][0]["median_sale_price"], 512000)
 
 
 class TestFred(CacheDirTestCase):

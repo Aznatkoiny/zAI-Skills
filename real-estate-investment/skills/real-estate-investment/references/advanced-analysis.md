@@ -34,13 +34,7 @@
 
 ### Three-Scenario Framework
 
-| Variable | Bear Case | Base Case | Bull Case |
-|----------|-----------|-----------|-----------|
-| Rent Growth | 1-2% | 3% | 4-5% |
-| Vacancy | 15-20% | 8-10% | 5% |
-| Exit Cap Rate | +50-100 bps | Market | -50 bps |
-| Interest Rate | +100 bps | Current | -50 bps |
-| OpEx Growth | 4-5% | 3% | 2% |
+The plugin's bear/base/bull definitions live in `references/benchmarks.md` (§Scenarios) so that every command and agent stresses a deal the same way. Run each scenario by editing the pro forma input file and re-running `pro_forma.py`.
 
 ### Tornado Diagram Methodology
 
@@ -86,13 +80,16 @@ interest-rate grid (the loan re-sizes with price via LTV) and prints a
 markdown table of levered IRR, year-1 cash-on-cash, or year-1 DSCR:
 
 ```bash
-pip install numpy numpy-financial   # one-time
+# Run with the plugin's MCP venv, which has numpy and numpy-financial
+# (see SKILL.md "Running the scripts" for fallbacks):
+PY="${CLAUDE_PLUGIN_ROOT}/mcp-servers/real-estate-data/.venv/bin/python"
+S="${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts"
 
-python scripts/pro_forma.py --sample-input > inputs.json
+"$PY" "$S/pro_forma.py" --sample-input > inputs.json
 # IRR grid, ±10% price x ±100 bps rate, 5x5 (defaults):
-python scripts/sensitivity.py --input inputs.json
+"$PY" "$S/sensitivity.py" --input inputs.json
 # Wider DSCR grid:
-python scripts/sensitivity.py --input inputs.json --metric dscr \
+"$PY" "$S/sensitivity.py" --input inputs.json --metric dscr \
     --price-spread 0.15 --rate-spread 0.015 --steps 7
 ```
 
@@ -113,7 +110,7 @@ def dcf_model(purchase_price, noi_year1, rent_growth, exit_cap, hold_period=5):
 
     # Project NOI
     for year in range(1, hold_period + 1):
-        noi = noi_year1 * ((1 + rent_growth) ** year)
+        noi = noi_year1 * ((1 + rent_growth) ** (year - 1))
         cash_flows.append(noi)
 
     # Add terminal value
@@ -254,11 +251,14 @@ reports mean/median/std, 5th/95th percentiles, 5% VaR, P(NPV < 0), and
 P(IRR ≥ target) for each requested target:
 
 ```bash
-pip install numpy numpy-financial   # one-time
+# Run with the plugin's MCP venv, which has numpy and numpy-financial
+# (see SKILL.md "Running the scripts" for fallbacks):
+PY="${CLAUDE_PLUGIN_ROOT}/mcp-servers/real-estate-data/.venv/bin/python"
+S="${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts"
 
-python scripts/monte_carlo.py --sample-input > mc_inputs.json
-python scripts/monte_carlo.py --input mc_inputs.json --table            # summary
-python scripts/monte_carlo.py --input mc_inputs.json \
+"$PY" "$S/monte_carlo.py" --sample-input > mc_inputs.json
+"$PY" "$S/monte_carlo.py" --input mc_inputs.json --table            # summary
+"$PY" "$S/monte_carlo.py" --input mc_inputs.json \
     --simulations 20000 --seed 42 --output mc_results.json              # full JSON
 ```
 
@@ -341,24 +341,20 @@ Waterfall distribution structures determine how profits split between GPs (spons
 - Continues until GP receives proportional share of cumulative profits
 - "Catches up" GP to agreed promote percentage
 
-**Tier 3: First Promote Split (8-12% IRR Hurdle)**
-- Example: 70% LP, 30% GP
-- Applies after 8% IRR achieved
-- Continues until next hurdle (e.g., 12% IRR)
+**Tier 3: Promote Splits Above the Pref**
+- Each IRR hurdle band gets its own LP/GP split, with the GP share rising as returns rise
+- Catch-up (Tier 2) is common in simple pref + promote deals and less common in multi-hurdle IRR waterfalls
 
-**Tier 4: Second Promote Split (12-18% IRR Hurdle)**
-- Example: 60% LP, 40% GP
-- May have additional tiers at 15%, 18%+ IRR
+**Typical IRR-hurdle structure** (the defaults in `scripts/waterfall.py`, and the one to quote as "typical"):
 
-**Common Hurdle Structures:**
-
-| IRR Range | LP Split | GP Split | Description |
+| Investor IRR | LP Split | GP Split | Description |
 |-----------|----------|----------|-------------|
-| < 8% | 100% | 0% | Return of capital + pref |
+| Up to 8% | 100% | 0% | Return of capital + 8% pref |
 | 8-12% | 80% | 20% | First promote tier |
-| 12-15% | 70% | 30% | Second promote tier |
-| 15-18% | 65% | 35% | Third promote tier |
-| 18%+ | 60% | 40% | Final promote tier |
+| 12-18% | 70% | 30% | Second promote tier |
+| Above 18% | 60% | 40% | Final split |
+
+Variations are common: prefs of 6-10%, extra hurdles (for example 15%), or a single 70/30 or 80/20 split above the pref. Label any other structure as an alternative and run it through the script with its own `hurdles` and `lp_splits`.
 
 ### American vs European Waterfalls
 
@@ -497,11 +493,14 @@ IRR hurdles measured on the investor's dated cash flows, GP co-investment
 pari passu with promote on top:
 
 ```bash
-pip install numpy numpy-financial   # one-time
+# Run with the plugin's MCP venv, which has numpy and numpy-financial
+# (see SKILL.md "Running the scripts" for fallbacks):
+PY="${CLAUDE_PLUGIN_ROOT}/mcp-servers/real-estate-data/.venv/bin/python"
+S="${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts"
 
-python scripts/waterfall.py --sample-input > waterfall_inputs.json
-python scripts/waterfall.py --input waterfall_inputs.json --table       # summary
-python scripts/waterfall.py --input waterfall_inputs.json \
+"$PY" "$S/waterfall.py" --sample-input > waterfall_inputs.json
+"$PY" "$S/waterfall.py" --input waterfall_inputs.json --table       # summary
+"$PY" "$S/waterfall.py" --input waterfall_inputs.json \
     --output waterfall_results.json                                     # full JSON
 ```
 
@@ -532,7 +531,7 @@ the pref per the Catch-Up Provision formula above, then a single promote
 tier:
 
 ```bash
-python scripts/waterfall.py --mode simple --total-proceeds 15000000 \
+"$PY" "$S/waterfall.py" --mode simple --total-proceeds 15000000 \
     --lp-capital 10000000 --pref-rate 0.08 --promote 0.20 --table
 ```
 

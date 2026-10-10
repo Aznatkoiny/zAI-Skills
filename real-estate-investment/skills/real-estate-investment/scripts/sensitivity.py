@@ -7,10 +7,11 @@ assumption constant, and prints a markdown table of the chosen metric
 (levered IRR by default; also year-1 cash-on-cash or year-1 DSCR).
 The input file uses the same JSON schema as pro_forma.py.
 
-Example invocation:
-    python pro_forma.py --sample-input > inputs.json
-    python sensitivity.py --input inputs.json
-    python sensitivity.py --input inputs.json --metric coc \
+Example invocation (the plugin's MCP venv has numpy and numpy-financial):
+    PY=${CLAUDE_PLUGIN_ROOT}/mcp-servers/real-estate-data/.venv/bin/python
+    $PY pro_forma.py --sample-input > inputs.json
+    $PY sensitivity.py --input inputs.json
+    $PY sensitivity.py --input inputs.json --metric coc \
         --price-spread 0.15 --rate-spread 0.015 --steps 7
 
 Requirements: numpy, numpy-financial

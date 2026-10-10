@@ -1,7 +1,7 @@
 {
   "name": "real-estate-investment",
-  "version": "1.3.1",
-  "description": "Comprehensive real estate investment analysis plugin with financial modeling, market data APIs, deal analysis agents, and tax-aware structuring. Covers all property types: residential, commercial, multifamily, short-term rentals, and land development.",
+  "version": "1.4.0",
+  "description": "Real estate investment analysis for rentals, multifamily, commercial and short-term rentals: deal analysis and screening, pro formas from tested scripts, BRRRR, market comparison, syndication waterfalls, portfolio and exit planning, and real estate tax strategy, with a data server for Redfin (no key), Census, FRED, Rentcast, ATTOM, Mashvisor and AirDNA.",
   "author": {
     "name": "Antony Zaki"
   },

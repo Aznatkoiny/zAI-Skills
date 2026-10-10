@@ -13,10 +13,11 @@ promote, never at the lowest tier's split.
 Also includes the simplified single-tier waterfall with GP catch-up
 (``--mode simple``) for quick pref + promote splits of a single total.
 
-Example invocation:
-    python waterfall.py --sample-input > waterfall_inputs.json
-    python waterfall.py --input waterfall_inputs.json --table
-    python waterfall.py --mode simple --total-proceeds 15000000 \
+Example invocation (the plugin's MCP venv has numpy and numpy-financial):
+    PY=${CLAUDE_PLUGIN_ROOT}/mcp-servers/real-estate-data/.venv/bin/python
+    $PY waterfall.py --sample-input > waterfall_inputs.json
+    $PY waterfall.py --input waterfall_inputs.json --table
+    $PY waterfall.py --mode simple --total-proceeds 15000000 \
         --lp-capital 10000000 --pref-rate 0.08 --promote 0.20
 
 Requirements: numpy, numpy-financial

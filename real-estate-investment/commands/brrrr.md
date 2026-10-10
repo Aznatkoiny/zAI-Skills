@@ -1,145 +1,75 @@
 ---
-description: BRRRR strategy calculator — Buy, Rehab, Rent, Refinance, Repeat analysis
-argument-hint: "[property address | quick]"
+description: BRRRR calculator (Buy, Rehab, Rent, Refinance, Repeat) — cash invested, refinance cash-out, capital recycled, post-refi cash flow and a Go / Conditional / Pass verdict
+argument-hint: "[quick] [address or deal details]"
 ---
 
 # BRRRR Strategy Calculator
 
-Property address, or "quick" for streamlined input (may be empty): $ARGUMENTS
+Request: $ARGUMENTS
 
-## Instructions
+Framework and rules of thumb: `${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/references/property-types.md` §BRRRR Method Framework. Thresholds: `${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/references/benchmarks.md` (BRRRR rows).
 
-When this command is invoked, analyze a BRRRR investment opportunity:
+## 1. Inputs
 
-### 1. Load Reference Material
+**Quick mode** (the request starts with `quick`, or the user gave only the essentials): five inputs, **purchase price, rehab cost, ARV, monthly rent, refinance LTV**. Ask for any of the five that are missing in one question, default everything else, and list the defaults.
 
-Read the property types reference for residential guidance:
-the `references/property-types.md` file from the `real-estate-investment` skill in this plugin
+**Full mode** (otherwise): use whatever the user gave and fill the gaps with these defaults, listing them:
 
-### 2. Collect BRRRR Inputs
+| Phase | Input | Default |
+|---|---|---|
+| Buy | Closing costs | 3% of price |
+| | Acquisition financing | All cash (hard-money loans: user gives down payment %, rate, points) |
+| Rehab | Timeline | 4 months |
+| | Holding costs | 0.5% of price per month for taxes, insurance and utilities, plus interest on any acquisition loan |
+| Rent | Vacancy | 6% |
+| | Operating expenses | 40% of effective rent (benchmarks.md) |
+| Refinance | LTV | 75% of ARV |
+| | Rate | Latest 30-year rate + investor spread (benchmarks.md) |
+| | Term | 30 years |
+| | Closing costs | 2.5% of the new loan |
 
-Use AskUserQuestion to gather:
+If the request is empty, ask for the five quick inputs with an example: `/brrrr quick $120k buy, $45k rehab, $230k ARV, $1,750 rent, 75% LTV`.
 
-**Purchase Phase:**
-- Purchase price
-- Purchase closing costs (default: 2-3% of price)
-- Initial loan terms (if financing): down payment %, interest rate, term
+## 2. Calculate
 
-**Rehab Phase:**
-- Estimated rehab cost (itemized or total)
-- Rehab timeline (months)
-- Holding costs during rehab: loan payments, utilities, taxes, insurance
+**Cash invested** (what the investor actually puts in):
 
-**ARV (After Repair Value):**
-- After-repair value estimate (from comps)
-- Source of ARV (appraisal, Zillow, agent CMA)
-
-**Rent Phase:**
-- Expected monthly rent after rehab
-- Vacancy rate assumption (default: 8%)
-- Operating expenses (% of gross rent or itemized)
-
-**Refinance Phase:**
-- Refinance loan-to-value (LTV) ratio (typical: 75-80% of ARV)
-- Refinance interest rate and term
-- Refinance closing costs (default: 2-3% of new loan)
-
-### 3. Calculate Total Investment
-
-Compute all-in cash investment:
 ```
-Total Investment = Purchase Price
-                   + Purchase Closing Costs
-                   + Down Payment (if financed)
-                   + Rehab Cost
-                   + Holding Costs
-                   - Initial Loan Amount (if applicable)
+Cash Invested = (Purchase Price − Acquisition Loan)   ← the down payment; the full price if cash
+              + Purchase Closing Costs
+              + Rehab Cost (unless the acquisition loan funds it)
+              + Holding Costs
 ```
 
-### 4. Validate with Rules of Thumb
+**Refinance**:
 
-Check against BRRRR rules and flag pass/fail:
-
-**70% Rule:**
-- Formula: `Purchase Price + Rehab ≤ 70% × ARV`
-- Pass/Fail indicator
-- Margin of safety
-
-**1% Rule:**
-- Formula: `Monthly Rent ≥ 1% × Total Investment`
-- Pass/Fail indicator
-- Actual percentage achieved
-
-**2% Rule (Aggressive):**
-- Formula: `Monthly Rent ≥ 2% × Purchase Price`
-- Pass/Fail indicator
-
-### 5. Analyze Cash Flow After Refinance
-
-Calculate post-refinance operating performance:
-- New loan amount: `ARV × Refinance LTV`
-- Monthly debt service on new loan
-- Monthly cash flow: `(Monthly Rent × (1 - Vacancy Rate)) - Operating Expenses - Debt Service`
-- Annual cash-on-cash return on remaining equity
-
-### 6. Calculate Refinance Outcome
-
-Determine capital recycling:
 ```
-Cash Out at Refinance = New Loan Amount
-                        - Remaining Balance on Initial Loan
-                        - Refinance Closing Costs
-
-Equity Left in Deal = ARV - New Loan Amount
-
-Capital Recycled = Cash Out at Refinance
-Remaining Investment = Total Investment - Capital Recycled
+New Loan        = ARV × Refinance LTV
+Cash Out        = New Loan − Acquisition Loan Payoff − Refinance Closing Costs
+Cash Left In    = Cash Invested − Cash Out   (zero or less = all capital recycled)
+Equity          = ARV − New Loan
 ```
 
-**Infinite Return Check:**
-- If `Capital Recycled ≥ Total Investment`, investor achieves infinite return (100% capital recovery)
+**Rent after refinance** (monthly):
 
-### 7. Present Stage-by-Stage Breakdown
+```
+Cash Flow = Rent × (1 − Vacancy) − Operating Expenses − New Loan P&I
+CoC       = Annual Cash Flow / Cash Left In   (infinite if Cash Left In ≤ 0 and cash flow is positive)
+DSCR      = Annual NOI / Annual New Loan P&I
+```
 
-Format output as clear sections:
+**Rules of thumb**: 70% rule (price + rehab ≤ 70% × ARV); 1% rule (monthly rent ≥ 1% of price + rehab).
 
-**Stage 1 - BUY:**
-- Purchase price and costs
-- All-in acquisition cost
+## 3. Present
 
-**Stage 2 - REHAB:**
-- Rehab budget and timeline
-- Holding costs during construction
-- Total investment to date
+Stage by stage, compactly:
 
-**Stage 3 - RENT:**
-- Expected rent vs 1% and 2% rules
-- Monthly cash flow before refinance
-- Rule validation (pass/fail table)
+- **Buy**: price, closing costs, cash in
+- **Rehab**: budget, timeline, holding costs, cash invested to date
+- **Rent**: rent, vacancy, expenses, rule checks (70% and 1%, pass/fail)
+- **Refinance**: new loan, cash out, cash left in, equity
+- **Repeat**: capital recycled (cash out as % of cash invested), post-refi cash flow, CoC on cash left in, DSCR
 
-**Stage 4 - REFINANCE:**
-- New loan amount and terms
-- Cash-out proceeds
-- Equity remaining in property
-- Closing costs
+Then the **verdict**: Go / Conditional / Pass against benchmarks.md's BRRRR rows, with conditions as numbers ("works if ARV appraises at $220k or more").
 
-**Stage 5 - REPEAT:**
-- Total capital recycled for next deal
-- Remaining cash invested in this property
-- Cash-on-cash return on remaining equity
-- Assessment of deal quality
-
-### 8. Provide Go/No-Go Recommendation
-
-Recommend whether to proceed based on:
-- All rules of thumb passing
-- Positive post-refinance cash flow
-- Acceptable cash-on-cash return (target: >15%)
-- Sufficient equity cushion (>20% remaining)
-
-## Notes
-
-- Flag if ARV assumption seems aggressive (verify with multiple comps)
-- Warn about refinance risk: What if property doesn't appraise at ARV?
-- Consider exit strategy if refinance doesn't work out
-- Highlight infinite return achievement if applicable
+Always show what happens if the appraisal comes in 10% below ARV (new loan, cash left in, cash flow), since a low appraisal is the most common way a BRRRR fails, and note the seasoning period many lenders require before a cash-out refinance (often 6-12 months). Flag an ARV that isn't backed by comparable sales. End with one line: educational analysis, not investment advice.

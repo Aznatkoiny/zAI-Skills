@@ -205,6 +205,82 @@ and fast-moving technical content re-checked against upstream sources.
 
 ## real-estate-investment
 
+### [1.4.0] - 2026-10-09
+
+Prompts updated for current Claude models, every entry point now gives the same numbers
+for the same deal, and the data server, scripts and tax content were brought up to date.
+
+#### Changed
+- **One calculation engine and one set of benchmarks.** `/analyze-deal`, the
+  deal-analyzer agent and the skill now run `pro_forma.py` instead of building models by
+  hand. A new `references/benchmarks.md` holds the only default assumptions, expense
+  ratios, bear/base/bull scenarios and thresholds; there is one market-scoring rubric
+  (market-analysis.md) and one typical waterfall (the script's). One recommendation
+  vocabulary everywhere: **Go / Conditional / Pass** (Quick Screen's old PASS meant the
+  opposite of Pass).
+- Commands ask only for what can't be defaulted (price, rent, financing), run with stated
+  defaults and show results first; `/brrrr quick` is defined as a 5-input path. A missing
+  FRED key falls back to a web lookup of the Freddie Mac rate instead of a question.
+- Agents use `model: inherit`, receive their MCP tools under the plugin-scoped names
+  (`mcp__plugin_real-estate-investment_real-estate-data__*`; the old bare names granted
+  nothing), state assumptions instead of asking (subagents can't), and carry the
+  standard injection caution. market-researcher and portfolio-reviewer gained the
+  Redfin snapshot and FRED tools. tax-optimizer checks current figures on the web and no
+  longer suggests S-Corps for buy-and-hold rentals.
+- Scripts run with the data server's venv (`numpy` and `numpy-financial` added to its
+  requirements) instead of a bare `python` plus `pip install`.
+- Skill description says what it's for and not for (corporate models belong to
+  consulting-frameworks); output styles apply only to delivered analyses and allow a
+  one-line assumptions and caveat line; the market-analysis API section is now a
+  provider → tool table.
+- `portfolio.json` gains optional `annual_debt_service`, `amortization_years` and
+  `cost_seg_depreciation`; portfolio-reviewer no longer promises IRR or equity multiple
+  without cash-flow history.
+
+#### Fixed
+- **Redfin**: the old market-tracker files stopped updating in June 2026; the snapshot
+  tool now reads Redfin's current housing-market CSVs, adds state and national levels,
+  takes several regions in one call (one download for a whole comparison), and labels
+  rolling 3-month periods. `get_redfin_market_data`'s column guide matches the real files.
+- **Census**: year-built bins are labeled by vintage (2020+ / 2010-2019 from 2021 on;
+  they were mislabeled 2014+ / 2010-2013), and all "no estimate" sentinel codes become
+  null.
+- **Rentcast**: live calls stop at the 50 free calls a month unless
+  `RENTCAST_ALLOW_OVERAGE=1`, since Rentcast bills each extra request; descriptions no
+  longer promise a confidence score or vacancy rate.
+- **ATTOM** valuation uses `/attomavm/detail` (the old endpoint isn't in ATTOM's docs);
+  **AirDNA** market stats use the Enterprise v2 search-then-metrics flow; **Mashvisor**
+  neighborhoods look up the ID first. These three follow the providers' docs but are
+  unverified against live keys, and say so in every response.
+- `run.sh` finds a Python 3.10+ (it used the first `python3`, which is 3.9 on some Macs);
+  missing-key errors say where to set keys.
+- `pro_forma.py`: closing costs and upfront capex are part of cash invested (returns were
+  overstated), monthly amortization, all-cash deals.
+- Math: `/brrrr` counted the down payment twice; `/str-revenue` break-even occupancy mixed
+  per-night and annual units and ignored platform fees; `/exit-analysis` now sets
+  amortization, opex ratio, exit cap and one selling-cost figure for every path; LTR
+  operating costs were 15% in one reference (now 35-45%); a DCF example grew Year-1 NOI;
+  a stated IRR was 15.24% instead of 14.97%.
+- **Tax content** (checked against IRS Notice 2026-11, Rev. Proc. 2025-32 and current
+  publications): 100% bonus depreciation is permanent for property acquired after
+  Jan 19, 2025 (not "through 2030"); recapture split into §1245 (ordinary) and
+  unrecaptured §1250 (up to 25%); 2026 §179 and §461(l) figures; old-regime opportunity
+  zone step-ups are no longer reachable and new designations start Jan 1, 2027; QPP
+  excludes lessors; QIP is straight-line and doesn't come with a purchase; corrected
+  MACRS, boot, 1031 and catch-up worked examples; QI related-party test is >10%; a dated
+  key-figures table (SALT, estate exemption, QBI, STR 7-day rule) replaces scattered
+  thresholds.
+- STR figures: 15.5% Airbnb host fee as the default; stale AirDNA statistics replaced with
+  the 2026 midyear outlook.
+- The tax hook keeps its once-per-session marker in the temp directory instead of the
+  user's project, and only asks for a reminder when the written content is tax guidance.
+
+### [1.3.1] - 2026-07-26
+
+#### Fixed
+- The MCP server moved from an inline `mcpServers` block in `plugin.json` to `.mcp.json`;
+  the inline form passed validation but registered no servers.
+
 ### [1.3.0] - 2026-07-26
 
 #### Added

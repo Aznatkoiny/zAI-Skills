@@ -1,94 +1,60 @@
 ---
-description: Syndication waterfall distribution calculator — model GP/LP profit splits across IRR hurdles
-argument-hint: "[american|european]"
+description: Syndication waterfall calculator — LP/GP distributions through IRR hurdles (or a simple pref + catch-up), run with the plugin's tested script
+argument-hint: "[american|european] [equity, hurdles, cash flows]"
 ---
 
 # Syndication Waterfall Calculator
 
-Requested waterfall type (may be empty): $ARGUMENTS
+Request: $ARGUMENTS
 
-## Instructions
+Model the waterfall by running the plugin's tested script rather than writing the tier math from prose. Mechanics, American vs. European, and the script's assumptions: `${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/references/advanced-analysis.md` §Waterfall.
 
-When this command is invoked, model a real estate syndication waterfall by **running the plugin's tested script** — do not re-write the tier math from prose:
+## 1. Inputs
 
-### 1. Load Reference Material
+Needed: **LP equity** (and any GP co-investment) and the **distributable cash flows** by year, including sale proceeds in the final year. If cash flows aren't given, derive them from a hold period, a target equity multiple and a distribution pattern ("all at exit" or "X% a year plus exit"), or reuse a pro forma's net cash flows and sale proceeds if one was just run.
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/references/advanced-analysis.md` (§3 Waterfall Distribution Modeling) for tier structures, catch-up mechanics, American vs. European differences, and the script's documented assumptions.
+Hurdles and splits default to the plugin's typical structure (the script's defaults): 100% to LPs until an 8% IRR, 80/20 to 12%, 70/30 to 18%, 60/40 above. Use the user's operating-agreement terms when they give them.
 
-### 2. Collect Syndication Structure
+If the request is empty, ask for equity and cash flows with an example: `/waterfall $10M LP, $500k GP, distributions $600k/yr for 4 years then $14M at exit`.
 
-Use AskUserQuestion to gather:
+**Type**: the script implements European (whole-fund) hurdles on dated cash flows. For American (deal-by-deal), run it once per deal with that deal's equity and cash flows and sum the GP promote.
 
-**Equity Structure:**
-- LP equity contribution (typically 90-95% of total)
-- GP equity co-investment (dollar amount or %; may be zero)
-
-**Hurdles and Splits:**
-- Preferred return rate (annual %, typical: 6-8%) — in the script this is the **first IRR hurdle** (compound, cumulative)
-- IRR hurdle schedule and LP share per tier, e.g. 100% LP to 8%, 80/20 to 12%, 70/30 to 18%, 60/40 above (the script's defaults)
-- Residual LP split above the highest hurdle
-
-**Waterfall Type (skip if provided via $ARGUMENTS):**
-- **European (whole-fund)**: hurdles measured on aggregate dated cash flows — this is what the script implements directly
-- **American (deal-by-deal)**: run the script once per deal, each with its own equity and cash flow vector, then sum GP promote across deals
-
-### 3. Collect Cash Flow Projections
-
-Ask for the annual distributable cash flows (end-of-year, Years 1-N), including exit proceeds in the final year. Alternatively, derive them from a hold period + target equity multiple + distribution pattern (e.g., "all at exit" or "X% annually plus exit"). If a pro forma was already built with `/pro-forma`, reuse its net cash flows and sale proceeds.
-
-### 4. Run the Canonical Script
-
-The tested implementation is `${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts/waterfall.py`. Write the structure into `waterfall_inputs.json` and run via Bash:
+## 2. Run
 
 ```bash
-# Schema template:
-python "${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts/waterfall.py" --sample-input
-
-# After writing waterfall_inputs.json (lp_capital, gp_capital,
-# annual_cash_flows, hurdles, lp_splits, residual_lp_split):
-python "${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts/waterfall.py" \
-    --input waterfall_inputs.json --output waterfall_results.json
-python "${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts/waterfall.py" \
-    --input waterfall_inputs.json --table
+PY="${CLAUDE_PLUGIN_ROOT}/mcp-servers/real-estate-data/.venv/bin/python"
+S="${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts"
+"$PY" "$S/waterfall.py" --sample-input            # schema
+# write waterfall_inputs.json (lp_capital, gp_capital, annual_cash_flows,
+# hurdles, lp_splits, residual_lp_split), then:
+"$PY" "$S/waterfall.py" --input waterfall_inputs.json --output waterfall_results.json
+"$PY" "$S/waterfall.py" --input waterfall_inputs.json --table
 ```
 
-If the imports fail, install the dependencies first (`pip install numpy numpy-financial`).
-
-For a quick single-distribution split with GP catch-up (no dated flows), use simple mode instead:
+For a single total split with a pref and full GP catch-up (no dated flows):
 
 ```bash
-python "${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/scripts/waterfall.py" \
-    --mode simple --total-proceeds 15000000 --lp-capital 10000000 \
-    --pref-rate 0.08 --promote 0.20 --table
+"$PY" "$S/waterfall.py" --mode simple --total-proceeds 15000000 \
+    --lp-capital 10000000 --pref-rate 0.08 --promote 0.20 --table
 ```
 
-### 5. Present the Waterfall Breakdown
+If that Python is missing, see `${CLAUDE_PLUGIN_ROOT}/skills/real-estate-investment/SKILL.md` §Running the Scripts; ask before installing anything.
 
-From `waterfall_results.json`, present:
+## 3. Present
 
-**Return Summary:**
-| Metric | LP | GP |
-|--------|----|----|
-| Equity Invested | | |
-| Cash Distributed | | |
-| Share of Distributions | | |
+| | LP | GP |
+|---|---|---|
+| Equity invested | | |
+| Cash distributed | | |
+| Share of distributions | | |
 | IRR | | |
 
-Plus project IRR, LP equity multiple, and the dated LP/GP cash flow vectors. Break GP economics into co-investment return vs. promote (the script reports GP totals; promote = GP total minus the GP's pro-rata investor share). Add management fees separately if applicable (typical: 1-2% of equity per year — not modeled by the script).
+Plus project IRR, LP equity multiple, and the LP/GP cash flows by year. Split GP economics into co-investment return and promote (promote = GP total − the GP's pro-rata investor share). Management fees (often 1-2% of equity a year) aren't in the script; add them separately if they apply.
 
-### 6. Sensitivity Scenarios
-
-Re-run the script with scaled cash flow vectors to show how the split shifts:
-- **Downside**: ~1.5x gross multiple
-- **Base**: user inputs
-- **Upside**: ~2.5x gross multiple
-
-For each scenario report LP IRR, GP promote dollars, and GP % of distributions. (Promote share rises steeply with performance — that is the point of the structure.)
+**Scenarios**: re-run with cash flows scaled to roughly a 1.5× and a 2.5× gross equity multiple next to the base case, and show LP IRR, GP promote dollars and GP share of distributions for each. The promote share rises steeply with performance, which is the point of the structure.
 
 ## Notes
 
-- Explain American vs. European clearly; the script is whole-fund — model American deals per-deal as described above
-- The script has **no GP catch-up tier** in IRR mode; catch-up exists in `--mode simple`. If the user's operating agreement has a catch-up plus IRR hurdles, say so explicitly and adjust interpretation
-- Highlight GP alignment: does the GP invest equity, or only receive promote?
-- Flag aggressive structures (GP >30% at early hurdles)
-- Note tax treatment: GP promote is typically taxed as long-term capital gains (carried interest)
+- IRR mode has no GP catch-up tier; `--mode simple` does. If the agreement has both a catch-up and IRR hurdles, say how the script's result differs.
+- Point out whether the GP has real money in the deal or only the promote, and flag structures that give the GP more than 30% at early hurdles.
+- The GP promote is carried interest: under §1061 it needs a 3-year holding period for long-term capital gain treatment, though gain from selling rental property (§1231) is generally excluded. A CPA should confirm.

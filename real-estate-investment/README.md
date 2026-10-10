@@ -1,136 +1,118 @@
-# Real Estate Investment — Claude Code Plugin
+# real-estate-investment
 
-Comprehensive real estate investment analysis plugin for Claude Code. Covers deal screening through financial modeling to investor-ready output: pro formas, IRR/NPV, BRRRR, short-term rentals, syndication waterfalls, Monte Carlo simulation, market comparison, exit planning, portfolio tracking, and tax-aware structuring. Ships a library of tested Python analysis scripts (pro forma, waterfall, Monte Carlo, sensitivity) plus a Python MCP server for live market data from Census, Redfin, FRED, Rentcast, Mashvisor, AirDNA, and ATTOM.
+For individual real estate investors and analysts: run the numbers on a rental or commercial deal, screen listings, model BRRRR and short-term rentals, compare markets, track a portfolio, plan a sale or 1031 exchange, and understand the tax side. The numbers come from tested Python scripts, and a bundled data server pulls live market data (Redfin needs no key).
 
-## Prerequisites
+## Install
 
-- **Claude Code** CLI
-- **Python 3.10+** on PATH (for the MCP server; the `mcp` package requires 3.10+)
-- **Optional:** `numpy` and `numpy-financial` for running the bundled analysis scripts (`pip install numpy numpy-financial`); `pandas` for spreadsheet-style output
-
-No manual server setup is needed: the MCP server launches through `run.sh`, which on first run creates a local virtualenv next to the server and installs its single dependency (`mcp>=1.0.0`) from `requirements.txt`. Later runs reuse the venv.
-
-## Installation
-
-```bash
-# Add the marketplace
+```
 /plugin marketplace add Aznatkoiny/zAI-Skills
-
-# Install the plugin
 /plugin install real-estate-investment@zAI-Skills
 ```
 
-Then restart Claude Code.
+Restart Claude Code after installing.
 
-## API Keys
+## Try it
 
-The MCP server reads six API keys from environment variables (configured in `plugin.json`). Every tool degrades gracefully — if its key is missing, the tool returns a JSON error with sign-up guidance instead of crashing. The two Redfin tools require no key at all.
+```
+/analyze-deal 4-plex in Columbus OH, $520k, $1,450/unit, 25% down
+```
 
-| Env Variable | Provider | Pricing | Tools that need it |
-|--------------|----------|---------|--------------------|
-| `CENSUS_API_KEY` | Census Bureau | Free ([sign up](https://api.census.gov/data/key_signup.html)) | `get_census_demographics`, `get_census_housing_stats` |
-| `FRED_API_KEY` | FRED (St. Louis Fed) | Free ([sign up](https://fred.stlouisfed.org/docs/api/api_key.html)) | `get_fred_series` |
-| `RENTCAST_API_KEY` | Rentcast | Free tier: 50 requests/month | `estimate_rent`, `get_rentcast_market_data` |
-| `MASHVISOR_API_KEY` | Mashvisor | Paid | `get_mashvisor_property`, `get_mashvisor_neighborhood` |
-| `AIRDNA_API_KEY` | AirDNA | Paid | `get_airdna_rentalizer`, `get_airdna_market_stats` |
-| `ATTOM_API_KEY` | ATTOM | Paid | `get_attom_property`, `get_attom_valuation` |
+You get a Go / Conditional / Pass verdict, the assumptions it used (so you can correct them), cap rate, cash flow, cash-on-cash, DSCR, IRR, and bear/base/bull scenarios. It asks only for what it can't default (price, rent, financing). Then:
 
-With no keys configured, you still get both Redfin market-data tools plus everything that does not touch the MCP server: all agents, commands, the skill, its reference library, and the analysis scripts.
+```
+/screen listings.csv                         # batch-screen address,price,rent rows
+/compare-markets Austin, Nashville, Raleigh  # score markets on one rubric (Redfin prices need no key)
+/brrrr quick $120k buy, $45k rehab, $230k ARV, $1,750 rent, 75% LTV
+/exit-analysis duplex worth $640k, owe $310k at 3.5%, NOI $38k, bought for $410k in 2017
+```
 
-## Quick Start
+You can also just describe a deal in chat ("is a 6.2% cap rate good for a fourplex in Columbus?").
 
-1. **Analyze a deal** — `/analyze-deal` or just describe the property: "Analyze this rental: $450k purchase, 4 units, $1,800/mo each, 25% down, 7% interest."
-2. **Compare markets** — `/compare-markets Austin, Phoenix, Nashville` scores markets on demographic, economic, and rental data.
-3. **Model a syndication** — `/waterfall` walks through GP/LP splits across IRR hurdles.
-4. **Generate a model** — `/pro-forma python` runs the bundled pro forma script with your assumptions: IRR, NPV, DSCR, and year-by-year cash flows.
-5. **Screen a list** — `/screen deals.csv` batch-checks `address,price,rent` rows against the 1% rule, 50% rule, DSCR, and cap rate.
-6. **Track your portfolio** — `/portfolio` maintains a `portfolio.json` in your project and runs the portfolio-reviewer agent against it; `/exit-analysis` compares hold vs. sale vs. 1031 vs. cash-out refi for any holding.
-7. **Pick an output style** — activate **Investor Report** for formal memos or **Quick Screen** for rapid pass/fail screening.
+## What it needs
 
-## Components
+| | |
+|---|---|
+| **Required** | **Python 3.10+** on your PATH. The first time the plugin's data server starts, it creates its own virtual environment inside the plugin and installs `mcp`, `numpy` and `numpy-financial` there (nothing goes into your system Python). The calculation scripts run with that environment. |
+| No key needed | Redfin housing-market data (prices, inventory, days on market, months of supply for national, state, metro, county, city and ZIP). The first call for a level downloads Redfin's file for it (metro ~46 MB, county ~150 MB, city or ZIP over 1 GB), so it can take a minute or more; results are cached for 24 hours. |
+| Optional: `CENSUS_API_KEY` | Free ([sign up](https://api.census.gov/data/key_signup.html)). Area rents, incomes, vacancy, home values. |
+| Optional: `FRED_API_KEY` | Free ([sign up](https://fred.stlouisfed.org/docs/api/api_key.html)). Current mortgage rates for default financing; without it, Claude looks the rate up on the web. |
+| Optional: `RENTCAST_API_KEY` | 50 free calls a month ([sign up](https://app.rentcast.io/app/api)). Rent estimates for a property. Rentcast bills calls beyond 50, so the server stops at 50 unless you set `RENTCAST_ALLOW_OVERAGE=1`. |
+| Optional, paid: `ATTOM_API_KEY`, `MASHVISOR_API_KEY`, `AIRDNA_API_KEY` | Property records and valuations (ATTOM), neighborhood data (Mashvisor), short-term rental revenue (AirDNA, issued by AirDNA's sales team). These integrations follow the providers' docs but haven't been tested with live keys. |
 
-### Agents (4)
+Set keys in your shell profile (`export CENSUS_API_KEY=...`) or under `env` in `~/.claude/settings.json`, then restart Claude Code. Without keys, commands fall back to web search for the same figures and say where each number came from.
 
-| Agent | Model | Role |
-|-------|-------|------|
-| `deal-analyzer` | sonnet | Builds full pro formas and return metrics from property details, with go/no-go recommendations |
-| `market-researcher` | sonnet | Compares and scores rental markets, trends, and submarkets |
-| `portfolio-reviewer` | opus | Aggregate multi-property portfolio analysis, risk, and optimization opportunities |
-| `tax-optimizer` | opus | Depreciation schedules, cost segregation, 1031 exchanges, entity structure selection |
+## Commands
 
-Model tiering: `deal-analyzer` and `market-researcher` run structured, formula-driven workflows and use Sonnet; `tax-optimizer` and `portfolio-reviewer` make judgment-heavy recommendations (tax strategy, disposition/refinance priorities) and use Opus. Each agent's frontmatter whitelists only the built-in and `mcp__real-estate-data__*` tools it needs.
+| Command | Does |
+|---|---|
+| `/analyze-deal <deal>` | Full analysis of one deal: pro forma, scenarios, Go / Conditional / Pass |
+| `/pro-forma <deal> [excel]` | The pro forma itself, as a table and JSON you can edit and re-run; optional Excel formulas |
+| `/screen <csv or rows>` | Batch screen: 1% rule, 50%-rule cash flow, DSCR, cap rate, a verdict per row |
+| `/brrrr [quick] <deal>` | Buy-rehab-rent-refinance: cash invested, cash out, capital recycled, post-refi cash flow, low-appraisal check |
+| `/str-revenue <property or market>` | Short-term rental revenue by month, fees and expenses, STR vs long-term rental with break-even occupancy |
+| `/compare-markets <markets>` | Scores and ranks 2-5 markets on jobs, population, rents, prices, vacancy and supply |
+| `/waterfall <structure>` | Syndication LP/GP distributions through IRR hurdles, or a simple pref + catch-up |
+| `/portfolio [add\|update\|remove\|review]` | Keeps `portfolio.json` in your project and reviews the portfolio |
+| `/exit-analysis <property>` | Hold vs taxable sale vs 1031 vs cash-out refinance, with after-tax proceeds and forward IRR |
 
-### Commands (9)
+## Agents
 
-| Command | Description |
-|---------|-------------|
-| `/analyze-deal [address]` | Interactive wizard that collects property details and produces comprehensive financial analysis |
-| `/brrrr [address\|quick]` | BRRRR strategy calculator — Buy, Rehab, Rent, Refinance, Repeat analysis |
-| `/compare-markets [markets]` | Compare and score real estate markets using demographic, economic, and rental data |
-| `/exit-analysis [property]` | Compare exit paths — hold, taxable sale, 1031 exchange, cash-out refi — with after-tax proceeds and forward IRR |
-| `/portfolio [add\|update\|remove\|review]` | Create/update `portfolio.json` in the working directory and run the portfolio-reviewer agent against it |
-| `/pro-forma [python\|excel\|both]` | Run the canonical pro forma script on a property (Excel formulas optional) |
-| `/screen [csv\|list]` | Batch quick-screen `address,price,rent` rows — 1% rule, 50% rule, DSCR, cap rate — in the Quick Screen format |
-| `/str-revenue [address\|market]` | Short-term rental revenue projection with seasonal modeling |
-| `/waterfall [american\|european]` | Syndication waterfall calculator — GP/LP profit splits across IRR hurdles |
+Claude uses these on its own when a request fits; they use whatever model your session runs.
 
-### Skill + References + Scripts
+| Agent | Does |
+|---|---|
+| `deal-analyzer` | One deal from its numbers to a verdict, using the pro forma script |
+| `market-researcher` | Researches and ranks markets with the same rubric as `/compare-markets` |
+| `portfolio-reviewer` | Portfolio-level leverage, cash flow, concentration and refinance priorities from `portfolio.json` |
+| `tax-optimizer` | Depreciation, cost segregation, 1031 and recapture, opportunity zones, entity choice; checks current tax figures on the web |
 
-The **real-estate-investment** skill routes analysis by property type and methodology, then loads the right reference:
+## Skill, references and scripts
+
+The **real-estate-investment** skill routes a question to the right method, data tool and reference:
 
 | Reference | Contents |
-|-----------|----------|
-| `financial-metrics.md` | 12 core metrics with formulas, Python functions, and Excel equivalents; pro forma construction; amortization schedules |
-| `advanced-analysis.md` | Sensitivity methodology, Monte Carlo distributions, waterfall tier mechanics, syndication LP/GP economics |
-| `property-types.md` | BRRRR, house hacking, commercial underwriting, STR revenue modeling, land development feasibility |
-| `market-analysis.md` | Market scoring with 15+ indicators, API integration patterns, comp adjustment methodology |
-| `tax-strategy.md` | Depreciation, cost segregation, 1031 exchanges, bonus depreciation (2025-2030), opportunity zones, entity comparison |
+|---|---|
+| `benchmarks.md` | The plugin's one set of default assumptions, expense ratios, scenarios and Go / Conditional / Pass thresholds |
+| `financial-metrics.md` | Metric formulas, pro forma structure, Excel equivalents |
+| `property-types.md` | BRRRR, house hacking, commercial, short-term rental, land and development |
+| `advanced-analysis.md` | Sensitivity, Monte Carlo, waterfall mechanics, LP/GP economics |
+| `market-analysis.md` | Market scoring rubric, data tools, comparables, submarkets |
+| `tax-strategy.md` | Depreciation, cost segregation, 1031, bonus depreciation, opportunity zones, entities, passive-loss rules, with a dated key-figures table |
 
-The canonical implementations live as tested, runnable modules in `skills/real-estate-investment/scripts/` (all JSON-in/JSON-out with argparse CLIs; requirements: `numpy`, `numpy-financial`):
+Scripts in `skills/real-estate-investment/scripts/` (JSON in, JSON or table out; `--sample-input` prints the schema):
 
-| Script | What it does |
-|--------|--------------|
-| `pro_forma.py` | Full `RealEstateProForma` model: year-by-year projection, exit sale, IRR / equity multiple / NPV / cap rate / CoC / DSCR |
-| `waterfall.py` | Incremental-tier, dated-cash-flow syndication waterfall with IRR hurdles (plus `--mode simple` pref + catch-up split) |
-| `monte_carlo.py` | Monte Carlo IRR/NPV distribution: normal/triangular draws, percentiles, VaR, P(IRR ≥ target) |
-| `sensitivity.py` | Purchase-price × interest-rate grid over the pro forma model, rendered as a markdown table |
+| Script | Does |
+|---|---|
+| `pro_forma.py` | Year-by-year projection with closing costs, monthly amortization and exit; IRR, equity multiple, NPV, cap rate, CoC, DSCR |
+| `sensitivity.py` | Price × interest-rate grid of IRR, CoC or DSCR |
+| `monte_carlo.py` | IRR/NPV distribution and probability of hitting a target |
+| `waterfall.py` | IRR-hurdle syndication waterfall, or `--mode simple` pref + catch-up |
 
-Each script prints its own input template via `--sample-input`; `/pro-forma` and `/waterfall` drive them automatically.
+## Output styles, hook and template
 
-### Templates
+- **Output styles**: *Investor Report* (formal memo) and *Quick Screen* (compact screening). Both apply to delivered analyses; follow-up questions get normal answers.
+- **Tax reminder hook**: when Claude writes or edits content mentioning real estate tax topics, it's reminded once per session to add a one-line "confirm with a CPA" note if the content is tax guidance. It writes nothing into your project.
+- **`templates/portfolio-template.json`**: the documented schema for the `portfolio.json` that `/portfolio` maintains.
 
-`templates/portfolio-template.json` — documented schema (see its `_schema` block) for the `portfolio.json` file that `/portfolio` maintains in your working directory and that the portfolio-reviewer agent and `/exit-analysis` read.
+## Data server (13 tools)
 
-### Output Styles (2)
+| Tool | Source | Returns |
+|---|---|---|
+| `get_redfin_market_snapshot` | Redfin | Monthly (or rolling 3-month) median sale price and YoY change, $/sq ft, homes sold, new listings, inventory, months of supply, days on market, sale-to-list, for one or several regions. No key. |
+| `get_redfin_market_data` | Redfin | Download URL and column guide for a whole Redfin file. No key. |
+| `get_census_demographics` | Census ACS | Population, income, median gross rent, housing units, vacancy, tenure |
+| `get_census_housing_stats` | Census ACS | Median home value, housing units by year built |
+| `get_fred_series` | FRED | Any FRED series (mortgage rates, Treasury yields, rental vacancy) |
+| `estimate_rent` | Rentcast | Rent estimate with a low-high range and comparable listings |
+| `get_rentcast_market_data` | Rentcast | ZIP sale and rental listing statistics |
+| `get_attom_property` | ATTOM | Property facts |
+| `get_attom_valuation` | ATTOM | AVM value, range and confidence score |
+| `get_mashvisor_property` | Mashvisor | Property record |
+| `get_mashvisor_neighborhood` | Mashvisor | City neighborhood list and a neighborhood's overview |
+| `get_airdna_rentalizer` | AirDNA | STR revenue estimate for a property |
+| `get_airdna_market_stats` | AirDNA | Market occupancy, ADR and average revenue |
 
-| Style | Format |
-|-------|--------|
-| **Investor Report** | Formal investment memorandum: executive summary, financial tables, risk assessment |
-| **Quick Screen** | Ultra-concise screening: compact metrics table, pass/fail indicators, one-line verdict |
-
-### Hook
-
-**Tax Disclaimer** — PostToolUse hook on `Write` that scans written content for tax topics (depreciation, 1031, cost segregation, opportunity zones, entity structure) and reminds that analysis is educational, recommending a CPA or tax attorney.
-
-### MCP Server — Real Estate Data (13 tools)
-
-The server is registered as `real-estate-data`, so its tools surface in Claude Code as `mcp__real-estate-data__<tool>` (e.g., `mcp__real-estate-data__estimate_rent`).
-
-| Tool | Provider | Description |
-|------|----------|-------------|
-| `get_census_demographics` | Census Bureau | Population, income, rent, and housing statistics by state/county/tract |
-| `get_census_housing_stats` | Census Bureau | Median home value and housing age distribution |
-| `get_redfin_market_snapshot` | Redfin Data Center | Parsed market snapshot for a metro/city: median sale price, inventory, days on market, months of supply (no key needed) |
-| `get_redfin_market_data` | Redfin Data Center | Market tracker file URLs, column guide, and usage guidance for bulk analysis (no key needed) |
-| `get_fred_series` | FRED (St. Louis Fed) | Economic time series — e.g., `MORTGAGE30US` current mortgage rates, unemployment, CPI (free key) |
-| `estimate_rent` | Rentcast | Rent estimate with comparable rentals and confidence score |
-| `get_rentcast_market_data` | Rentcast | ZIP-code rental market statistics |
-| `get_mashvisor_property` | Mashvisor | Property details with STR/LTR income estimates |
-| `get_mashvisor_neighborhood` | Mashvisor | Neighborhood investment analysis (score, CoC, cap rate) |
-| `get_airdna_rentalizer` | AirDNA | STR revenue projection: ADR, occupancy, RevPAR |
-| `get_airdna_market_stats` | AirDNA | Market-level STR statistics |
-| `get_attom_property` | ATTOM | Detailed property data: lot, building, year built, beds/baths |
-| `get_attom_valuation` | ATTOM | AVM estimate with confidence score and comps |
+Server details, caching and tests: [`mcp-servers/real-estate-data/README.md`](mcp-servers/real-estate-data/README.md).
 
 ## License
 

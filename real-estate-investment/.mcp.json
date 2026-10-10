@@ -8,7 +8,8 @@
       "ATTOM_API_KEY": "${ATTOM_API_KEY:-}",
       "RENTCAST_API_KEY": "${RENTCAST_API_KEY:-}",
       "CENSUS_API_KEY": "${CENSUS_API_KEY:-}",
-      "FRED_API_KEY": "${FRED_API_KEY:-}"
+      "FRED_API_KEY": "${FRED_API_KEY:-}",
+      "RENTCAST_ALLOW_OVERAGE": "${RENTCAST_ALLOW_OVERAGE:-}"
     }
   }
 }

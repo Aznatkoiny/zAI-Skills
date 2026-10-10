@@ -391,7 +391,7 @@ Where:
 - Projected Monthly Revenue = $180 × 0.70 × 30 = $3,780
 
 **Platform Fees (2026):**
-- **Airbnb Single-Fee Model** (as of Oct 2025): Hosts pay 15.5% service fee; guests see full price
+- **Airbnb Single-Fee Model** (the default; PMS-connected hosts moved Oct 27, 2025): Hosts pay 15.5% service fee (14-16% for some); guests see full price. Use 15.5% unless the user confirms they're still on split fees.
 - **Previous Split-Fee Model** (still available for some): Hosts 3% + guests 14.1-16.5%
 - **Note**: Independent hosts on native platform may access split-fee; PMS users automatically moved to 15.5%
 - **Pricing Markup to Offset 15.5% Fee**: ~18.34%
@@ -408,27 +408,16 @@ Where:
 
 **ADR (Average Daily Rate):**
 - **Definition**: Average nightly rate earned across all bookings
-- **Recent Trends**: National ADR jumped 24.88% YoY (May 2024-May 2025)
-- **Historical Context**: 30%+ annual growth from 2020-2024
+- National ADR has grown roughly with inflation since 2024; local ADR varies far more than the national figure, so pull it for the market (`get_airdna_market_stats` or a WebSearch for recent AirDNA/market reports) rather than projecting a national trend
 
 **Occupancy Rate:**
-- **National Average**: ~54.9% (significant seasonal variation)
-- **Strong Markets**: 55%+ occupancy with strong ADR growth
-- **Target Benchmark**: 60%+ for profitability
+- **National**: about 57% forecast for 2026 and 2027 [AirDNA U.S. midyear outlook, July 2026], with strong seasonal swings
+- Use the market's own figure when you can get it; without one, anchor the annual average near the national figure rather than assuming peak-season occupancy year-round
+- **Target Benchmark**: 60%+ for comfortable profitability in most markets
 
-**Revenue Potential:**
-- STRs can generate 30% more annually than LTRs
-- Average monthly STR earnings: ~$4,300
-- **Comparison**: Property renting for $2,000/month as LTR might generate $4,500/month at 80% STR occupancy ($150/night × 80% × 30 days)
+**2026 National Outlook** [AirDNA midyear update, July 2026]: RevPAR about +2.9% for 2026, driven mostly by rate; listing supply growing about 2.7%.
 
-**2026 Profitability Targets:**
-- RevPAR: $11,990 annually
-- Occupancy: 60%
-- Gross Margin: 85%
-
-**2026 National Forecast:**
-- Occupancy expected to ease by 1%
-- ADR forecast to strengthen by 1.5%, with further acceleration in 2027
+**Revenue comparison**: a property renting for $2,000/month as an LTR grosses $2,280/month as an STR at $150/night and 50% occupancy (before the 15.5% platform fee and much higher operating costs), or $3,600/month at 80%. Occupancy assumptions drive the whole STR case, so show the break-even occupancy alongside any projection.
 
 ---
 
@@ -468,9 +457,9 @@ Where:
 - Immediate response required (can't wait for lease end)
 - HVAC, plumbing, appliance repairs more frequent
 
-**Operating Expense Summary:**
-- **LTR Operating Costs**: ~15% of revenue
-- **STR Operating Costs**: ~50-60% of revenue
+**Operating Expense Summary** (excluding debt service; benchmarks in `references/benchmarks.md`):
+- **LTR Operating Costs**: ~35-45% of effective gross income (taxes, insurance, maintenance, management, turnover)
+- **STR Operating Costs**: ~50-60% of revenue after platform fees, with professional management (self-managed: subtract the 20-25% management fee)
 
 ---
 
@@ -480,7 +469,7 @@ Where:
 - [ ] Research local registration requirements
 - [ ] Budget for licensing fees ($50-$500+ annually)
 - [ ] Ensure compliance with display requirements (license numbers on listings)
-- [ ] Timeline example: Austin effective July 1, 2026—platforms must display valid license numbers
+- [ ] Example: Austin required platforms to display valid license numbers from July 1, 2026
 
 **Zoning:**
 - [ ] Verify zoning allows STR at specific property address
@@ -489,7 +478,7 @@ Where:
 - [ ] Check occupancy limits (days per year caps: 90-180 days common)
 
 **HOA Restrictions:**
-- [ ] **CRITICAL**: Request and read CC&Rs before purchase
+- [ ] Request and read the CC&Rs before purchase (an HOA ban can end an STR plan outright)
 - [ ] Verify current HOA rules allow STRs
 - [ ] Assess risk of future HOA vote to ban STRs
 - [ ] **Example**: Phoenix host bought condo for Airbnb; HOA voted to ban all STRs 6 months later
@@ -517,13 +506,12 @@ Where:
 ### STR vs LTR Comparison
 
 **Income Potential:**
-- **STR**: 30% higher annual revenue on average
-- **STR Monthly Average**: $4,300
-- **Example**: $2,000/month LTR vs. $4,500/month STR (at $150/night, 80% occupancy)
+- STR gross revenue usually exceeds LTR rent, but the gap depends almost entirely on local occupancy and ADR
+- **Example**: $2,000/month LTR vs. $2,280/month STR at $150/night and 50% occupancy, or $3,600/month at 80%, before fees and expenses
 
 **Operating Costs:**
-- **LTR**: ~15% of revenue
-- **STR**: ~50-60% of revenue
+- **LTR**: ~35-45% of effective gross income
+- **STR**: ~50-60% of revenue after platform fees, plus the 15.5% platform fee
 
 **Management Intensity:**
 - **LTR**: Passive after tenant placement; occasional maintenance; annual renewals
@@ -536,7 +524,7 @@ Where:
 
 **Occupancy & Stability:**
 - **LTR**: 90%+ occupancy with year-long leases; predictable income
-- **STR**: 54.9% average occupancy; significant seasonal volatility; revenue uncertainty
+- **STR**: national occupancy around 57% (AirDNA, 2026); significant seasonal volatility; revenue uncertainty
 
 **Regulatory Risk:**
 - **LTR**: Minimal regulatory risk; established landlord-tenant law
@@ -854,10 +842,9 @@ Escalation = Actual Costs - Estimated Costs
 **STR:**
 - Revenue = ADR × Occupancy × 365 - Platform Fees
 - Airbnb Host Fee: 15.5%
-- STR Operating Costs: 50-60% of revenue
+- STR Operating Costs: 50-60% of revenue after platform fees (professionally managed)
 - Management Fees: 20-25% of revenue
 - Target Occupancy: 60%+
-- RevPAR Target (2026): $11,990 annually
 
 **Development:**
 - Hard Costs: 70-80% of total budget

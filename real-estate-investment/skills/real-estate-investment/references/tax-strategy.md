@@ -2,6 +2,23 @@
 
 **DISCLAIMER**: Educational reference only — not legal or tax advice. Consult qualified professionals before making investment or tax planning decisions.
 
+**Currency**: Checked against IRS guidance in October 2026 (OBBBA as implemented by Notice 2026-11, Notice 2026-16, Notice 2026-40, Rev. Proc. 2025-32 and the 2025 editions of Pubs 925, 544 and 946). Dollar thresholds are indexed every year and rules change, so verify any figure that drives a decision with a current search and state the tax year you used.
+
+## Key Figures (verify for the current tax year)
+
+| Item | 2025 | 2026 | Notes |
+|---|---|---|---|
+| Bonus depreciation | 100% if acquired after Jan 19, 2025 | 100% | Permanent under OBBBA; keyed to the acquisition (binding written contract) date. Property under contract before Jan 20, 2025 keeps the old phase-down (40% if placed in service in 2025, 20% in 2026). |
+| §179 limit / phase-out start | $2.5M / $4M | $2.56M / $4.09M | Limited to active trade-or-business income; generally unavailable for residential rental buildings (lodging exclusion) |
+| Excess business loss (§461(l)) | $313K single / $626K joint | $256K / $512K | The 2026 threshold dropped, so large bonus or cost-seg losses hit it sooner |
+| Long-term capital gains | 0% / 15% / 20% | 0% up to $49,450 single / $98,900 joint; 20% above $545,500 / $613,700 | Plus 3.8% NIIT above MAGI $200K single / $250K joint (not indexed) |
+| Unrecaptured §1250 gain | up to 25% | up to 25% | Straight-line depreciation on buildings only |
+| §1245 recapture (cost-seg 5/7/15-year components) | ordinary rates | ordinary rates | Up to 37% |
+| QBI (§199A) | 20% | 20%, now permanent; thresholds $201,750 / $403,500 | $400 minimum deduction from 2026 for $1,000+ of QBI with material participation. Rentals qualify only as a trade or business (or under the Rev. Proc. 2019-38 safe harbor). |
+| Passive loss allowance | $25K, phased out at MAGI $100K-$150K | same | Not indexed |
+| SALT deduction cap | $40,000 | $40,400 | Phases down above $505K MAGI (2026); scheduled to revert to $10K in 2030 |
+| Estate and gift exemption | $13.99M | $15M | Indexed from 2027; annual gift exclusion $19,000 (2026) |
+
 ---
 
 ## Table of Contents
@@ -33,14 +50,16 @@
 |-------|----------------|---------------------|----------------------|
 | 5-Year | 5 years | 200% DB | Appliances, carpeting, furniture, computers |
 | 7-Year | 7 years | 200% DB | Office furniture/fixtures, machinery/equipment |
-| 15-Year | 15 years | 150% DB | Land improvements (parking, sidewalks, fencing, landscaping), QIP |
+| 15-Year | 15 years | 150% DB, half-year | Land improvements (parking, sidewalks, fencing, landscaping) |
+| QIP | 15 years | Straight-line, half-year | Qualified improvement property (below) |
 
-**Qualified Improvement Property (QIP)** — 2025 Update:
-- Interior improvements to nonresidential buildings (excludes structural enlargements, elevators, internal framework)
-- 15-year MACRS recovery period
-- **After January 19, 2025**: 100% bonus depreciation eligible
-- **January 1-19, 2025**: 40% bonus depreciation
-- **Section 179**: $2.5M maximum (up from $1.25M), $4M phase-out threshold
+**Qualified Improvement Property (QIP)**:
+- Interior improvements to nonresidential buildings (excludes structural enlargements, elevators, internal framework). Residential rental buildings don't qualify.
+- Must be made by the taxpayer after the building was first placed in service, so it does not come with a purchase: interior improvements a seller made stay part of the 39-year building for the buyer.
+- 15-year recovery, straight-line (not 150% DB)
+- **Acquired after January 19, 2025**: 100% bonus depreciation eligible; **January 1-19, 2025**: 40%
+- An electing real property trade or business under §163(j) must use ADS, which makes QIP ineligible for bonus
+- **Section 179** can also apply to QIP (limits in Key Figures above)
 
 ### Land vs. Building Allocation
 
@@ -63,20 +82,22 @@
 **Example 2: Commercial Property**
 - Purchase: $2,000,000 | Land: $300,000 | Building: $1,700,000
 - Annual depreciation: $1,700,000 ÷ 39 = **$43,590/year**
-- Year 1 (placed in service March): $43,590 × 9.5/12 = **$34,522**
+- Year 1 (placed in service March): $1,700,000 ÷ 39 × 9.5/12 = **$34,509**
 
-**Example 3: Component Depreciation Impact**
+**Example 3: Component Depreciation Impact** (placed in service January)
 - Purchase: $1,000,000 residential | Land: $150,000
 - With segregation: Building $700,000 (27.5yr), Personal property $100,000 (5yr), Land improvements $50,000 (15yr)
 
-Year 1 depreciation:
-- Building: $700,000 ÷ 27.5 = $25,455
-- Personal property: $100,000 × 20% = $20,000
+Year 1 depreciation if the owner elects out of bonus:
+- Building: $700,000 ÷ 27.5 × 11.5/12 = $24,394
+- Personal property: $100,000 × 20% = $20,000 (the MACRS table rate already includes the half-year convention)
 - Land improvements: $50,000 × 5% = $2,500
-- **Total: $47,955**
+- **Total: $46,894**
 
-Without segregation: $850,000 ÷ 27.5 = **$30,909**
-**Additional deduction: $17,046**
+Without segregation: $850,000 ÷ 27.5 × 11.5/12 = **$29,621**
+**Additional deduction: $17,273**
+
+With 100% bonus (acquired after Jan 19, 2025, the default under current law): $24,394 + $150,000 = **$174,394** in year 1.
 
 ---
 
@@ -91,17 +112,14 @@ Engineering-based study reclassifies building components from 27.5/39-year to 5/
 2. Component classification (personal property, land improvements, building structure)
 3. IRS-compliant documentation and audit support
 
-### 2025 Legislative Change: 100% Bonus Depreciation
+### 100% Bonus Depreciation (OBBBA)
 
-**One Big Beautiful Bill Act** (PL 119-21, signed July 4, 2025):
-- **100% bonus depreciation** for property acquired/placed in service **after January 19, 2025 through December 31, 2030**
+**One Big Beautiful Bill Act** (PL 119-21, signed July 4, 2025; Notice 2026-11):
+- **100% bonus depreciation is permanent** for qualified property **acquired after January 19, 2025**. The acquisition date (the date of a binding written contract) controls, not the placed-in-service date. There is no 2030 end date.
 - Applies to 5/7/15-year property (NOT 27.5/39-year building structure)
 - No retroactive relief for 2023-2024 purchases
 
-**Phase-Down Schedule**:
-- 2023: 80% | 2024: 60% | Jan 1-19, 2025: 40%
-- **After Jan 19, 2025-2030: 100%**
-- After 2030: Subject to future legislation
+**Property acquired before January 20, 2025** keeps the prior phase-down: 80% (placed in service 2023), 60% (2024), 40% (2025), 20% (2026), 0% after. A taxpayer can elect 40% instead of 100% for the first tax year ending after January 19, 2025.
 
 ### Typical Savings by Property Value
 
@@ -117,28 +135,29 @@ Engineering-based study reclassifies building components from 27.5/39-year to 5/
 - Large/complex: $25,000-$75,000+
 
 **Minimum Thresholds**:
-- $250K+: Worthwhile for high-income investors (especially STRs)
+- $250K+: Worthwhile for high-income investors (especially STRs, because of the 7-day exception under Passive Activity Loss Rules below)
 - $500K+: Generally recommended
 - $750K+: Engineering-based study typically justified
 
-### Worked Example: $1M Commercial Property (July 2025)
+### Worked Example: $1M Commercial Property (purchased July 2025)
 
 **Land**: $150,000 | **Depreciable basis**: $850,000
 
 **Without Cost Segregation**:
-- $850,000 ÷ 39 years × 5.5/12 = **$10,043** Year 1
+- $850,000 ÷ 39 years × 5.5/12 = **$9,989** Year 1
 
 **With Cost Segregation**:
-- Building (39yr): $550,000 → $550,000 ÷ 39 × 5.5/12 = $6,490
+- Building (39yr): $600,000 → $600,000 ÷ 39 × 5.5/12 = $7,051 (includes $50,000 of interior improvements the seller made; they aren't QIP to a buyer)
 - Personal property (5yr): $150,000 → 100% bonus = $150,000
 - Land improvements (15yr): $100,000 → 100% bonus = $100,000
-- QIP (15yr): $50,000 → 100% bonus = $50,000
-- **Total Year 1: $306,490**
+- **Total Year 1: $257,051**
 
-**Tax Savings**:
-- Additional depreciation: $296,447
-- At 37% rate: **$109,685**
-- At 24% rate: **$71,147**
+**Year-1 deduction value**:
+- Additional depreciation: $247,062
+- At 37% rate: **$91,413**
+- At 24% rate: **$59,295**
+
+The deduction is only worth this if the investor can use it this year (see Passive Activity Loss Rules below), and the accelerated portion is recaptured at ordinary rates on a sale (see Depreciation Recapture).
 
 ### When Cost Segregation Makes Sense
 
@@ -153,7 +172,7 @@ Engineering-based study reclassifies building components from 27.5/39-year to 5/
 - Properties <$250K (cost may exceed benefit)
 - Purchases many years ago (fewer remaining years)
 - Passive investors subject to PAL limitations
-- Properties planned for near-term sale (depreciation recapture)
+- Properties planned for near-term sale: depreciation on the 5/7/15-year components is §1245 recapture, taxed at ordinary rates rather than the 25% cap (see Depreciation Recapture)
 
 **Timing**: Can apply retroactively via Form 3115 (change in accounting method).
 
@@ -166,10 +185,12 @@ Engineering-based study reclassifies building components from 27.5/39-year to 5/
 - Can fully utilize cost seg deductions against ordinary income
 - Without status: passive losses limited to $25K offset (phased out by MAGI $100K-$150K)
 
+**Short-term rental exception**: an activity whose average customer stay is 7 days or less isn't a "rental activity" under §469. If the owner materially participates (for example, 100+ hours and more than anyone else, documented in a time log), its losses, including cost-seg and bonus losses, are non-passive without real estate professional status. This is the main reason cost seg is popular with STR owners. STRs with hotel-like services report on Schedule C and owe self-employment tax.
+
 **Excess Business Loss Limitation (IRC §461(l))**:
-- 2025 threshold: $313K (single) / $626K (joint)
+- 2025 threshold: $313K (single) / $626K (joint); 2026: $256K / $512K
 - Bonus depreciation can trigger limitation
-- Consider 15-year QIP election instead of 100% bonus if near threshold
+- Consider electing out of bonus for a class (or spreading QIP straight-line) if near the threshold
 
 ---
 
@@ -197,7 +218,7 @@ Engineering-based study reclassifies building components from 27.5/39-year to 5/
 ```
 Day 0: Close on Relinquished Property
   ↓
-Day 45: Identification Deadline (strict, no extensions)
+Day 45: Identification Deadline (strict; only IRS disaster-relief postponements extend it)
   ↓
 Day 180: Exchange Completion Deadline
          OR Tax Return Due Date (whichever is earlier)
@@ -233,9 +254,11 @@ Mortgage Boot = MAX(0, Debt Relinquished - Debt Replacement - Cash Added)
 
 | Scenario | Relinquished | Replacement | Boot | Tax Impact |
 |----------|--------------|-------------|------|------------|
-| Cash Boot | $1M value, $300K debt | $900K value, $250K debt | $50K cash | $50K taxable |
-| Mortgage Boot | $1M value, $400K debt | $950K value, $350K debt | $100K total | $100K taxable |
-| Offset with Cash | $800K value, $300K debt | $1M value, $250K debt + $50K cash added | $0 | $0 taxable |
+| Trade down, cash out | $1M value, $300K debt ($700K equity) | $900K value, $250K debt ($650K equity) | $50K cash + $50K mortgage = $100K | $100K taxable |
+| Trade down, all equity reinvested | $1M value, $400K debt ($600K equity) | $950K value, $350K debt ($600K equity) | $0 cash + $50K mortgage = $50K | $50K taxable |
+| Debt drop offset with cash | $800K value, $300K debt ($500K equity) | $850K value, $250K debt ($600K equity: $500K proceeds + $100K cash added) | Mortgage boot MAX(0, 300K − 250K − 100K) = $0 | $0 taxable |
+
+In each row the boot equals the drop in value or the cash taken out, which is why "trade equal or up and reinvest all equity" avoids it.
 
 **Rules to Avoid Boot**:
 1. Trade equal or up (replacement value ≥ relinquished value)
@@ -252,15 +275,20 @@ Mortgage Boot = MAX(0, Debt Relinquished - Debt Replacement - Cash Added)
 **Partial Exchange (Boot Received)**:
 - Depreciation recapture taxed **first** (before capital gain)
 - Recapture amount = lesser of (a) boot received, or (b) accumulated depreciation
-- Recapture taxed at **25%** (unrecaptured Section 1250 gain)
+- Straight-line depreciation on the building is unrecaptured §1250 gain, taxed at **up to 25%** (the investor's ordinary rate if lower)
+- Depreciation on cost-segregated 5/7-year components is **§1245 recapture, taxed as ordinary income** (up to 37%); bonus or accelerated depreciation on 15-year land improvements is §1250 "additional depreciation", also ordinary
+- So split accumulated depreciation into the cost-seg/bonus portion and the straight-line portion before estimating the tax on a sale
+- Depreciation is "allowed or allowable": basis drops by the depreciation the owner could have taken even if they never claimed it. An owner who skipped it can catch up with Form 3115 before selling.
 
-**Example**:
+**Cost seg and 1031**: if the relinquished property holds §1245 components, §1245(b)(4) can trigger recapture in an exchange unless enough §1245 property is received in the replacement.
+
+**Example** (straight-line only, no cost seg):
 - Original cost: $500K (land $100K, building $400K)
 - Accumulated depreciation: $150K
 - Adjusted basis: $350K | Sale: $800K | Gain: $450K
 
-**If sold outright**: $150K recapture (25%) + $300K capital gain (15-20%)
-**If 1031 with $50K boot**: $50K recapture (25%) + $100K deferred recapture + $400K deferred gain
+**If sold outright**: $150K unrecaptured §1250 gain (up to 25%) + $300K capital gain (15-20%)
+**If 1031 with $50K boot**: $50K recognized (unrecaptured §1250, up to 25%) + $100K deferred recapture + $300K deferred capital gain
 
 ### Reverse and Improvement Exchanges
 
@@ -281,7 +309,7 @@ Mortgage Boot = MAX(0, Debt Relinquished - Debt Replacement - Cash Added)
 
 **Independence**: Cannot be taxpayer or disqualified person (within 2 years):
 - Employee, attorney, accountant, investment banker, broker, agent
-- Family members, related entities (>50% common ownership)
+- Family members, related entities (>10% common ownership, per Reg. §1.1031(k)-1(k)(3))
 
 **Fund Control**:
 - Taxpayer cannot have "constructive receipt" of proceeds
@@ -296,7 +324,7 @@ Mortgage Boot = MAX(0, Debt Relinquished - Debt Replacement - Cash Added)
 
 **Fatal Errors**:
 1. **Constructive receipt** of funds (even temporarily)
-2. **Missing deadlines** (45-day/180-day absolute, no extensions)
+2. **Missing deadlines** (45-day/180-day; no extensions except IRS disaster-relief postponements)
 3. **Disqualified person as QI**
 4. **Related party exchange** without 2-year hold requirement
 5. **Property not held for investment** (primary residence, immediate flip)
@@ -315,19 +343,11 @@ Mortgage Boot = MAX(0, Debt Relinquished - Debt Replacement - Cash Added)
 
 ## Bonus Depreciation
 
-### Current Law: One Big Beautiful Bill Act (2025-2030)
+### Current Law: One Big Beautiful Bill Act
 
-**Legislative Change**:
-- Prior phase-down: 40% (2025), 20% (2026), 0% (2027+)
-- **OBBBA (PL 119-21, July 4, 2025)**: **100% bonus** for property acquired/placed in service **after January 19, 2025**
-
-**Effective Dates**:
-- Jan 1-19, 2025: 40%
-- **After Jan 19, 2025 - Dec 31, 2030: 100%**
-- 2023: 80% | 2024: 60%
-- After 2030: Subject to future legislation
-
-**No Retroactive Relief** for 2023-2024 purchases.
+- **100% bonus, permanent**, for property **acquired after January 19, 2025** (binding written contract date; Notice 2026-11)
+- Acquired before January 20, 2025: prior phase-down by placed-in-service year: 80% (2023), 60% (2024), 40% (2025), 20% (2026), 0% after
+- **No retroactive relief** for 2023-2024 purchases
 
 ### Qualifying Property
 
@@ -347,9 +367,9 @@ Mortgage Boot = MAX(0, Debt Relinquished - Debt Replacement - Cash Added)
 
 ### Qualified Production Property (QPP) — NEW 2025
 
-**Definition**: Newly constructed nonresidential property for manufacturing/production/refining in U.S.
+**Definition** (§168(n), Notice 2026-16): nonresidential property used by the taxpayer in U.S. manufacturing, production or refining. Construction must begin after Jan 19, 2025 and before Jan 1, 2029, and the property must be placed in service after July 4, 2025 and before Jan 1, 2031.
 
-**Significance**: **Rare exception** allowing 100% write-off of 39-year building structure for qualified facilities.
+**Significance**: a rare 100% write-off of a 39-year building, but **lessors don't qualify**: the owner must use the property in the production activity, so most landlords can't use it. Office, lodging and similar uses are excluded, and disposing of the use within 10 years triggers §1245 recapture.
 
 ### Interaction with Passive Activity Loss Rules
 
@@ -364,9 +384,9 @@ Mortgage Boot = MAX(0, Debt Relinquished - Debt Replacement - Cash Added)
 - 100% bonus depreciation fully usable in current year
 
 **Excess Business Loss (IRC §461(l))**:
-- 2025 limit: $313K (single) / $626K (joint)
+- 2025 limit: $313K (single) / $626K (joint); 2026: $256K / $512K
 - Bonus depreciation can trigger limitation
-- Consider electing out for QIP (15-year straight-line) if near threshold
+- Consider electing out of bonus for a class if near the threshold
 
 ### Election Out of Bonus Depreciation
 
@@ -384,30 +404,30 @@ Mortgage Boot = MAX(0, Debt Relinquished - Debt Replacement - Cash Added)
 **QIP Options**:
 - 100% bonus (immediate)
 - 15-year straight-line (spread evenly)
-- Section 179 (up to $2.5M in 2025, subject to income/investment limits)
+- Section 179 (limits in Key Figures; limited to active business income). QIP and §179 apply to nonresidential property; for a residential rental, the choice is bonus or regular MACRS.
 
 ### Example: Residential with Cost Seg and 100% Bonus
 
-**Property (March 2025)**: $1M purchase | Land: $200K | Depreciable: $800K
+**Property (acquired March 2025)**: $1M purchase | Land: $200K | Depreciable: $800K
 
 **Cost Seg Allocations**:
 - Building (27.5yr): $500K
 - 5-year property: $200K
 - 15-year land improvements: $100K
 
-**Without Bonus**:
-- Building: $500K ÷ 27.5 × 9.5/12 = $14,495
-- 5-year: $200K × 20% × 50% = $20,000
-- 15-year: $100K × 5% × 50% = $2,500
-- **Total Year 1: $36,995**
+**Without Bonus** (MACRS table rates already include the half-year convention):
+- Building: $500K ÷ 27.5 × 9.5/12 = $14,394
+- 5-year: $200K × 20% = $40,000
+- 15-year: $100K × 5% = $5,000
+- **Total Year 1: $59,394**
 
 **With 100% Bonus**:
-- Building: $14,495
+- Building: $14,394
 - 5-year: $200K × 100% = $200,000
 - 15-year: $100K × 100% = $100,000
-- **Total Year 1: $314,495**
+- **Total Year 1: $314,394**
 
-**Tax savings (37% bracket)**: $314,495 × 37% = **$116,363**
+**Year-1 deduction value (37% bracket)**: $314,394 × 37% = **$116,326**, or $94,350 more than without bonus ($255,000 × 37%). Usable this year only if passive-loss and excess-business-loss limits allow.
 
 ---
 
@@ -418,20 +438,20 @@ Mortgage Boot = MAX(0, Debt Relinquished - Debt Replacement - Cash Added)
 **OBBBA (July 4, 2025)**:
 - Made Opportunity Zones **permanent** (sunset provisions repealed)
 - Different rules for investments through 2026 vs. 2027+
-- **Redesignation**: July 1, 2026, then every 10 years
+- **Redesignation**: governors nominated tracts in a window that opened July 1, 2026; the new designations take effect **January 1, 2027**, with new rounds every 10 years. Existing designations run through December 31, 2028.
 
-**8,700+ designated census tracts** nationwide (verify via IRS/Treasury CDFI maps).
+Check whether a tract is (or will be) designated on the current Treasury/CDFI Fund opportunity zone map rather than relying on a count.
 
 ### Investment Timeline: Through 2026 vs. 2027+
 
-| Timeline | Investments Through Dec 31, 2026 | Investments After Dec 31, 2026 |
+| Timeline | Investments Through Dec 31, 2026 (old regime) | Investments After Dec 31, 2026 |
 |----------|----------------------------------|-------------------------------|
-| **Gain Deferral** | Earlier of: (a) QOF sale/disposal, OR (b) Dec 31, 2026 sunset | **5 years from QOF investment** OR sale |
-| **5-Year Step-Up** | 10% of deferred gain excluded | 10% of deferred gain excluded |
-| **7-Year Step-Up** | Additional 5% (15% total) | Eliminated |
-| **10-Year Exclusion** | 100% exclusion of QOF gain | 100% exclusion of QOF gain |
+| **Gain Deferral** | Ends Dec 31, 2026 at the latest | **5 years from QOF investment** OR earlier sale |
+| **5-Year Step-Up** | No longer reachable (needed an investment by end of 2021) | 10% of deferred gain excluded (30% for rural funds) |
+| **7-Year Step-Up** | No longer reachable (needed an investment by end of 2019) | Eliminated |
+| **10-Year Exclusion** | 100% exclusion of QOF gain | 100% exclusion of QOF gain (appreciation capped after 30 years) |
 
-**Note**: 7-year step-up no longer achievable for 2025-2026 investments (would require 2019 investment to reach 7 years by 2026).
+**Timing note (late 2026)**: a new old-regime investment today gets no step-up and only a few weeks of deferral. Gains realized in 2026 can generally be invested after January 1, 2027 under the new rules (within the 180-day window), which is usually the better choice; confirm with Notice 2026-40.
 
 ### QOF and QOZP Requirements
 
@@ -446,7 +466,7 @@ Mortgage Boot = MAX(0, Debt Relinquished - Debt Replacement - Cash Added)
 2. QO Zone Partnership Interest (acquired for cash)
 3. QO Zone Business Property (tangible property, original use OR substantially improved)
 
-**Substantial Improvement**: Improvements within 30 months ≥ adjusted basis.
+**Substantial Improvement**: Improvements within 30 months ≥ adjusted basis (50% of basis for property in an entirely rural QOZ).
 
 ### Capital Gains Benefits
 
@@ -454,11 +474,10 @@ Mortgage Boot = MAX(0, Debt Relinquished - Debt Replacement - Cash Added)
 
 1. **Deferral of Original Gain**
    - Defer recognition until sale or 5-year mark (post-2026 investments)
-   - For through-2026 investments: specific sunset dates apply
+   - Old-regime investments: deferral ends December 31, 2026
 
 2. **Step-Up in Basis on Deferred Gain**
-   - 5-year hold: 10% of deferred gain permanently excluded
-   - 7-year hold (pre-2027 only): 15% of deferred gain excluded
+   - 5-year hold (post-2026 investments): 10% of deferred gain permanently excluded (30% for rural funds)
 
 3. **Exclusion of QOF Gain (10-Year Hold)**
    - Make election to step up basis to FMV on sale
@@ -472,9 +491,9 @@ Mortgage Boot = MAX(0, Debt Relinquished - Debt Replacement - Cash Added)
 
 ### Qualified Rural Opportunity Funds (QROF) — NEW 2025
 
-**Definition**: QOF invested in rural Opportunity Zones (population <50K or outside metro areas).
+**Definition**: QOF invested in rural Opportunity Zones. "Rural" means any area other than a city or town of more than 50,000 people and the urbanized area next to it (Notice 2025-50).
 
-**Enhanced Benefit**: **30% step-up** at 5-year hold (vs. 10% for standard QOF).
+**Enhanced Benefit**: **30% step-up** at 5-year hold (vs. 10% for standard QOF), for investments after December 31, 2026.
 
 **Example**:
 - Invest $1M in QROF
@@ -524,7 +543,7 @@ Mortgage Boot = MAX(0, Debt Relinquished - Debt Replacement - Cash Added)
 
 **Disadvantages**:
 - Limited asset protection in some states (charging order weaker)
-- No SE tax savings (rental income not subject to SE tax anyway)
+- No SE tax savings (ordinary rental income isn't subject to SE tax anyway; STRs with hotel-like services are the exception and report on Schedule C)
 
 **Recommended For**: Individual investors, 1-3 properties, simplicity priority.
 
@@ -584,7 +603,7 @@ Mortgage Boot = MAX(0, Debt Relinquished - Debt Replacement - Cash Added)
 **Disadvantages (Buy-and-Hold Rental)**:
 - **Stock basis limitation**: Debt does NOT increase basis (unlike LLC/partnership)
 - No step-up in basis on death (property inside S-corp)
-- No SE tax savings for passive rental (already not subject to SE tax)
+- No SE tax savings for rental income (generally not subject to SE tax; STRs with substantial services are the exception)
 - Reasonable compensation requirement
 
 **Stock Basis Issue Example**:
@@ -687,14 +706,16 @@ Mortgage Boot = MAX(0, Debt Relinquished - Debt Replacement - Cash Added)
 | **1. Return of Capital** | LPs receive 100% of invested capital | $5M investment → $5M to LPs |
 | **2. Preferred Return** | LPs receive fixed annual return (6-10%) | 8% × 5 years × $5M = $2M to LPs |
 | **3. GP Catch-Up** | GP receives disproportionate share until target split | GP gets 100% until 20% of total profits |
-| **4. Final Split** | Remaining cash flow split per ratio | 70/30 LP/GP or 80/20 LP/GP |
+| **4. Final Split** | Remaining cash flow split per ratio | 80/20 LP/GP (matching a 20% catch-up target) |
 
-**Example Waterfall** ($5M LP investment, $8M net proceeds after 5 years):
+**Example Waterfall** ($5M LP investment, $8M net proceeds after 5 years, simple pref with a full catch-up):
 - Tier 1 (ROC): LPs get $5M
 - Tier 2 (8% pref): LPs get $2M
-- Tier 3 (GP catch-up to 20%): GP gets $600K
-- Tier 4 (70/30 split): LPs get $280K, GP gets $120K
-- **Total**: LPs $7.28M (45.6% return) | GP $720K
+- Tier 3 (GP catch-up to 20% of profits): GP gets $500K ($500K / $2.5M distributed profit = 20%)
+- Tier 4 (80/20 split of the last $500K): LPs get $400K, GP gets $100K
+- **Total**: LPs $7.4M ($2.4M profit, 48% over 5 years) | GP $600K (20% of the $3M profit)
+
+`scripts/waterfall.py --mode simple` runs this structure (it applies one year of pref, so pass `--pref-rate 0.40` for five years at 8% to reproduce this example); its IRR mode runs the hurdle-based waterfall in advanced-analysis.md. The GP promote is carried interest: under §1061 it needs a 3-year holding period for long-term treatment, though §1231 gain from selling rental property is generally excluded from recharacterization.
 
 **Capital Contributions**: LPs 80-95%, GP 5-20% (plus expertise/time).
 
@@ -725,7 +746,7 @@ Mortgage Boot = MAX(0, Debt Relinquished - Debt Replacement - Cash Added)
 - >100 hours and no one participates more, OR
 - Other IRS tests
 
-**Grouping Election**: Treat all rental activities as one (easier to meet 500-hour threshold).
+**Election to aggregate rental real estate** (§469(c)(7)(A), Reg. §1.469-9(g); RE professionals only): treat all rental real estate as one activity, which makes the 500-hour test easier to meet.
 
 **Benefits**:
 - Rental losses NOT passive
@@ -758,56 +779,22 @@ Mortgage Boot = MAX(0, Debt Relinquished - Debt Replacement - Cash Added)
 
 ## Sources
 
-### Depreciation
-- [Publication 946 (2024), How To Depreciate Property | IRS](https://www.irs.gov/publications/p946)
-- [2026 Depreciation Schedule Guide | Uncle Kam](https://unclekam.com/tax-strategy-blog/2026-depreciation-schedule/)
-- [Publication 527 (2025), Residential Rental Property | IRS](https://www.irs.gov/publications/p527)
-- [MACRS Depreciation Method | Bloomberg Tax](https://pro.bloombergtax.com/insights/federal-tax/macrs-depreciation-method/)
+Primary IRS guidance (checked October 2026):
+- [Notice 2026-11: 100% bonus depreciation under OBBBA](https://www.irs.gov/pub/irs-drop/n-26-11.pdf)
+- [Notice 2026-16: Qualified production property](https://www.irs.gov/pub/irs-drop/n-26-16.pdf)
+- [Notice 2026-40: Opportunity zones under OBBBA](https://www.irs.gov/pub/irs-drop/n-26-40.pdf)
+- [Rev. Proc. 2025-32: 2026 inflation adjustments](https://www.irs.gov/pub/irs-drop/rp-25-32.pdf)
+- [Publication 946 (2025), How To Depreciate Property](https://www.irs.gov/publications/p946)
+- [Publication 925 (2025), Passive Activity and At-Risk Rules](https://www.irs.gov/publications/p925)
+- [Publication 527 (2025), Residential Rental Property](https://www.irs.gov/publications/p527)
+- [Publication 544 (2025), Sales and Other Dispositions of Assets](https://www.irs.gov/publications/p544)
+- [Topic 409, Capital gains and losses](https://www.irs.gov/taxtopics/tc409)
+- [Instructions for Form 8824, Like-Kind Exchanges](https://www.irs.gov/instructions/i8824)
+- [Opportunity Zones FAQs](https://www.irs.gov/credits-deductions/opportunity-zones-frequently-asked-questions)
+- [26 U.S.C. §168](https://www.law.cornell.edu/uscode/text/26/168) and [Reg. §1.1031(k)-1](https://www.law.cornell.edu/cfr/text/26/1.1031(k)-1)
+- [Final regulations under §1061 (T.D. 9945)](https://www.federalregister.gov/documents/2021/01/19/2021-00427/guidance-under-section-1061)
 
-### QIP
-- [Qualified Improvement Property Depreciation | Landmark CPAs](https://www.landmarkcpas.com/qualified-improvement-property-depreciation/)
-- [Expanded Bonus Depreciation for QIP Under OBBBA | Doeren](https://www.doeren.com/viewpoint/expanded-bonus-depreciation-for-qualified-improvement-property-under-obbba)
-- [Qualified Improvement Property | Bloomberg Tax](https://pro.bloombergtax.com/insights/federal-tax/qualified-improvement-property/)
-
-### Cost Segregation
-- [Cost Segregation Study for Rental Properties 2025-2026 | CSSI](https://cssiservices.com/cost-segregation-for-rental-properties/)
-- [Why Cost Segregation More Valuable | MGO CPA](https://www.mgocpa.com/perspective/why-cost-segregation-more-valuable-real-estate/)
-- [Cost Segregation + 100% Bonus Depreciation | HCVT](https://www.hcvt.com/alertarticle-Cost-Segregation)
-- [What is Cost Segregation | Warren Averett](https://warrenaverett.com/insights/what-is-cost-segregation/)
-
-### 1031 Exchange
-- [IRS 1031 Exchange Rules 2026 | DoorLoop](https://www.doorloop.com/blog/1031-exchange-rules)
-- [1031 Exchange Timeline Guide | REI Hub](https://www.reihub.net/resources/1031-exchange-timeline/)
-- [1031 Exchange Boot Guide | Realized1031](https://www.realized1031.com/blog/1031-exchange-boot-what-it-is-how-to-calculate-and-rules-to-consider)
-- [Improvement and Reverse Exchanges | IPX1031](https://www.ipx1031.com/our-services/reverse-improvement-exchanges/)
-- [Qualified Intermediary Guide | First American](https://www.firstexchange.com/1031-exchange-articles/key-considerations-1031-exchanges-qualified-intermediary)
-
-### Bonus Depreciation
-- [One Big Beautiful Bill Breakdown | Warren Averett](https://warrenaverett.com/insights/one-big-beautiful-bill-bonus-depreciation/)
-- [Big Beautiful Bill Restores 100% Bonus | KLR](https://kahnlitwin.com/blogs/tax-blog/big-beautiful-bill-act-restores-100-bonus-depreciation-what-businesses-need-to-know-for-2025)
-- [One Big Beautiful Bill Explained | Stinson](https://www.stinson.com/newsroom-publications-one-big-beautiful-bill-explained)
-- [100% Bonus Deduction New Rules | Wipfli](https://www.wipfli.com/insights/articles/cre-what-are-the-new-rules-for-100-bonus-deduction-in-2025)
-
-### Opportunity Zones
-- [Opportunity Zone Regime Permanently Extended | Saul Ewing](https://www.saul.com/insights/alert/opportunity-zone-regime-permanently-extended-new-benefits-limitations-and)
-- [OBBBA Makes Enhanced OZ Permanent | Crowe](https://www.crowe.com/insights/tax-news-highlights/obbba-makes-enhanced-opportunity-zones-permanent)
-- [Qualified Opportunity Zones 2.0 Changes | Origin Investments](https://origininvestments.com/qualified-opportunity-zones-2-0-key-changes-for-investors-in-2025/)
-- [Opportunity Zones FAQs | IRS](https://www.irs.gov/credits-deductions/opportunity-zones-frequently-asked-questions)
-
-### Entity Structure
-- [Right Entity Structure for Real Estate | MGO CPA](https://www.mgocpa.com/perspective/choosing-real-estate-entity-structure/)
-- [LLC vs LP for Real Estate | Rock Step](https://rockstep.com/blog/llcs-vs-lps-real-estate)
+Practitioner background (secondary; use the IRS sources above for figures):
 - [S-Corp Wrong Entity for RE Investments | Cerebral Tax](https://www.cerebraltaxadvisors.com/blog/real-estate-in-an-s-corp/)
-- [Wyoming LLC Asset Protection | Wyoming LLC Attorney](https://wyomingllcattorney.com/Form-a-Wyoming-LLC/Asset-Protection)
-- [Land Trust Benefits | Exeter Trust](https://www.exeterco.com/benefits_of_a_title_holding_trust)
-
-### Syndication
-- [GP vs LP Roles | InvestNext](https://www.investnext.com/blog/gp-vs-lp-roles-in-real-estate-syndications/)
-- [Real Estate Syndication Structures | FNRP](https://fnrpusa.com/blog/what-is-a-real-estate-syndication/)
+- [Improvement and Reverse Exchanges | IPX1031](https://www.ipx1031.com/our-services/reverse-improvement-exchanges/)
 - [Distribution Waterfalls | Tactica RES](https://www.tacticares.com/blog-feed/distribution-waterfalls-in-multifamily-investment)
-
-### Passive Activity Loss
-- [Publication 925 (2024) | IRS](https://www.irs.gov/publications/p925)
-- [Topic 425, Passive Activities | IRS](https://www.irs.gov/taxtopics/tc425)
-- [RE Professional Status IRS Tests | NATP](https://www.natptax.com/news-insights/blog/can-your-clients-qualify-for-real-estate-professional-status-irs-tests-explained/)
-- [Passive Activity Loss Rules 2025 | Madras Accountancy](https://madrasaccountancy.com/blog-posts/passive-activity-loss-rules-for-rental-property-what-real-estate-investors-need-to-know-2025)

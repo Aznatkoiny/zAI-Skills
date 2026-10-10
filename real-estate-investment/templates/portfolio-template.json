@@ -6,10 +6,13 @@
     "properties[].type": "One of: SFR, multifamily, commercial, STR (optional but recommended)",
     "properties[].acquired": "Acquisition date YYYY-MM-DD (optional; enables vintage analysis)",
     "properties[].basis": "Tax basis: purchase price + capital improvements (required)",
-    "properties[].accumulated_depreciation": "Depreciation taken to date (optional; needed for /exit-analysis)",
+    "properties[].accumulated_depreciation": "Depreciation taken or allowable to date, all types (optional; needed for /exit-analysis). If none was ever claimed, basis still drops by the allowable amount.",
+    "properties[].cost_seg_depreciation": "Portion of accumulated_depreciation from cost-segregated 5/7/15-year components or bonus depreciation (optional). Recaptured at ordinary rates on a sale, unlike straight-line building depreciation (up to 25%).",
     "properties[].debt": "Current loan balance (required; 0 if free and clear)",
     "properties[].rate": "Current loan interest rate as a decimal (required if debt > 0)",
     "properties[].maturity": "Loan maturity date YYYY-MM-DD (required if debt > 0)",
+    "properties[].annual_debt_service": "Annual principal + interest actually paid (optional; needed for accurate DSCR on interest-only or balloon loans)",
+    "properties[].amortization_years": "Remaining amortization in years (optional; used to estimate debt service when annual_debt_service is absent)",
     "properties[].rent": "Current gross monthly rent (required)",
     "properties[].noi": "Current annual net operating income (required)",
     "properties[].value": "Current market value estimate (required)",
@@ -46,7 +49,8 @@
       "noi": 46000,
       "value": 865000,
       "value_source": "user estimate",
-      "notes": "4-plex; loan balloons 2032 — refi risk to track"
+      "notes": "4-plex; interest-only (6.25% x $585,000), balloons 2032 — refi risk to track",
+      "annual_debt_service": 36563
     }
   ]
 }

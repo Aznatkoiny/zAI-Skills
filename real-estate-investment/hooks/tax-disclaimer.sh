@@ -1,8 +1,10 @@
 #!/bin/bash
 # tax-disclaimer.sh — PostToolUse hook for the real-estate-investment plugin.
-# When written/edited content touches tax-specific topics, emits additionalContext
-# JSON on stdout so Claude reminds the user to consult a CPA or tax attorney.
-# Fires at most once per session (marker file).
+# When content written or edited mentions real estate tax topics, emits one
+# hookSpecificOutput.additionalContext JSON on stdout asking Claude to add a
+# one-line CPA reminder if (and only if) that content gives the user tax
+# guidance. Fires at most once per session; the dedupe marker lives in the
+# temp directory, never in the user's project.
 
 # Read tool payload from stdin
 INPUT=$(cat)
@@ -49,14 +51,10 @@ if re.search(pattern, text, re.IGNORECASE):
 if [[ -n "$MATCHED" ]]; then
   SESSION_ID="${MATCHED#match:}"
 
-  # Once-per-session dedupe marker. Prefer the project's .claude dir; fall
-  # back to TMPDIR. Keyed by session id when one is available.
-  if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
-    MARKER_DIR="${CLAUDE_PROJECT_DIR}/.claude"
-  else
-    MARKER_DIR="${TMPDIR:-/tmp}"
-  fi
-  MARKER="$MARKER_DIR/.tax-disclaimer-shown${SESSION_ID:+-$SESSION_ID}"
+  # Once-per-session dedupe marker, kept in the temp directory so nothing is
+  # written into the user's project.
+  MARKER_DIR="${TMPDIR:-/tmp}/real-estate-investment-tax-reminder"
+  MARKER="$MARKER_DIR/${SESSION_ID:-nosession}"
 
   if [[ -f "$MARKER" ]]; then
     exit 0
@@ -67,7 +65,7 @@ if [[ -n "$MATCHED" ]]; then
   touch "$MARKER" 2>/dev/null || true
 
   cat <<'EOF'
-{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"Reminder: Tax analysis is for educational purposes only. Recommend the user consult a CPA or tax attorney before acting on it."}}
+{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"[real-estate-investment] The content just written mentions real estate tax topics. If it gives the user tax guidance (depreciation, 1031, cost segregation, capital gains), add one line to your reply saying it is educational and a CPA or tax attorney should confirm it before they act. If it's code or unrelated material, ignore this. Shown once per session."}}
 EOF
 fi
 

@@ -12,7 +12,6 @@ in the same directory.
 
 from mcp.server.fastmcp import FastMCP
 import datetime
-import gzip
 import hashlib
 import io
 import os
@@ -50,6 +49,28 @@ def _validate_zip(zip_code: str) -> str:
     if not re.fullmatch(r"\d{5}", zip_code):
         return "Invalid zip_code: must be exactly 5 digits (e.g., '90001')."
     return ""
+
+
+def _missing_key(var: str, signup: str) -> str:
+    return json.dumps({
+        "error": f"{var} not configured.",
+        "info": (f"{signup} Set {var} in your shell profile (export {var}=...) or under \"env\" "
+                 "in ~/.claude/settings.json, then restart Claude Code."),
+    })
+
+
+def _acs_int(raw):
+    """Parse an ACS estimate. Census encodes "no estimate" as large negative
+    sentinels (-666666666, -999999999, -888888888, ...), which become None."""
+    if raw in (None, ""):
+        return None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if value <= -100000000:
+        return None
+    return int(value)
 
 
 def _fetch_acs(variables: list, geography: str, api_key: str, year: int):
@@ -96,7 +117,7 @@ def _fetch_acs(variables: list, geography: str, api_key: str, year: int):
 
 CACHE_TTL_MARKET = 24 * 3600      # API market data (Rentcast, FRED): 24 hours
 CACHE_TTL_CENSUS = 7 * 24 * 3600  # Census ACS data: 7 days
-CACHE_TTL_REDFIN = 24 * 3600      # Filtered Redfin market-tracker slices: 24 hours
+CACHE_TTL_REDFIN = 24 * 3600      # Filtered Redfin region series: 24 hours
 
 
 def _cache_dir() -> str:
@@ -210,8 +231,8 @@ def _with_rentcast_quota(data, count: int, from_cache: bool = False) -> dict:
         if count >= RENTCAST_WARN_THRESHOLD:
             out["rentcast_quota_warning"] = (
                 f"Approaching the Rentcast free-tier limit of "
-                f"{RENTCAST_FREE_TIER_LIMIT} calls/month. Further live calls may "
-                "fail or incur charges; cached responses do not count against the quota."
+                f"{RENTCAST_FREE_TIER_LIMIT} calls/month. At the limit, live calls stop "
+                "unless RENTCAST_ALLOW_OVERAGE=1 is set; cached responses don't count."
             )
     if from_cache:
         out["served_from_cache"] = True
@@ -265,10 +286,7 @@ def get_census_demographics(state_fips: str, county_fips: str = "", tract: str =
 
     api_key = os.environ.get("CENSUS_API_KEY", "")
     if not api_key:
-        return json.dumps({
-            "error": "CENSUS_API_KEY not configured. Set it in your plugin's environment variables.",
-            "info": "Get a free API key at https://api.census.gov/data/key_signup.html"
-        })
+        return _missing_key("CENSUS_API_KEY", "Get a free API key at https://api.census.gov/data/key_signup.html.")
 
     # Define variables to fetch
     variables = [
@@ -302,14 +320,14 @@ def get_census_demographics(state_fips: str, county_fips: str = "", tract: str =
         # Create result dictionary
         result = {
             "acs_vintage": vintage,
-            "total_population": int(values[0]) if values[0] and values[0] != "-666666666" else None,
-            "median_household_income": int(values[1]) if values[1] and values[1] != "-666666666" else None,
-            "median_gross_rent": int(values[2]) if values[2] and values[2] != "-666666666" else None,
-            "total_housing_units": int(values[3]) if values[3] and values[3] != "-666666666" else None,
-            "occupied_units": int(values[4]) if values[4] and values[4] != "-666666666" else None,
-            "vacant_units": int(values[5]) if values[5] and values[5] != "-666666666" else None,
-            "owner_occupied_units": int(values[6]) if values[6] and values[6] != "-666666666" else None,
-            "renter_occupied_units": int(values[7]) if values[7] and values[7] != "-666666666" else None,
+            "total_population": _acs_int(values[0]),
+            "median_household_income": _acs_int(values[1]),
+            "median_gross_rent": _acs_int(values[2]),
+            "total_housing_units": _acs_int(values[3]),
+            "occupied_units": _acs_int(values[4]),
+            "vacant_units": _acs_int(values[5]),
+            "owner_occupied_units": _acs_int(values[6]),
+            "renter_occupied_units": _acs_int(values[7]),
             "state_fips": state_fips,
             "county_fips": county_fips if county_fips else None,
             "tract": tract if tract else None
@@ -348,8 +366,10 @@ def get_census_housing_stats(state_fips: str, county_fips: str = "", year: int =
             if that vintage is not yet published.
 
     Returns:
-        JSON string with median home value and housing age distribution,
-        including the ACS vintage year used ("acs_vintage").
+        JSON string with median home value and the count of housing units by
+        year built, including the ACS vintage year used ("acs_vintage"). From
+        the 2021 vintage on, the newest bins are "2020_or_later" and
+        "2010_to_2019"; earlier vintages use "2014_or_later" and "2010_to_2013".
         Successful responses are cached on disk for 7 days.
     """
     validation_error = _validate_geography(state_fips, county_fips)
@@ -358,17 +378,14 @@ def get_census_housing_stats(state_fips: str, county_fips: str = "", year: int =
 
     api_key = os.environ.get("CENSUS_API_KEY", "")
     if not api_key:
-        return json.dumps({
-            "error": "CENSUS_API_KEY not configured. Set it in your plugin's environment variables.",
-            "info": "Get a free API key at https://api.census.gov/data/key_signup.html"
-        })
+        return _missing_key("CENSUS_API_KEY", "Get a free API key at https://api.census.gov/data/key_signup.html.")
 
     # Define variables to fetch
     variables = [
         "B25077_001E",  # Median home value
         "B25034_001E",  # Total housing units (for year built)
-        "B25034_002E",  # Built 2014 or later
-        "B25034_003E",  # Built 2010-2013
+        "B25034_002E",  # Built 2020 or later (2014 or later before the 2021 vintage)
+        "B25034_003E",  # Built 2010-2019 (2010-2013 before the 2021 vintage)
         "B25034_004E",  # Built 2000-2009
         "B25034_005E",  # Built 1990-1999
         "B25034_006E",  # Built 1980-1989
@@ -394,24 +411,28 @@ def get_census_housing_stats(state_fips: str, county_fips: str = "", year: int =
         # Parse response
         values = data[1]
 
+        # The ACS changed the two newest year-built bins with the 2021 vintage.
+        newest, recent = (("2020_or_later", "2010_to_2019") if vintage >= 2021
+                          else ("2014_or_later", "2010_to_2013"))
+
         # Create result dictionary
         result = {
             "acs_vintage": vintage,
-            "median_home_value": int(values[0]) if values[0] and values[0] != "-666666666" else None,
+            "median_home_value": _acs_int(values[0]),
             "state_fips": state_fips,
             "county_fips": county_fips if county_fips else None,
             "year_built_distribution": {
-                "total_units": int(values[1]) if values[1] and values[1] != "-666666666" else None,
-                "2014_or_later": int(values[2]) if values[2] and values[2] != "-666666666" else None,
-                "2010_to_2013": int(values[3]) if values[3] and values[3] != "-666666666" else None,
-                "2000_to_2009": int(values[4]) if values[4] and values[4] != "-666666666" else None,
-                "1990_to_1999": int(values[5]) if values[5] and values[5] != "-666666666" else None,
-                "1980_to_1989": int(values[6]) if values[6] and values[6] != "-666666666" else None,
-                "1970_to_1979": int(values[7]) if values[7] and values[7] != "-666666666" else None,
-                "1960_to_1969": int(values[8]) if values[8] and values[8] != "-666666666" else None,
-                "1950_to_1959": int(values[9]) if values[9] and values[9] != "-666666666" else None,
-                "1940_to_1949": int(values[10]) if values[10] and values[10] != "-666666666" else None,
-                "1939_or_earlier": int(values[11]) if values[11] and values[11] != "-666666666" else None
+                "total_units": _acs_int(values[1]),
+                newest: _acs_int(values[2]),
+                recent: _acs_int(values[3]),
+                "2000_to_2009": _acs_int(values[4]),
+                "1990_to_1999": _acs_int(values[5]),
+                "1980_to_1989": _acs_int(values[6]),
+                "1970_to_1979": _acs_int(values[7]),
+                "1960_to_1969": _acs_int(values[8]),
+                "1950_to_1959": _acs_int(values[9]),
+                "1940_to_1949": _acs_int(values[10]),
+                "1939_or_earlier": _acs_int(values[11])
             }
         }
 
@@ -429,111 +450,47 @@ def get_census_housing_stats(state_fips: str, county_fips: str = "", year: int =
 # Redfin Data Center Tools (Free - no auth required)
 # ============================================================================
 
-@mcp.tool()
-def get_redfin_market_data(region_type: str = "metro") -> str:
-    """
-    Get information about Redfin market data files and how to access them.
-    Note: These are large TSV files (hundreds of MB) - this tool provides URLs and guidance.
+REDFIN_BASE_URL = "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_data_center/housing_market/monthly/"
 
-    Args:
-        region_type: Geographic level of the data file. Must be one of
-            "national", "metro", "city", "zip", or "neighborhood".
-            Defaults to "metro".
-
-    Returns:
-        JSON string with download URLs, column descriptions, and usage guidance
-    """
-    base_url = "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/"
-
-    files = {
-        "national": "us_national_market_tracker.tsv000.gz",
-        "metro": "redfin_metro_market_tracker.tsv000.gz",
-        "city": "city_market_tracker.tsv000.gz",
-        "zip": "zip_code_market_tracker.tsv000.gz",
-        "neighborhood": "neighborhood_market_tracker.tsv000.gz"
-    }
-
-    if region_type not in files:
-        return json.dumps({
-            "error": f"Invalid region_type: '{region_type}'.",
-            "valid_region_types": list(files.keys())
-        })
-
-    file_url = base_url + files[region_type]
-
-    result = {
-        "see_also": ("For a ready-parsed monthly time series for a single region "
-                     "(no manual download), call the get_redfin_market_snapshot "
-                     "tool instead."),
-        "data_source": "Redfin Data Center",
-        "region_type": region_type,
-        "download_url": file_url,
-        "format": "TSV (tab-separated values), gzip compressed",
-        "file_size": "Large (typically 100+ MB compressed)",
-        "update_frequency": "Monthly",
-        "key_columns": {
-            "period_begin": "Start date of the time period",
-            "period_end": "End date of the time period",
-            "region_type": "Geographic level (national, metro, city, zip, neighborhood)",
-            "region_name": "Name of the geographic region",
-            "median_sale_price": "Median sale price of homes",
-            "median_sale_price_mom": "Month-over-month % change in median sale price",
-            "median_sale_price_yoy": "Year-over-year % change in median sale price",
-            "median_ppsf": "Median price per square foot",
-            "homes_sold": "Total number of homes sold",
-            "inventory": "Total number of homes for sale",
-            "months_of_supply": "Number of months to sell current inventory at current pace",
-            "median_dom": "Median days on market",
-            "avg_sale_to_list": "Average sale price to list price ratio",
-            "sold_above_list": "Percentage of homes that sold above list price",
-            "off_market_in_two_weeks": "Percentage of homes that went off market within two weeks"
-        },
-        "usage_instructions": [
-            "1. Download the file using wget, curl, or your preferred tool",
-            "2. Decompress the .gz file",
-            "3. Parse the TSV file (tab-separated)",
-            "4. Filter by region and time period as needed",
-            "5. For latest data, sort by period_end descending and take the most recent"
-        ],
-        "example_curl": f"curl -o redfin_data.tsv.gz {file_url}",
-        "available_files": {
-            "national": "National-level metrics",
-            "metro": "Metro area metrics (400+ metros)",
-            "city": "City-level metrics",
-            "zip": "ZIP code-level metrics",
-            "neighborhood": "Neighborhood-level metrics"
-        },
-        "note": "Due to file size, this tool provides guidance rather than downloading the data directly. Process locally for best results."
-    }
-
-    return json.dumps(result, indent=2)
-
-
-REDFIN_BASE_URL = "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/"
-
-# Files behind get_redfin_market_snapshot. Redfin's data calls cities "place",
-# matching the region_type value used inside the files themselves.
+# Redfin Data Center "Housing Market Data" downloads (plain CSV, refreshed
+# monthly). These replaced the old redfin_market_tracker/*.tsv000.gz files,
+# which stopped updating in June 2026. Redfin calls cities "City" in the data;
+# the tool keeps the region_type name "place" for backward compatibility.
 REDFIN_SNAPSHOT_FILES = {
-    "metro": "redfin_metro_market_tracker.tsv000.gz",
-    "county": "county_market_tracker.tsv000.gz",
-    "place": "city_market_tracker.tsv000.gz",
-    "zip": "zip_code_market_tracker.tsv000.gz",
+    "national": "country.csv",       # ~55 KB
+    "state": "all_states.csv",       # ~3 MB
+    "metro": "all_metros.csv",       # ~46 MB
+    "county": "all_counties.csv",    # ~150 MB
+    "place": "all_cities.csv",       # ~1.1 GB
+    "zip": "all_zips.csv",           # ~1.3 GB
 }
 
 REDFIN_REGION_EXAMPLES = {
-    "metro": "Los Angeles, CA metro area",
-    "county": "Los Angeles County, CA",
+    "national": "National",
+    "state": "Texas",
+    "metro": "Austin, TX metro area",
+    "county": "Travis County, TX",
     "place": "Denver, CO",
-    "zip": "90210",
+    "zip": "78704",
 }
 
-_REDFIN_METRIC_COLUMNS = ("median_sale_price", "homes_sold", "inventory",
-                          "median_dom", "months_of_supply")
+# Output field -> CSV column header (headers are matched case-insensitively).
+_REDFIN_COLUMNS = {
+    "median_sale_price": "MEDIAN SALE PRICE NSA ($)",
+    "median_sale_price_yoy_pct": "MEDIAN SALE PRICE NSA YOY (%)",
+    "median_sale_price_per_sqft": "MEDIAN SALE PRICE PER SQ.FT. ($)",
+    "homes_sold": "HOMES SOLD",
+    "new_listings": "NEW LISTINGS",
+    "inventory": "INVENTORY",
+    "months_of_supply": "MONTHS OF SUPPLY",
+    "median_days_on_market": "MEDIAN DAYS ON MARKET (DAYS)",
+    "avg_sale_to_list_pct": "AVERAGE SALE TO LIST RATIO (%)",
+}
 
 
 def _redfin_num(raw: str):
-    """Parse a Redfin TSV numeric field; empty/NA becomes None, whole floats become int."""
-    raw = raw.strip().strip('"')
+    """Parse a Redfin numeric field; empty/NA becomes None, whole floats become int."""
+    raw = (raw or "").strip().strip('"')
     if not raw or raw.upper() == "NA":
         return None
     try:
@@ -544,126 +501,144 @@ def _redfin_num(raw: str):
 
 
 def _redfin_region_match(region_lc: str, needle: str, region_type: str) -> bool:
+    if region_type == "national":
+        return True  # the country file has a single region, "National"
     if region_type == "zip":
-        # Rows look like "Zip Code: 90210" - compare digits only.
         return re.sub(r"\D", "", region_lc) == needle
     return needle in region_lc
 
 
-def _scan_redfin_file(region_type: str, needle: str):
-    """Stream one Redfin market-tracker gzip TSV from S3 line by line.
+def _scan_redfin_file(region_type: str, needles: list):
+    """Stream one Redfin housing-market CSV from S3 and keep rows for the needles.
 
-    Never loads the whole file into memory: the HTTP body is decompressed
-    incrementally and each line is filtered as it arrives. Keeps only
-    "All Residential", non-seasonally-adjusted, monthly rows whose region
-    matches needle.
-
-    Returns (matches, samples): matches maps each matching region name to
-    {period_begin: row_dict}; samples is a list of example region names seen
-    in the file (for helpful no-match error messages).
+    The file is read row by row (never loaded whole). Returns (matches, samples):
+    matches maps needle -> {region_name -> {frequency -> {period_begin: row}}};
+    samples is a list of example region names seen in the file, for
+    helpful no-match errors.
     """
+    import csv
     url = REDFIN_BASE_URL + REDFIN_SNAPSHOT_FILES[region_type]
-    matches = {}
-    samples = []
-    seen_samples = set()
+    matches = {n: {} for n in needles}
+    samples, seen_samples = [], set()
 
-    req = urllib.request.Request(url, headers={"Accept-Encoding": "identity"})
-    with urllib.request.urlopen(req, timeout=120) as response:
-        gz = gzip.GzipFile(fileobj=response)
-        text = io.TextIOWrapper(gz, encoding="utf-8", errors="replace", newline="")
-
-        # Header names are quoted and UPPERCASE in the live files
-        # (e.g. "PERIOD_BEGIN"); normalize to bare lowercase.
-        header = text.readline().rstrip("\r\n").split("\t")
-        col = {name.strip().strip('"').lower(): i for i, name in enumerate(header)}
-        required = ["region", "period_begin", "period_end", "property_type"]
-        required += list(_REDFIN_METRIC_COLUMNS)
+    req = urllib.request.Request(url, headers={"User-Agent": "real-estate-data-mcp (zAI-Skills plugin)"})
+    with urllib.request.urlopen(req, timeout=180) as response:
+        text = io.TextIOWrapper(response, encoding="utf-8", errors="replace", newline="")
+        reader = csv.reader(text)
+        header = next(reader)
+        col = {name.strip().upper(): i for i, name in enumerate(header)}
+        required = ["FREQUENCY", "PERIOD BEGIN", "PERIOD END", "REGION NAME"] + list(_REDFIN_COLUMNS.values())
         missing = [c for c in required if c not in col]
         if missing:
             raise ValueError(f"Redfin file is missing expected columns: {missing}")
-
-        region_i = col["region"]
-        ptype_i = col["property_type"]
-        adj_i = col.get("is_seasonally_adjusted")
-        dur_i = col.get("period_duration")
+        region_i, freq_i = col["REGION NAME"], col["FREQUENCY"]
         max_i = max(col[c] for c in required)
 
-        for line in text:
-            fields = line.rstrip("\r\n").split("\t")
-            if len(fields) <= region_i:
+        for fields in reader:
+            if len(fields) <= max_i:
                 continue
-            region_raw = fields[region_i].strip().strip('"')
+            region_raw = fields[region_i].strip()
             region_lc = region_raw.lower()
             if len(seen_samples) < 15 and region_lc not in seen_samples:
                 seen_samples.add(region_lc)
                 samples.append(region_raw)
-            if not _redfin_region_match(region_lc, needle, region_type):
-                continue
-            if len(fields) <= max_i:
-                continue
-            if fields[ptype_i].strip().strip('"') != "All Residential":
-                continue
-            if adj_i is not None and len(fields) > adj_i and \
-                    fields[adj_i].strip().strip('"').lower() in ("t", "true"):
-                continue
-            if dur_i is not None and len(fields) > dur_i and \
-                    fields[dur_i].strip().strip('"') not in ("30", "30.0", ""):
-                continue  # keep only monthly periods
-            row = {
-                "period_begin": fields[col["period_begin"]].strip().strip('"'),
-                "period_end": fields[col["period_end"]].strip().strip('"'),
-            }
-            for metric in _REDFIN_METRIC_COLUMNS:
-                row[metric] = _redfin_num(fields[col[metric]])
-            matches.setdefault(region_raw, {})[row["period_begin"]] = row
-
+            for needle in needles:
+                if not _redfin_region_match(region_lc, needle, region_type):
+                    continue
+                row = {
+                    "period_begin": fields[col["PERIOD BEGIN"]].strip(),
+                    "period_end": fields[col["PERIOD END"]].strip(),
+                }
+                for out_name, header_name in _REDFIN_COLUMNS.items():
+                    row[out_name] = _redfin_num(fields[col[header_name]])
+                freq = fields[freq_i].strip()
+                matches[needle].setdefault(region_raw, {}).setdefault(freq, {})[row["period_begin"]] = row
     return matches, samples
 
 
-def _redfin_snapshot_result(region: str, region_type: str, rows: list,
+def _redfin_series(by_freq: dict):
+    """Prefer monthly rows; fall back to rolling 3-month rows (city and ZIP files)."""
+    for freq in ("Monthly", "Rolling 3 Months"):
+        if by_freq.get(freq):
+            rows = sorted(by_freq[freq].values(), key=lambda r: r["period_begin"], reverse=True)
+            return freq, rows
+    freq, rows_by_begin = next(iter(by_freq.items()))
+    return freq, sorted(rows_by_begin.values(), key=lambda r: r["period_begin"], reverse=True)
+
+
+def _redfin_snapshot_result(region: str, region_type: str, frequency: str, rows: list,
                             months: int, from_cache: bool) -> dict:
     return {
-        "data_source": "Redfin Data Center market tracker (property type: All Residential)",
+        "data_source": "Redfin Data Center housing market data (all residential, not seasonally adjusted)",
         "region": region,
         "region_type": region_type,
-        "months_returned": min(months, len(rows)),
+        "period_type": frequency,
+        "latest_period_end": rows[0]["period_end"] if rows else None,
+        "periods_returned": min(months, len(rows)),
         "served_from_cache": from_cache,
-        "monthly": rows[:months],  # newest first
+        "periods": rows[:months],  # newest first
     }
+
+
+def _redfin_resolve(needle: str, region_name: str, region_type: str, found: dict, samples: list):
+    """Pick one region for a needle, or explain why not."""
+    if not found:
+        return None, {
+            "region_name": region_name,
+            "error": f"No {region_type} rows matched '{region_name}'.",
+            "hint": ("Matching is a case-insensitive substring for named regions and an exact "
+                     "5-digit match for ZIPs; metros use Redfin's names like 'Austin, TX metro area'."),
+            "region_name_examples": REDFIN_REGION_EXAMPLES,
+            "sample_regions_in_file": samples,
+        }
+    if len(found) > 1:
+        exact = [name for name in found if name.strip().lower() == needle]
+        if len(exact) != 1:
+            return None, {
+                "region_name": region_name,
+                "error": f"'{region_name}' matched {len(found)} regions; pass one of the exact names below.",
+                "matching_regions": sorted(found.keys())[:25],
+            }
+        return exact[0], None
+    return next(iter(found)), None
 
 
 @mcp.tool()
 def get_redfin_market_snapshot(region_name: str, region_type: str = "metro", months: int = 24) -> str:
     """
-    Get a monthly housing-market time series for one region from Redfin Data
-    Center's free public market-tracker data. No API key required - this is
-    the plugin's zero-cost live market data path.
+    Housing-market time series for one or more regions from Redfin Data
+    Center's free public data. No API key required.
 
-    Returns median sale price, homes sold, inventory, median days on market,
-    and months of supply for each of the last `months` months (property type
-    "All Residential", newest first).
+    Each period has: median sale price (and its year-over-year %), median sale
+    price per sq ft, homes sold, new listings, inventory, months of supply,
+    median days on market, and average sale-to-list ratio, all residential
+    property types combined, not seasonally adjusted, newest first. Metro,
+    county, state and national data are monthly; city ("place") and ZIP data
+    are mostly rolling 3-month periods (the response says which). Redfin
+    publishes about six weeks after month end. No rent data: use the Rentcast
+    tools or Census for rents.
 
-    Cost note: the first uncached call streams Redfin's gzipped TSV from S3
-    and can take minutes on slow connections. Approximate compressed sizes:
-    metro ~110 MB, county ~240 MB, place ~1 GB, zip ~1.5 GB - prefer metro or
-    county when either granularity works. The file is processed line by line
-    (never fully loaded into memory), and the filtered slice is cached for
-    24 hours under ~/.cache/real-estate-data/, so repeat calls for the same
-    region are instant regardless of the `months` value.
+    To compare markets, pass several regions separated by " | " in one call
+    (e.g. "Austin, TX metro area | Nashville, TN metro area"): the file is read
+    once for all of them. The first uncached call downloads the file for that
+    level (metro ~46 MB, county ~150 MB, place ~1.1 GB, zip ~1.3 GB), which can
+    take minutes for place and zip; results are cached for 24 hours.
 
     Args:
-        region_name: Region to look up. Format by region_type:
-            metro: "Los Angeles, CA metro area" (a case-insensitive substring
-                like "los angeles" also works if it matches only one region)
-            county: "Los Angeles County, CA"
-            place: "Denver, CO" (cities/towns)
-            zip: "90210" (5-digit ZIP code, exact match)
-        region_type: One of "metro", "county", "place", "zip". Default "metro".
-        months: Number of most recent months to return (default 24, max 240).
+        region_name: Region(s) to look up, separated by " | ". Formats:
+            metro: "Austin, TX metro area" (a substring like "austin, tx" works if unique)
+            county: "Travis County, TX"
+            place: "Denver, CO"
+            zip: "78704"
+            state: "Texas"
+            national: any name (the file has one region, "National")
+        region_type: "metro" (default), "county", "place", "zip", "state", or "national".
+        months: Number of most recent periods per region (default 24, max 240).
 
     Returns:
-        JSON string with one entry per month (newest first), or an error that
-        lists valid region examples when nothing matches
+        JSON with one result per region (or a single result object when one
+        region was asked for), each listing periods newest first, or an error
+        with valid examples when a region doesn't match
     """
     region_type = region_type.strip().lower()
     if region_type not in REDFIN_SNAPSHOT_FILES:
@@ -676,65 +651,103 @@ def get_redfin_market_snapshot(region_name: str, region_type: str = "metro", mon
         return json.dumps({"error": "months must be a positive integer."})
     months = min(months, 240)
 
-    if region_type == "zip":
-        needle = re.sub(r"\D", "", region_name)
-        if len(needle) != 5:
-            return json.dumps({
-                "error": "For region_type 'zip', region_name must be a 5-digit "
-                         "ZIP code (e.g., '90210')."
-            })
-    else:
-        needle = region_name.strip().lower()
-        if not needle:
-            return json.dumps({
-                "error": "region_name must not be empty.",
-                "region_name_examples": REDFIN_REGION_EXAMPLES
-            })
+    requested = [r.strip() for r in region_name.split("|") if r.strip()]
+    if not requested:
+        return json.dumps({"error": "region_name must not be empty.", "region_name_examples": REDFIN_REGION_EXAMPLES})
+    needles = {}
+    for name in requested:
+        if region_type == "zip":
+            digits = re.sub(r"\D", "", name)
+            if len(digits) != 5:
+                return json.dumps({"error": f"For region_type 'zip', each region must be a 5-digit ZIP code (got '{name}')."})
+            needles[name] = digits
+        else:
+            needles[name] = name.lower()
 
-    cache_key = f"{region_type}|{needle}"
-    cached = _cache_get("redfin", cache_key, CACHE_TTL_REDFIN)
-    if cached is not None:
-        return json.dumps(
-            _redfin_snapshot_result(cached["region"], region_type,
-                                    cached["rows"], months, from_cache=True),
-            indent=2)
+    results, to_scan = {}, []
+    for name, needle in needles.items():
+        cached = _cache_get("redfin-v2", f"{region_type}|{needle}", CACHE_TTL_REDFIN)
+        if cached is not None:
+            results[name] = _redfin_snapshot_result(cached["region"], region_type, cached["frequency"],
+                                                    cached["rows"], months, from_cache=True)
+        else:
+            to_scan.append(name)
 
-    try:
-        matches, samples = _scan_redfin_file(region_type, needle)
-    except urllib.error.HTTPError as e:
-        return json.dumps({"error": f"Redfin data download HTTP error: {e.code} - {e.reason}"})
-    except urllib.error.URLError as e:
-        return json.dumps({"error": f"Redfin data download connection error: {str(e)}"})
-    except (OSError, ValueError) as e:
-        return json.dumps({"error": f"Redfin data processing error: {str(e)}"})
+    if to_scan:
+        try:
+            matches, samples = _scan_redfin_file(region_type, sorted({needles[n] for n in to_scan}))
+        except urllib.error.HTTPError as e:
+            return json.dumps({"error": f"Redfin data download HTTP error: {e.code} - {e.reason}"})
+        except urllib.error.URLError as e:
+            return json.dumps({"error": f"Redfin data download connection error: {str(e)}"})
+        except (OSError, ValueError) as e:
+            return json.dumps({"error": f"Redfin data processing error: {str(e)}"})
+        for name in to_scan:
+            needle = needles[name]
+            resolved, err = _redfin_resolve(needle, name, region_type, matches.get(needle, {}), samples)
+            if err:
+                results[name] = err
+                continue
+            frequency, rows = _redfin_series(matches[needle][resolved])
+            _cache_put("redfin-v2", f"{region_type}|{needle}", {"region": resolved, "frequency": frequency, "rows": rows})
+            results[name] = _redfin_snapshot_result(resolved, region_type, frequency, rows, months, from_cache=False)
 
-    if not matches:
-        return json.dumps({
-            "error": f"No {region_type} rows matched region_name '{region_name}'.",
-            "hint": ("Check the spelling and format. Matching is a case-insensitive "
-                     "substring for metro/county/place and an exact 5-digit match for zip."),
-            "region_name_examples": REDFIN_REGION_EXAMPLES,
-            "sample_regions_in_file": samples
-        }, indent=2)
+    if len(requested) == 1:
+        return json.dumps(results[requested[0]], indent=2)
+    return json.dumps({"results": [results[n] for n in requested]}, indent=2)
 
-    if len(matches) > 1:
-        exact = [name for name in matches if name.strip().lower() == needle]
-        if len(exact) != 1:
-            return json.dumps({
-                "error": (f"region_name '{region_name}' matched {len(matches)} regions; "
-                          "pass one of the exact names below."),
-                "matching_regions": sorted(matches.keys())[:25]
-            }, indent=2)
-        resolved = exact[0]
-    else:
-        resolved = next(iter(matches))
 
-    rows = sorted(matches[resolved].values(),
-                  key=lambda r: r["period_begin"], reverse=True)
-    _cache_put("redfin", cache_key, {"region": resolved, "rows": rows})
-    return json.dumps(
-        _redfin_snapshot_result(resolved, region_type, rows, months, from_cache=False),
-        indent=2)
+@mcp.tool()
+def get_redfin_market_data(region_type: str = "metro") -> str:
+    """
+    Download link and column guide for a whole Redfin Data Center housing-market
+    file, for analysis across many regions at once (e.g. ranking all metros).
+    For one or a few regions, use get_redfin_market_snapshot instead: it
+    downloads, filters and parses the file for you.
+
+    Args:
+        region_type: "national", "state", "metro" (default), "county", "place", or "zip".
+
+    Returns:
+        JSON with the download URL, approximate size, format notes and the
+        column names as they appear in the file
+    """
+    region_type = region_type.strip().lower()
+    if region_type == "city":
+        region_type = "place"
+    if region_type not in REDFIN_SNAPSHOT_FILES:
+        return json.dumps({"error": f"Invalid region_type: '{region_type}'.",
+                           "valid_region_types": sorted(REDFIN_SNAPSHOT_FILES.keys())})
+    sizes = {"national": "~55 KB", "state": "~3 MB", "metro": "~46 MB", "county": "~150 MB",
+             "place": "~1.1 GB", "zip": "~1.3 GB"}
+    url = REDFIN_BASE_URL + REDFIN_SNAPSHOT_FILES[region_type]
+    return json.dumps({
+        "data_source": "Redfin Data Center housing market data",
+        "region_type": region_type,
+        "download_url": url,
+        "format": "CSV with a header row; text fields quoted; missing values are NA",
+        "approximate_size": sizes[region_type],
+        "update_frequency": "Monthly (about six weeks after month end)",
+        "rows": ("One row per region per period. FREQUENCY is 'Monthly' or 'Rolling 3 Months' "
+                 "(city and ZIP files are mostly rolling 3-month). All residential property "
+                 "types combined, not seasonally adjusted."),
+        "key_columns": {
+            "REGION NAME": "Region, e.g. 'Austin, TX metro area', 'Travis County, TX', '78704'",
+            "FREQUENCY": "Monthly or Rolling 3 Months",
+            "PERIOD BEGIN / PERIOD END": "Period dates (YYYY-MM-DD)",
+            "MEDIAN SALE PRICE NSA ($)": "Median sale price",
+            "MEDIAN SALE PRICE NSA YOY (%)": "Year-over-year change in median sale price",
+            "MEDIAN SALE PRICE PER SQ.FT. ($)": "Median sale price per square foot",
+            "HOMES SOLD": "Homes sold in the period",
+            "NEW LISTINGS / ACTIVE LISTINGS / INVENTORY": "Supply measures",
+            "MONTHS OF SUPPLY": "Months to sell current inventory at the current pace",
+            "MEDIAN DAYS ON MARKET (DAYS)": "Median days on market",
+            "AVERAGE SALE TO LIST RATIO (%)": "Average sale price as % of list price",
+        },
+        "see_also": "get_redfin_market_snapshot (one or a few regions, parsed for you)",
+        "tip": ("Filter by REGION NAME and FREQUENCY, sort by PERIOD END descending. With pandas: "
+                "pd.read_csv(url, na_values='NA')."),
+    }, indent=2)
 
 
 # ============================================================================
@@ -773,10 +786,7 @@ def get_fred_series(series_id: str, observations: int = 24) -> str:
 
     api_key = os.environ.get("FRED_API_KEY", "")
     if not api_key:
-        return json.dumps({
-            "error": "FRED_API_KEY not configured. Set it in your plugin's environment variables.",
-            "info": "Get a free API key at https://fred.stlouisfed.org/docs/api/api_key.html"
-        })
+        return _missing_key("FRED_API_KEY", "Get a free API key at https://fred.stlouisfed.org/docs/api/api_key.html.")
 
     cache_key = f"{series_id}|{observations}"
     cached = _cache_get("fred", cache_key, CACHE_TTL_MARKET)
@@ -839,12 +849,26 @@ def _rentcast_call(api_key: str, cache_key: str, url: str) -> str:
     Cache hits do not increment the counter (they cost no quota). Live calls
     increment it before the request is issued, so failed requests - which may
     still count against Rentcast's free tier - are tracked conservatively.
+    Once the month's free calls are used, live calls stop unless the user set
+    RENTCAST_ALLOW_OVERAGE=1, because Rentcast bills each request beyond the
+    free allowance.
     """
     cached = _cache_get("rentcast", cache_key, CACHE_TTL_MARKET)
     if cached is not None:
         return json.dumps(
             _with_rentcast_quota(cached, _rentcast_usage(), from_cache=True),
             indent=2)
+
+    used = _rentcast_usage()
+    if used >= RENTCAST_FREE_TIER_LIMIT and os.environ.get("RENTCAST_ALLOW_OVERAGE", "") != "1":
+        return json.dumps({
+            "error": (f"Rentcast free-tier limit reached ({used}/{RENTCAST_FREE_TIER_LIMIT} "
+                      "calls this month by this plugin's count). No request was sent, "
+                      "because further calls may be billed."),
+            "info": ("Use Census median gross rent or comparable listings instead, or, if the "
+                     "user accepts Rentcast's per-request charges, they can set "
+                     "RENTCAST_ALLOW_OVERAGE=1 and restart Claude Code."),
+        }, indent=2)
 
     req = urllib.request.Request(url)
     req.add_header("X-Api-Key", api_key)
@@ -875,24 +899,25 @@ def _rentcast_call(api_key: str, cache_key: str, url: str) -> str:
 @mcp.tool()
 def estimate_rent(address: str) -> str:
     """
-    Get rent estimate for a property using Rentcast AVM.
+    Long-term rent estimate for one property from Rentcast's rent AVM.
 
     Responses are cached on disk for 24 hours (cache hits cost no quota).
     Every response includes a "rentcast_quota" note tracking free-tier usage
-    ("N/50 free-tier calls used this month") and a warning as the limit nears.
+    ("N/50 free-tier calls used this month"), a warning as the limit nears,
+    and a refusal at the limit unless RENTCAST_ALLOW_OVERAGE=1.
 
     Args:
         address: Full property address (e.g., "123 Main St, Los Angeles, CA 90001")
 
     Returns:
-        JSON string with rent estimate, comparable rentals, and confidence score
+        JSON with the estimated monthly rent, a low-high range
+        (rentRangeLow/rentRangeHigh), and the comparable rental listings used
+        (address, rent, distance, correlation). Rentcast gives no separate
+        confidence score; a wide range means a less certain estimate.
     """
     api_key = os.environ.get("RENTCAST_API_KEY", "")
     if not api_key:
-        return json.dumps({
-            "error": "RENTCAST_API_KEY not configured. Set it in your plugin's environment variables.",
-            "info": "Sign up for a free API key at https://app.rentcast.io/app/api"
-        })
+        return _missing_key("RENTCAST_API_KEY", "Sign up for a free API key at https://app.rentcast.io/app/api.")
 
     base_url = "https://api.rentcast.io/v1/avm/rent/long-term"
     url = f"{base_url}?{urllib.parse.urlencode({'address': address})}"
@@ -906,13 +931,18 @@ def get_rentcast_market_data(zip_code: str) -> str:
 
     Responses are cached on disk for 24 hours (cache hits cost no quota).
     Every response includes a "rentcast_quota" note tracking free-tier usage
-    ("N/50 free-tier calls used this month") and a warning as the limit nears.
+    ("N/50 free-tier calls used this month"), a warning as the limit nears,
+    and a refusal at the limit unless RENTCAST_ALLOW_OVERAGE=1.
 
     Args:
         zip_code: Five-digit ZIP code (e.g., "90001")
 
     Returns:
-        JSON string with market stats including median rent, rent growth, and vacancy rate
+        JSON with Rentcast's listing statistics for the ZIP: saleData and
+        rentalData, each with averages, medians, ranges, per-sq-ft figures,
+        days on market and listing counts, broken down by property type and
+        bedrooms, plus monthly history. These come from listings, so there is
+        no vacancy rate (use Census for vacancy).
     """
     validation_error = _validate_zip(zip_code)
     if validation_error:
@@ -920,10 +950,7 @@ def get_rentcast_market_data(zip_code: str) -> str:
 
     api_key = os.environ.get("RENTCAST_API_KEY", "")
     if not api_key:
-        return json.dumps({
-            "error": "RENTCAST_API_KEY not configured. Set it in your plugin's environment variables.",
-            "info": "Sign up for a free API key at https://app.rentcast.io/app/api"
-        })
+        return _missing_key("RENTCAST_API_KEY", "Sign up for a free API key at https://app.rentcast.io/app/api.")
 
     base_url = "https://api.rentcast.io/v1/markets"
     url = f"{base_url}?{urllib.parse.urlencode({'zipCode': zip_code})}"
@@ -931,13 +958,65 @@ def get_rentcast_market_data(zip_code: str) -> str:
 
 
 # ============================================================================
-# Mashvisor Tools (Paid - requires MASHVISOR_API_KEY)
+# Paid providers: Mashvisor, AirDNA, ATTOM
+#
+# These calls follow each provider's published API docs but have not been run
+# against a live key by this plugin's maintainers, so each response carries an
+# "unverified_integration" note. If a call fails, the HTTP error body is
+# returned as-is so the cause is visible.
 # ============================================================================
+
+_UNVERIFIED_NOTE = ("This integration follows the provider's published docs but hasn't been tested "
+                    "with a live key; check field names in the raw response before relying on them.")
+
+
+def _paid_request(provider: str, url: str, headers: dict, payload=None):
+    """Send one JSON request. Returns (data, None) or (None, error_dict)."""
+    body = json.dumps(payload).encode() if payload is not None else None
+    req = urllib.request.Request(url, data=body, method="POST" if body is not None else "GET")
+    req.add_header("Accept", "application/json")
+    if body is not None:
+        req.add_header("Content-Type", "application/json")
+    for name, value in headers.items():
+        req.add_header(name, value)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            return json.loads(response.read().decode()), None
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode(errors="replace") if e.fp else ""
+        return None, {"error": f"{provider} API HTTP error: {e.code} - {e.reason}",
+                      "details": error_body[:2000]}
+    except urllib.error.URLError as e:
+        return None, {"error": f"{provider} API connection error: {str(e)}"}
+    except ValueError as e:
+        return None, {"error": f"{provider} API returned non-JSON content: {str(e)}"}
+
+
+def _find_records(data, keys=("id",)):
+    """Return the first list of dicts (searching nested dicts) whose items have all keys."""
+    if isinstance(data, list):
+        if data and all(isinstance(x, dict) and all(k in x for k in keys) for x in data):
+            return data
+        for item in data:
+            found = _find_records(item, keys)
+            if found:
+                return found
+    elif isinstance(data, dict):
+        for value in data.values():
+            found = _find_records(value, keys)
+            if found:
+                return found
+    return []
+
 
 @mcp.tool()
 def get_mashvisor_property(address: str, state: str, city: str, zip_code: str) -> str:
     """
-    Get property details and rental income estimates from Mashvisor.
+    Property record from Mashvisor (paid; needs MASHVISOR_API_KEY).
+
+    Returns Mashvisor's property details as the API sends them (listing and
+    building facts). Mashvisor serves rental income estimates from a separate
+    endpoint this tool doesn't call, so don't expect STR/LTR estimates here.
 
     Args:
         address: Street address (e.g., "123 Main St")
@@ -946,119 +1025,94 @@ def get_mashvisor_property(address: str, state: str, city: str, zip_code: str) -
         zip_code: Five-digit ZIP code (e.g., "90001")
 
     Returns:
-        JSON string with property details, STR/LTR estimates, and neighborhood score
+        JSON with Mashvisor's raw property response, or an error
     """
     validation_error = _validate_zip(zip_code)
     if validation_error:
         return json.dumps({"error": validation_error})
-
     api_key = os.environ.get("MASHVISOR_API_KEY", "")
     if not api_key:
-        return json.dumps({
-            "error": "MASHVISOR_API_KEY not configured. Set it in your plugin's environment variables.",
-            "info": "Sign up for an API key at https://www.mashvisor.com/api"
-        })
+        return _missing_key("MASHVISOR_API_KEY", "Mashvisor API access: https://www.mashvisor.com/data-api.")
 
-    # Build URL with query parameters
-    base_url = "https://api.mashvisor.com/v1.1/client/property"
-    params = {
-        "address": address,
-        "state": state,
-        "city": city,
-        "zip_code": zip_code
-    }
-    url = f"{base_url}?{urllib.parse.urlencode(params)}"
-
-    # Create request with API key header
-    req = urllib.request.Request(url)
-    req.add_header("x-api-key", api_key)
-    req.add_header("Accept", "application/json")
-
-    try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            data = json.loads(response.read().decode())
-
-        return json.dumps(data, indent=2)
-
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode() if e.fp else ""
-        return json.dumps({
-            "error": f"Mashvisor API HTTP error: {e.code} - {e.reason}",
-            "details": error_body
-        })
-    except urllib.error.URLError as e:
-        return json.dumps({"error": f"Mashvisor API connection error: {str(e)}"})
-    except Exception as e:
-        return json.dumps({"error": f"Mashvisor API error: {str(e)}"})
+    params = {"address": address, "state": state, "city": city, "zip_code": zip_code}
+    url = f"https://api.mashvisor.com/v1.1/client/property?{urllib.parse.urlencode(params)}"
+    data, err = _paid_request("Mashvisor", url, {"x-api-key": api_key})
+    if err:
+        return json.dumps(err, indent=2)
+    return json.dumps({"unverified_integration": _UNVERIFIED_NOTE, "data": data}, indent=2)
 
 
 @mcp.tool()
-def get_mashvisor_neighborhood(city: str, state: str, zip_code: str = "") -> str:
+def get_mashvisor_neighborhood(city: str, state: str, neighborhood: str = "", neighborhood_id: str = "") -> str:
     """
-    Get neighborhood investment analysis from Mashvisor.
+    Neighborhood investment overview from Mashvisor (paid; needs MASHVISOR_API_KEY).
+
+    Mashvisor keys neighborhood data by ID. With neighborhood_id, this returns
+    that neighborhood's overview. Otherwise it lists the city's neighborhoods
+    (with IDs); if `neighborhood` names exactly one of them, it fetches that
+    overview too. The overview's fields (rental yields, occupancy, prices) are
+    passed through as Mashvisor returns them.
 
     Args:
         city: City name (e.g., "Los Angeles")
         state: Two-letter state code (e.g., "CA")
-        zip_code: Five-digit ZIP code (optional, e.g., "90001")
+        neighborhood: Neighborhood name to look up (optional, e.g., "Silver Lake")
+        neighborhood_id: Mashvisor neighborhood ID, if already known (optional)
 
     Returns:
-        JSON string with neighborhood analysis including investment score, cash on cash, cap rate
+        JSON with the overview, or the list of neighborhoods to choose from
     """
-    if zip_code:
-        validation_error = _validate_zip(zip_code)
-        if validation_error:
-            return json.dumps({"error": validation_error})
-
     api_key = os.environ.get("MASHVISOR_API_KEY", "")
     if not api_key:
-        return json.dumps({
-            "error": "MASHVISOR_API_KEY not configured. Set it in your plugin's environment variables.",
-            "info": "Sign up for an API key at https://www.mashvisor.com/api"
-        })
+        return _missing_key("MASHVISOR_API_KEY", "Mashvisor API access: https://www.mashvisor.com/data-api.")
+    headers = {"x-api-key": api_key}
+    state = state.strip().upper()
 
-    # Build URL with query parameters
-    base_url = "https://api.mashvisor.com/v1.1/client/neighborhood"
-    params = {
-        "city": city,
-        "state": state
-    }
-    if zip_code:
-        params["zip_code"] = zip_code
+    if not neighborhood_id:
+        list_url = ("https://api.mashvisor.com/v1.1/client/city/neighborhoods/"
+                    f"{urllib.parse.quote(state)}/{urllib.parse.quote(city.strip())}")
+        data, err = _paid_request("Mashvisor", list_url, headers)
+        if err:
+            return json.dumps(err, indent=2)
+        hoods = _find_records(data, ("id", "name"))
+        if neighborhood:
+            wanted = neighborhood.strip().lower()
+            hits = [h for h in hoods if wanted in str(h.get("name", "")).lower()]
+            exact = [h for h in hits if str(h.get("name", "")).lower() == wanted]
+            hits = exact or hits
+            if len(hits) == 1:
+                neighborhood_id = str(hits[0]["id"])
+        if not neighborhood_id:
+            return json.dumps({
+                "unverified_integration": _UNVERIFIED_NOTE,
+                "note": ("Pass one of these IDs as neighborhood_id (or a unique name as neighborhood) "
+                         "to get its overview."),
+                "neighborhoods": [{"id": h.get("id"), "name": h.get("name")} for h in hoods][:200],
+                "raw": data if not hoods else None,
+            }, indent=2)
 
-    url = f"{base_url}?{urllib.parse.urlencode(params)}"
-
-    # Create request with API key header
-    req = urllib.request.Request(url)
-    req.add_header("x-api-key", api_key)
-    req.add_header("Accept", "application/json")
-
-    try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            data = json.loads(response.read().decode())
-
-        return json.dumps(data, indent=2)
-
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode() if e.fp else ""
-        return json.dumps({
-            "error": f"Mashvisor API HTTP error: {e.code} - {e.reason}",
-            "details": error_body
-        })
-    except urllib.error.URLError as e:
-        return json.dumps({"error": f"Mashvisor API connection error: {str(e)}"})
-    except Exception as e:
-        return json.dumps({"error": f"Mashvisor API error: {str(e)}"})
+    bar_url = (f"https://api.mashvisor.com/v1.1/client/neighborhood/{urllib.parse.quote(str(neighborhood_id))}"
+               f"/bar?{urllib.parse.urlencode({'state': state})}")
+    data, err = _paid_request("Mashvisor", bar_url, headers)
+    if err:
+        return json.dumps(err, indent=2)
+    return json.dumps({"unverified_integration": _UNVERIFIED_NOTE,
+                       "neighborhood_id": neighborhood_id, "data": data}, indent=2)
 
 
-# ============================================================================
-# AirDNA Tools (Paid - requires AIRDNA_API_KEY)
-# ============================================================================
+AIRDNA_BASE_URL = "https://api.airdna.co/api/enterprise/v2"
+AIRDNA_SIGNUP = "AirDNA Enterprise API tokens are issued by AirDNA's sales team (airdna.co), not self-serve."
+
 
 @mcp.tool()
 def get_airdna_rentalizer(address: str, bedrooms: int, bathrooms: float) -> str:
     """
-    Get short-term rental revenue projections for a property from AirDNA's Rentalizer.
+    Short-term rental revenue estimate for one property from AirDNA's
+    Rentalizer (paid Enterprise API; needs AIRDNA_API_KEY).
+
+    The request path and body follow AirDNA's Enterprise v2 docs as far as
+    they could be read; it's unverified. The response is passed through as
+    AirDNA returns it (typically projected revenue, ADR and occupancy).
 
     Args:
         address: Full property address (e.g., "123 Main St, Los Angeles, CA 90001")
@@ -1066,199 +1120,126 @@ def get_airdna_rentalizer(address: str, bedrooms: int, bathrooms: float) -> str:
         bathrooms: Number of bathrooms (e.g., 2 or 2.5)
 
     Returns:
-        JSON string with STR revenue projection, ADR, occupancy rate, and RevPAR
+        JSON with AirDNA's raw estimate response, or an error
     """
     api_key = os.environ.get("AIRDNA_API_KEY", "")
     if not api_key:
-        return json.dumps({
-            "error": "AIRDNA_API_KEY not configured. Set it in your plugin's environment variables.",
-            "info": "Sign up for an API key at https://www.airdna.co/vacation-rental-data"
-        })
+        return _missing_key("AIRDNA_API_KEY", AIRDNA_SIGNUP)
+    data, err = _paid_request(
+        "AirDNA", f"{AIRDNA_BASE_URL}/rentalizer/estimate", {"Authorization": f"Bearer {api_key}"},
+        {"address": address, "bedrooms": bedrooms, "bathrooms": bathrooms})
+    if err:
+        return json.dumps(err, indent=2)
+    return json.dumps({"unverified_integration": _UNVERIFIED_NOTE, "data": data}, indent=2)
 
-    # Rentalizer estimates are requested via POST with a JSON body
-    url = "https://api.airdna.co/api/enterprise/v2/rentalizer/estimate"
-    payload = json.dumps({
-        "address": address,
-        "bedrooms": bedrooms,
-        "bathrooms": bathrooms
-    }).encode()
 
-    # Create request with bearer token
-    req = urllib.request.Request(url, data=payload, method="POST")
-    req.add_header("Authorization", f"Bearer {api_key}")
-    req.add_header("Content-Type", "application/json")
-    req.add_header("Accept", "application/json")
-
-    try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            data = json.loads(response.read().decode())
-
-        return json.dumps(data, indent=2)
-
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode() if e.fp else ""
-        return json.dumps({
-            "error": f"AirDNA API HTTP error: {e.code} - {e.reason}",
-            "details": error_body
-        })
-    except urllib.error.URLError as e:
-        return json.dumps({"error": f"AirDNA API connection error: {str(e)}"})
-    except Exception as e:
-        return json.dumps({"error": f"AirDNA API error: {str(e)}"})
+AIRDNA_MARKET_METRICS = ("occupancy", "adr", "avg_revenue")
 
 
 @mcp.tool()
 def get_airdna_market_stats(city: str, state: str) -> str:
     """
-    Get market-level short-term rental statistics from AirDNA.
+    Market-level short-term rental metrics from AirDNA (paid Enterprise API;
+    needs AIRDNA_API_KEY).
+
+    Two steps: searches AirDNA markets for "<city>, <state>", then requests
+    occupancy, average daily rate (ADR) and average revenue for the best
+    match. Metric responses are passed through as AirDNA returns them.
 
     Args:
-        city: City name (e.g., "Los Angeles")
-        state: Two-letter state code (e.g., "CA")
+        city: City name (e.g., "Austin")
+        state: Two-letter state code (e.g., "TX")
 
     Returns:
-        JSON string with market STR metrics including ADR, occupancy, revenue, listings count
+        JSON with the matched market, the other candidates, and each metric's
+        raw response (or that metric's error)
     """
     api_key = os.environ.get("AIRDNA_API_KEY", "")
     if not api_key:
-        return json.dumps({
-            "error": "AIRDNA_API_KEY not configured. Set it in your plugin's environment variables.",
-            "info": "Sign up for an API key at https://www.airdna.co/vacation-rental-data"
-        })
+        return _missing_key("AIRDNA_API_KEY", AIRDNA_SIGNUP)
+    headers = {"Authorization": f"Bearer {api_key}"}
 
-    # Build URL with query parameters
-    base_url = "https://api.airdna.co/v2/market/statistics"
-    params = {
-        "city": city,
-        "state": state
-    }
-    url = f"{base_url}?{urllib.parse.urlencode(params)}"
+    search_term = f"{city.strip()}, {state.strip().upper()}"
+    found, err = _paid_request("AirDNA", f"{AIRDNA_BASE_URL}/market/search", headers,
+                               {"search_term": search_term})
+    if err:
+        return json.dumps(err, indent=2)
+    markets = _find_records(found, ("id",))
+    if not markets:
+        return json.dumps({"error": f"AirDNA returned no market for '{search_term}'.",
+                           "unverified_integration": _UNVERIFIED_NOTE, "raw": found}, indent=2)
 
-    # Create request with bearer token
-    req = urllib.request.Request(url)
-    req.add_header("Authorization", f"Bearer {api_key}")
-    req.add_header("Accept", "application/json")
-
-    try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            data = json.loads(response.read().decode())
-
-        return json.dumps(data, indent=2)
-
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode() if e.fp else ""
-        return json.dumps({
-            "error": f"AirDNA API HTTP error: {e.code} - {e.reason}",
-            "details": error_body
-        })
-    except urllib.error.URLError as e:
-        return json.dumps({"error": f"AirDNA API connection error: {str(e)}"})
-    except Exception as e:
-        return json.dumps({"error": f"AirDNA API error: {str(e)}"})
+    market = markets[0]
+    market_id = urllib.parse.quote(str(market["id"]))
+    metrics = {}
+    for metric in AIRDNA_MARKET_METRICS:
+        data, err = _paid_request("AirDNA", f"{AIRDNA_BASE_URL}/market/{market_id}/metrics/{metric}",
+                                  headers, {})
+        metrics[metric] = err or data
+    return json.dumps({
+        "unverified_integration": _UNVERIFIED_NOTE,
+        "market": market,
+        "other_candidates": [{"id": m.get("id"), "name": m.get("name")} for m in markets[1:6]],
+        "metrics": metrics,
+    }, indent=2)
 
 
-# ============================================================================
-# ATTOM Tools (Paid - requires ATTOM_API_KEY)
-# ============================================================================
+ATTOM_BASE_URL = "https://api.gateway.attomdata.com/propertyapi/v1.0.0"
+ATTOM_SIGNUP = "ATTOM API keys: https://api.developer.attomdata.com/."
+
 
 @mcp.tool()
 def get_attom_property(address: str) -> str:
     """
-    Get detailed property information from ATTOM Data Solutions.
+    Property record from ATTOM (paid; needs ATTOM_API_KEY): lot and building
+    size, year built, bedrooms and bathrooms, property type, and similar
+    facts, passed through as ATTOM returns them.
 
     Args:
         address: Full property address with a comma between the street and the
             city/state/zip (e.g., "123 Main St, Los Angeles, CA 90001")
 
     Returns:
-        JSON string with property details, lot size, building size, year built, bed/bath count
+        JSON with ATTOM's raw property detail response, or an error
     """
     params, address_error = _attom_address_params(address)
     if address_error:
         return json.dumps({"error": address_error})
-
     api_key = os.environ.get("ATTOM_API_KEY", "")
     if not api_key:
-        return json.dumps({
-            "error": "ATTOM_API_KEY not configured. Set it in your plugin's environment variables.",
-            "info": "Sign up for an API key at https://api.developer.attomdata.com/"
-        })
-
-    # ATTOM requires the street (address1) and city/state/zip (address2) split
-    base_url = "https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/detail"
-    url = f"{base_url}?{urllib.parse.urlencode(params)}"
-
-    # Create request with API key header
-    req = urllib.request.Request(url)
-    req.add_header("apikey", api_key)
-    req.add_header("Accept", "application/json")
-
-    try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            data = json.loads(response.read().decode())
-
-        return json.dumps(data, indent=2)
-
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode() if e.fp else ""
-        return json.dumps({
-            "error": f"ATTOM API HTTP error: {e.code} - {e.reason}",
-            "details": error_body
-        })
-    except urllib.error.URLError as e:
-        return json.dumps({"error": f"ATTOM API connection error: {str(e)}"})
-    except Exception as e:
-        return json.dumps({"error": f"ATTOM API error: {str(e)}"})
+        return _missing_key("ATTOM_API_KEY", ATTOM_SIGNUP)
+    data, err = _paid_request("ATTOM", f"{ATTOM_BASE_URL}/property/detail?{urllib.parse.urlencode(params)}",
+                              {"apikey": api_key})
+    if err:
+        return json.dumps(err, indent=2)
+    return json.dumps(data, indent=2)
 
 
 @mcp.tool()
 def get_attom_valuation(address: str) -> str:
     """
-    Get automated valuation model (AVM) estimate from ATTOM Data Solutions.
+    Automated valuation (AVM) from ATTOM (paid; needs ATTOM_API_KEY): the
+    estimated value with a high-low range and ATTOM's confidence score
+    ("scr"). It doesn't include comparable sales.
 
     Args:
         address: Full property address with a comma between the street and the
             city/state/zip (e.g., "123 Main St, Los Angeles, CA 90001")
 
     Returns:
-        JSON string with AVM estimate, confidence score, and comparable sales
+        JSON with ATTOM's raw AVM response, or an error
     """
     params, address_error = _attom_address_params(address)
     if address_error:
         return json.dumps({"error": address_error})
-
     api_key = os.environ.get("ATTOM_API_KEY", "")
     if not api_key:
-        return json.dumps({
-            "error": "ATTOM_API_KEY not configured. Set it in your plugin's environment variables.",
-            "info": "Sign up for an API key at https://api.developer.attomdata.com/"
-        })
-
-    # ATTOM requires the street (address1) and city/state/zip (address2) split
-    base_url = "https://api.gateway.attomdata.com/propertyapi/v1.0.0/valuation/homevaluation"
-    url = f"{base_url}?{urllib.parse.urlencode(params)}"
-
-    # Create request with API key header
-    req = urllib.request.Request(url)
-    req.add_header("apikey", api_key)
-    req.add_header("Accept", "application/json")
-
-    try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            data = json.loads(response.read().decode())
-
-        return json.dumps(data, indent=2)
-
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode() if e.fp else ""
-        return json.dumps({
-            "error": f"ATTOM API HTTP error: {e.code} - {e.reason}",
-            "details": error_body
-        })
-    except urllib.error.URLError as e:
-        return json.dumps({"error": f"ATTOM API connection error: {str(e)}"})
-    except Exception as e:
-        return json.dumps({"error": f"ATTOM API error: {str(e)}"})
+        return _missing_key("ATTOM_API_KEY", ATTOM_SIGNUP)
+    data, err = _paid_request("ATTOM", f"{ATTOM_BASE_URL}/attomavm/detail?{urllib.parse.urlencode(params)}",
+                              {"apikey": api_key})
+    if err:
+        return json.dumps(err, indent=2)
+    return json.dumps({"unverified_integration": _UNVERIFIED_NOTE, "data": data}, indent=2)
 
 
 # ============================================================================

@@ -1,1 +1,4 @@
 mcp>=1.0.0
+# Used by the plugin's calculation scripts (scripts/*.py), which run with this venv's Python.
+numpy>=1.26
+numpy-financial>=1.0

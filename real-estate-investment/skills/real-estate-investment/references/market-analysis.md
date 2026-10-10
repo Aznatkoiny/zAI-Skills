@@ -2,13 +2,7 @@
 
 ## Table of Contents
 1. [Market Scoring Framework](#market-scoring-framework)
-2. [API Integration](#api-integration)
-   - [Mashvisor API](#mashvisor-api)
-   - [AirDNA API](#airdna-api)
-   - [ATTOM Data API](#attom-data-api)
-   - [Rentcast API](#rentcast-api)
-   - [Census Bureau API](#census-bureau-api)
-   - [Redfin Data Center](#redfin-data-center)
+2. [Data Tools](#data-tools)
 3. [Comparable Analysis](#comparable-analysis)
 4. [Submarket Analysis](#submarket-analysis)
 
@@ -21,7 +15,6 @@
 **Job Growth** (BLS)
 - Most critical metric for rental demand
 - Data: https://www.bls.gov/emp/, https://trerc.tamu.edu/data/employment-bls/
-- National projection: 5.2M jobs 2024-2034 (3.1% growth)
 
 **Population Growth** (Census)
 - Census API and ACS at tract/county/metro/state levels
@@ -31,7 +24,7 @@
 - Updated annually at all geographic levels
 
 **Rent Growth YoY**
-- Sources: Zillow Rent Index (free), Redfin CSV (free), AirDNA (STR, paid), Rentcast API (50 free/month)
+- Sources: Zillow Observed Rent Index (free), Census ACS year over year (free key), Rentcast (50 free calls/month), AirDNA (STR, paid). Redfin has prices, not rents.
 
 ### Supply Metrics
 
@@ -81,288 +74,40 @@
 
 ### Weighted Scoring Model
 
-Example structure:
-```
-Job Growth: 20%
-Rent Growth YoY: 20%
-Population Growth: 15%
-Vacancy Rate: 15%
-Median Income Growth: 10%
-Price-to-Rent Ratio: 10%
-Building Permits: 5%
-Days on Market: 5%
-```
+This is the plugin's one market-scoring rubric. `/compare-markets` and the market-researcher agent both use it, so the same markets get the same scores either way. Score each factor 0-100 from the buckets, multiply by the weight, and sum to a 0-100 total.
 
-Calculate distance between comparatives and target; weight by Gross Asset Value (GAV) for portfolios.
+| Factor | Weight | 100 | 75 | 50 | 25 | Where to get it |
+|---|---|---|---|---|---|---|
+| Job growth (YoY) | 20% | >3% | 2-3% | 1-2% | <1% | BLS (WebSearch) |
+| Population growth (YoY) | 15% | >2% | 1-2% | 0.5-1% | <0.5% | Census estimates (WebSearch) |
+| Rent growth (YoY) | 20% | >5% | 3-5% | 1-3% | <1% | Rentcast, Census ACS year over year, or published rent indexes |
+| Rental vacancy | 15% | <5% | 5-7% | 7-10% | >10% | Census ACS (`get_census_demographics`), FRED for the national rate |
+| Rent-to-price (monthly rent / price) | 15% | >0.8% | 0.6-0.8% | 0.4-0.6% | <0.4% | Redfin median sale price plus Census or Rentcast rent |
+| Supply risk | 15% | Low pipeline | Moderate | High | Oversupply | Redfin months of supply and inventory trend, permits (HUD SOCDS) |
 
----
+Supply-risk guide: months of supply under 3 with flat or falling inventory is low; 3-5 moderate; 5-7 or inventory rising more than 20% year over year is high; above 7 is oversupply. When a factor has no data, score the others, reweight them to 100%, and say which factor is missing.
 
-## API Integration
-
-### Mashvisor API
-
-**Auth**: Token via `x-api-key` HTTP header (JWT over HTTPS)
-**Base**: `https://api.mashvisor.com/v1.1/client/`
-**Docs**: https://www.mashvisor.com/api-doc/, https://github.com/mashvisor/mashvisor-api-docs
-
-**Endpoints**:
-```
-GET /airbnb-property/market-summary
-    Params: state, city
-GET /trends/neighborhoods
-GET /city/properties/{state}/{city}
-```
-
-**Python**:
-```python
-import requests
-
-headers = {'x-api-key': 'YOUR_API_KEY'}
-url = 'https://api.mashvisor.com/v1.1/client/airbnb-property/market-summary'
-params = {'state': 'FL', 'city': 'Miami'}
-response = requests.get(url, headers=headers, params=params)
-data = response.json()
-```
-
-**Pricing**: Contact sales (available via RapidAPI)
+The national job outlook for context: BLS projects about +5.9 million jobs (+3.5%) for 2025-2035 [BLS Employment Projections, released 2026-08-27].
 
 ---
 
-### AirDNA API
+## Data Tools
 
-**Auth**: Bearer Token in `Authorization` header
-**Base**: `https://api.airdna.co`
-**Docs**: https://apidocs.airdna.co/, https://airdna.redoc.ly/, https://enterprise-help.airdna.co/en/articles/8185669
+The plugin's `real-estate-data` server wraps these providers, so call its tools rather than writing HTTP code. Tool names appear in Claude Code as `mcp__plugin_real-estate-investment_real-estate-data__<tool>`.
 
-**Packages**: Market Data, Property Valuations & Comps, Rentalizer Lead Gen, Smart Rates Data
+| Provider | Tool(s) | Key | Gives |
+|---|---|---|---|
+| Redfin Data Center | `get_redfin_market_snapshot`, `get_redfin_market_data` | none | Monthly median sale price (and YoY), $/sq ft, homes sold, new listings, inventory, months of supply, days on market, sale-to-list, for national, state, metro, county, city or ZIP. Pass several regions separated by " \| " in one call. No rents. |
+| Census ACS | `get_census_demographics`, `get_census_housing_stats` | `CENSUS_API_KEY` (free) | Population, median income, median gross rent, vacancy, tenure, median home value, housing age. Takes FIPS codes; look them up first if needed. |
+| FRED | `get_fred_series` | `FRED_API_KEY` (free) | Mortgage rates (`MORTGAGE30US`), Treasury yields (`DGS10`), national rental vacancy (`RRVRUSQ156N`), any other FRED series |
+| Rentcast | `estimate_rent`, `get_rentcast_market_data` | `RENTCAST_API_KEY` (50 free calls a month, then billed; the server stops at 50 unless the user opts in) | Property rent estimate with range and comps; ZIP listing statistics |
+| ATTOM | `get_attom_property`, `get_attom_valuation` | `ATTOM_API_KEY` (paid) | Property facts; AVM value with range and confidence score |
+| Mashvisor | `get_mashvisor_property`, `get_mashvisor_neighborhood` | `MASHVISOR_API_KEY` (paid) | Property record; neighborhood overview by ID |
+| AirDNA | `get_airdna_rentalizer`, `get_airdna_market_stats` | `AIRDNA_API_KEY` (paid, via AirDNA sales) | STR revenue estimate; market occupancy, ADR and revenue |
 
-**Endpoints**:
-```
-POST /rentalizer/estimate
-    Returns: Revenue projections, occupancy, recommended rates
-GET /market/search
-    Returns: Market availability, classification
-GET /property/availability
-    Returns: Availability calendar (up to 12 months)
-```
+The ATTOM, Mashvisor and AirDNA tools follow the providers' docs but are untested against live keys, so check the raw fields they return. When a tool reports a missing key, fall back to WebSearch for the same figure and cite the page you used.
 
-**Python**:
-```python
-import requests
-
-headers = {
-    'Authorization': 'Bearer YOUR_API_TOKEN',
-    'Accept': 'application/json'
-}
-
-url = 'https://api.airdna.co/rentalizer/estimate'
-payload = {
-    'address': '123 Main St, Miami, FL 33101',
-    'bedrooms': 2,
-    'bathrooms': 2
-}
-response = requests.post(url, headers=headers, json=payload)
-estimate = response.json()
-```
-
-**Pricing**: Contact sales; enterprise discounts for >5,000 calls/month
-
----
-
-### ATTOM Data API
-
-**Coverage**: 155M+ U.S. residential/commercial properties, 70B rows, 9,000 attributes/property
-**Docs**: https://apitracker.io/a/attomdata, https://www.postman.com/api-evangelist/attom/documentation/4puqnzg, https://docs.deweydata.io/docs/attom
-
-**Data**: Property details, tax assessments, sales history, ownership, AVMs, automated rent values, mortgage info, zoning, land use, development applications, historical imagery
-
-**Endpoints**: Property Details, Property Valuation (AVM), Sales History, Tax Assessment, Mortgage/Foreclosure, Neighborhood Data
-
-**Python**:
-```python
-import requests
-
-headers = {
-    'apikey': 'YOUR_API_KEY',
-    'Accept': 'application/json'
-}
-
-url = 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/detail'
-params = {
-    'address1': '123 Main St',
-    'address2': 'Miami, FL 33101'
-}
-response = requests.get(url, headers=headers, params=params)
-property_data = response.json()
-```
-
-**Pricing**: ~$500/month basic (few thousand calls); scales for bulk downloads; enterprise via consultation
-
----
-
-### Rentcast API
-
-**Auth**: API Key via `X-Api-Key` header
-**Base**: `https://api.rentcast.io/v1/`
-**Docs**: https://developers.rentcast.io/, https://www.postman.com/rentcast/rentcast-api/documentation/ca4yudw
-
-**Endpoints**:
-```
-GET /properties
-    Params: city, state, limit
-GET /avm/value
-    Returns: Property valuation estimate
-GET /avm/rent
-    Returns: Rental estimate
-GET /markets
-    Returns: Market trends, statistics
-```
-
-**Python**:
-```python
-import requests
-
-headers = {
-    'Accept': 'application/json',
-    'X-Api-Key': 'YOUR_API_KEY'
-}
-
-# Search properties
-url = 'https://api.rentcast.io/v1/properties'
-params = {'city': 'Austin', 'state': 'TX', 'limit': 20}
-response = requests.get(url, headers=headers, params=params)
-properties = response.json()
-
-# Rental estimate
-url = 'https://api.rentcast.io/v1/avm/rent'
-params = {
-    'address': '123 Main St',
-    'city': 'Austin',
-    'state': 'TX',
-    'zipCode': '78701',
-    'bedrooms': 2,
-    'bathrooms': 2,
-    'squareFootage': 1200
-}
-response = requests.get(url, headers=headers, params=params)
-rent_estimate = response.json()
-```
-
-**Pricing**: Free (50 requests/month), paid tiers with higher limits, live support 7 days/week
-
----
-
-### Census Bureau API
-
-**Auth**: Free API key via query param `?key=YOUR_API_KEY`
-**Request key**: https://api.census.gov/data/key_signup.html
-**Base URLs**:
-- ACS 5-Year: `https://api.census.gov/data/{year}/acs/acs5`
-- ACS 1-Year: `https://api.census.gov/data/{year}/acs/acs1`
-- Decennial: `https://api.census.gov/data/{year}/dec/sf1`
-
-**Docs**: https://www.census.gov/data/developers/data-sets.html, https://www.census.gov/programs-surveys/acs/data/data-via-api.html
-
-**Key Housing Variables**:
-```
-B25001: Total Housing Units
-B25002: Occupancy Status
-B25003: Tenure (Owner/Renter)
-B25004: Vacancy Status (For Rent, For Sale, etc.)
-B25034: Year Structure Built
-B25064: Median Gross Rent
-B25077: Median Home Value
-B19013: Median Household Income
-B01003: Total Population
-```
-
-**Variable Finder**: https://api.census.gov/data/2021/acs/acs5/variables.html
-
-**Python (census library)**:
-```python
-from census import Census
-from us import states
-
-c = Census("YOUR_API_KEY")
-
-# Median household income by state
-data = c.acs5.get(
-    ('NAME', 'B19013_001E'),
-    {'for': 'state:*'},
-    year=2021
-)
-
-# Vacancy status by tract (Miami-Dade County, FL)
-data = c.acs5.get(
-    ('NAME', 'B25004_001E', 'B25004_002E', 'B25004_003E'),
-    {'for': 'tract:*', 'in': 'state:12 county:086'},
-    year=2021
-)
-
-# Multiple housing variables for city
-variables = ['NAME', 'B25001_001E', 'B25002_002E', 'B25002_003E',
-             'B25064_001E', 'B19013_001E']
-data = c.acs5.get(
-    tuple(variables),
-    {'for': 'place:45000', 'in': 'state:12'},  # Miami, FL
-    year=2021
-)
-```
-
-**Python (requests)**:
-```python
-import requests
-import pandas as pd
-
-base_url = 'https://api.census.gov/data/2021/acs/acs5'
-params = {
-    'get': 'NAME,B25001_001E,B25064_001E,B19013_001E',
-    'for': 'county:*',
-    'in': 'state:12',  # Florida
-    'key': 'YOUR_API_KEY'
-}
-response = requests.get(base_url, params=params)
-data = response.json()
-df = pd.DataFrame(data[1:], columns=data[0])
-```
-
-**Geographic Levels**: Nation, State, County, Census Tract, Block Group, Place (cities), MSA, ZCTA
-
-**Libraries**: census (https://pypi.org/project/census/), pytidycensus, censusdata
-
-**Pricing**: FREE
-
----
-
-### Redfin Data Center
-
-**Access**: Manual CSV download (no API)
-**URL**: https://www.redfin.com/news/data-center/, https://www.redfin.com/news/data-center/printable-market-data/
-
-**Geographic Levels**: National, Metro, State, County, City, ZIP, Neighborhood
-
-**Metrics**: Median sale price, homes sold, new listings, days on market, price drops, inventory, sale-to-list ratio, pending sales, off-market sales
-
-**Updates**: Weekly (Wednesdays), Monthly (3rd Friday)
-
-**Download Methods**:
-1. Via visualization: Select region/metro/timeframe/metric → click chart → download button
-2. Via Download tab: Select region type → download complete dataset
-
-**Python (conceptual)**:
-```python
-import requests
-import pandas as pd
-from io import StringIO
-
-# UNVERIFIED - may require interactive download
-url = 'https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/city_market_tracker.tsv000.gz'
-response = requests.get(url)
-df = pd.read_csv(StringIO(response.text), sep='\t', compression='gzip')
-miami_data = df[df['city'] == 'Miami']
-```
-
-**Pricing**: FREE
+Other free sources worth a search: Zillow Observed Rent Index (ZORI) for rent growth, HUD SOCDS for building permits, BLS for metro employment.
 
 ---
 
@@ -560,7 +305,7 @@ print(f"Walk: {scores.get('walkscore')}, Transit: {scores.get('transit', {}).get
 **6. Investment**
 - Price-to-rent ratio, cap rates, cash-on-cash return, rent growth, appreciation history
 
-**Scoring Model**:
+**Scoring Model** (for neighborhoods within one metro; compare whole metros with the rubric in §Weighted Scoring Model):
 ```python
 import pandas as pd
 
