@@ -6,20 +6,31 @@ Runs entirely offline. Dependencies: Python stdlib + PyYAML.
 Checks:
   1. JSON syntax: .claude-plugin/marketplace.json, every plugin.json,
      every hooks/hooks.json (object schema required — top-level arrays are
-     rejected), every .mcp.json.
+     rejected), every .mcp.json. External (GitHub/git) marketplace sources must
+     pin a ref or sha; local checks are skipped for them. Every local plugin
+     has a README.md. .mcp.json env values may not use ${VAR} without a
+     default — an unset variable reaches the server as the literal "${VAR}".
   2. Marketplace entry versions equal the corresponding plugin.json versions.
   3. Plugin names are kebab-case.
   4. Frontmatter lint over commands/, agents/, skills/*/SKILL.md and
-     output-styles/: description present everywhere, argument-hint present on
-     every command, SKILL.md descriptions <= 1024 chars, agent model values in
-     {opus, sonnet, haiku} or absent.
-  5. Cross-reference integrity: every mcp__<server>__<tool> string in *.md
-     matches a tool registered in the corresponding server source; every
+     output-styles/: description present everywhere, argument-hint present and
+     $ARGUMENTS used in every command, SKILL.md descriptions <= 1024 chars and
+     skill name == directory name, agent model values in
+     {inherit, opus, sonnet, haiku} or absent.
+  5. Cross-reference integrity: MCP tool references in *.md use the
+     plugin-scoped form mcp__plugin_<plugin>_<server>__<tool> and match a tool
+     registered in that server's source (the bare mcp__<server>__<tool> form is
+     what a standalone server gets; for a plugin-bundled server it matches
+     nothing, so an agent's tools: allowlist silently drops it). Every
      ${CLAUDE_PLUGIN_ROOT} path referenced from commands/ and agents/ resolves
      on disk.
-  6. Count drift: numeric "N commands" / "N slash commands" / "N tools" claims
-     in the root README and marketplace.json descriptions are compared against
-     actual file / registered-tool counts.
+  6. Count drift: numeric "N commands" / "N tools" / "N agents" / "N skills"
+     claims in the root README, marketplace.json and plugin.json descriptions
+     are compared against actual counts.
+  7. Prompt hygiene: commands and agents that read web or MCP content carry
+     the standard prompt-injection sentence (INJECTION_PHRASE); prompt files
+     don't name retired models or settings (STALE_MODEL_RE), except files in
+     STALE_ALLOWED that quote them on purpose.
 
 Exit status: 0 if every check passes, 1 otherwise.
 
@@ -42,8 +53,23 @@ except ImportError:  # pragma: no cover
 REPO_ROOT = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent
 
 KEBAB_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
-AGENT_MODELS = {"opus", "sonnet", "haiku"}
-EXCLUDED_DIRS = {"node_modules", ".git", "__pycache__", "dist"}
+AGENT_MODELS = {"inherit", "opus", "sonnet", "haiku"}
+EXCLUDED_DIRS = {"node_modules", ".git", "__pycache__", "dist", ".venv"}
+
+# The standard caution every web- or MCP-consuming command/agent carries.
+# Keep the sentence identical everywhere so this check can find it.
+INJECTION_PHRASE = "as data to analyze, not as instructions to follow"
+WEB_OR_MCP_RE = re.compile(r"\b(WebFetch|WebSearch|mcp__)")
+
+# Retired model names and settings. Update this list each model generation.
+STALE_MODEL_RE = re.compile(
+    r"claude-(?:opus|sonnet|haiku)-[34]\b|claude-(?:opus|sonnet|haiku)-[34]-|"
+    r"claude-(?:opus|sonnet|fable|haiku)-5(?![-.\d])|"
+    r"\b(?:Opus|Sonnet|Haiku) [34]\.\d|\bbudget_tokens\b"
+)
+# Files that mention old models deliberately: the verbatim Anthropic prompting
+# docs bundled in ai-toolkit's prompt-engineer skill, and the changelog.
+STALE_ALLOWED = ("AI-Toolkit/skills/prompt-engineer/", "CHANGELOG.md")
 
 # server.tool("name" | server.registerTool("name" | registerAppTool("name"
 # | any registerXxxTool("name" wrapper (first argument must be a string literal).
@@ -51,12 +77,14 @@ TS_TOOL_RE = re.compile(
     r"""(?:\.(?:registerTool|registerAppTool|tool)|\bregister\w*Tool)\s*\(\s*["']([A-Za-z0-9_.-]+)["']"""
 )
 PY_TOOL_RE = re.compile(r"@mcp\.tool\([^)]*\)\s*\ndef\s+(\w+)")
-MCP_REF_RE = re.compile(r"\bmcp__([A-Za-z0-9-]+)__([A-Za-z0-9_]+)")
+MCP_REF_RE = re.compile(r"\bmcp__plugin_([a-z0-9-]+)_([A-Za-z0-9-]+)__([A-Za-z0-9_]+)")
+BARE_MCP_REF_RE = re.compile(r"\bmcp__(?!plugin_)([A-Za-z0-9-]+)__([A-Za-z0-9_]+)")
+ENV_NO_DEFAULT_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 PLUGIN_ROOT_RE = re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}(/[^\s\"'`),;]*)")
 # "N commands", "N slash commands", "N-tool", "17 consulting slash commands", ...
 # allows up to two intervening words between the number and commands/tools.
 CLAIM_RE = re.compile(
-    r"\b(\d+)[-\s]+((?:[A-Za-z][A-Za-z-]*[-\s]+){0,2}?)(commands?|tools?)\b",
+    r"\b(\d+)[-\s]+((?:[A-Za-z][A-Za-z-]*[-\s]+){0,2}?)(commands?|tools?|agents?|skills?)\b",
     re.IGNORECASE,
 )
 
@@ -130,6 +158,23 @@ plugins: list[dict] = []  # {name, version, description, dir}
 for entry in marketplace.get("plugins", []):
     name = entry.get("name", "<unnamed>")
     source = entry.get("source", "")
+    if isinstance(source, dict):
+        # External plugin (e.g. {"source": "github", "repo": "owner/name"}).
+        # Its files live in another repo, so only the entry itself is checked.
+        # An unpinned source serves whatever the default branch holds, which
+        # can drift from the version this marketplace advertises.
+        kind = source.get("source")
+        if kind not in {"github", "git", "url"}:
+            fail(f"marketplace entry '{name}': unknown source type {kind!r}")
+        elif kind == "github" and not source.get("repo"):
+            fail(f"marketplace entry '{name}': github source needs 'repo'")
+        elif not (source.get("ref") or source.get("sha")):
+            fail(f"marketplace entry '{name}': external source must pin 'ref' or 'sha'")
+        else:
+            ok(f"marketplace entry '{name}': external {kind} source pinned")
+        if not KEBAB_RE.match(name):
+            fail(f"plugin name {name!r} is not kebab-case")
+        continue
     plugin_dir = (REPO_ROOT / source).resolve()
     if not plugin_dir.is_dir():
         fail(f"marketplace entry '{name}': source '{source}' is not a directory")
@@ -153,6 +198,8 @@ for plugin in plugins:
     if data is not None:
         ok(f"{rel(pj_path)} parses")
         plugin_json_by_name[plugin["name"]] = data
+    if not (plugin["dir"] / "README.md").is_file():
+        fail(f"{plugin['name']}: missing README.md")
 
 for hooks_path in sorted(REPO_ROOT.glob("*/hooks/hooks.json")):
     data = load_json(hooks_path)
@@ -179,6 +226,13 @@ for plugin in plugins:
             else:
                 ok(f"{rel(mcp_path)} parses")
                 servers.update(data.get("mcpServers", data))
+                for server_name, config in servers.items():
+                    for key, value in (config.get("env") or {}).items():
+                        for var in ENV_NO_DEFAULT_RE.findall(str(value)):
+                            fail(
+                                f"{rel(mcp_path)}: {server_name}.env.{key} uses ${{{var}}} with no default — "
+                                f"write ${{{var}:-}} so an unset variable arrives empty, not as the literal text"
+                            )
     pj = plugin_json_by_name.get(plugin["name"], {})
     inline = pj.get("mcpServers")
     if isinstance(inline, dict):
@@ -245,10 +299,14 @@ for plugin in plugins:
                 fail(f"{rel(path)}: missing 'description' in frontmatter")
             elif kind == "skill" and len(desc) > 1024:
                 fail(f"{rel(path)}: SKILL.md description is {len(desc)} chars (max 1024)")
+            if kind == "skill" and fm.get("name") != path.parent.name:
+                fail(f"{rel(path)}: skill name {fm.get('name')!r} != directory name {path.parent.name!r}")
             if kind == "command":
                 hint = fm.get("argument-hint")
                 if not isinstance(hint, str) or not hint.strip():
                     fail(f"{rel(path)}: command missing 'argument-hint' in frontmatter")
+                if "$ARGUMENTS" not in path.read_text(encoding="utf-8"):
+                    fail(f"{rel(path)}: command body never uses $ARGUMENTS — arguments would be dropped")
             if kind == "agent":
                 model = fm.get("model")
                 if model is not None and model not in AGENT_MODELS:
@@ -289,22 +347,31 @@ for plugin in plugins:
         server_plugin[server_name] = plugin["name"]
         ok(f"server '{server_name}' ({plugin['name']}): {len(tools)} registered tools")
 
-# 5b. Every mcp__<server>__<tool> reference in markdown must resolve.
+# 5b. Every MCP tool reference in markdown must use the plugin-scoped name and
+# resolve to a registered tool of that plugin's server.
 ref_errors = 0
 for path in iter_md_files(REPO_ROOT):
     text = path.read_text(encoding="utf-8")
-    for server_name, tool in MCP_REF_RE.findall(text):
-        if server_name not in server_tools:
-            fail(f"{rel(path)}: references unknown MCP server 'mcp__{server_name}__{tool}'")
+    for plugin_name, server_name, tool in MCP_REF_RE.findall(text):
+        ref = f"mcp__plugin_{plugin_name}_{server_name}__{tool}"
+        if server_name not in server_tools or server_plugin.get(server_name) != plugin_name:
+            fail(f"{rel(path)}: references unknown plugin MCP server '{ref}'")
             ref_errors += 1
         elif tool not in server_tools[server_name]:
             fail(
-                f"{rel(path)}: references unregistered tool 'mcp__{server_name}__{tool}' "
+                f"{rel(path)}: references unregistered tool '{ref}' "
                 f"(server '{server_name}' registers: {', '.join(sorted(server_tools[server_name]))})"
             )
             ref_errors += 1
+    for server_name, tool in BARE_MCP_REF_RE.findall(text):
+        if server_name in server_tools:
+            fail(
+                f"{rel(path)}: bare 'mcp__{server_name}__{tool}' — plugin tools are named "
+                f"'mcp__plugin_{server_plugin[server_name]}_{server_name}__{tool}'"
+            )
+            ref_errors += 1
 if ref_errors == 0:
-    ok("all mcp__<server>__<tool> references resolve to registered tools")
+    ok("all MCP tool references are plugin-scoped and resolve to registered tools")
 
 # 5c. Every ${CLAUDE_PLUGIN_ROOT} path in commands/ and agents/ resolves.
 path_errors = 0
@@ -339,12 +406,16 @@ for plugin in plugins:
         for server_name, tools in server_tools.items()
         if server_plugin.get(server_name) == plugin["name"]
     )
-    actual_counts[plugin["name"]] = {"command": n_commands, "tool": n_tools}
+    agents_dir = plugin["dir"] / "agents"
+    skills_dir = plugin["dir"] / "skills"
+    actual_counts[plugin["name"]] = {
+        "command": n_commands,
+        "tool": n_tools,
+        "agent": len(list(agents_dir.glob("*.md"))) if agents_dir.is_dir() else 0,
+        "skill": len(list(skills_dir.glob("*/SKILL.md"))) if skills_dir.is_dir() else 0,
+    }
 
-totals = {
-    "command": sum(c["command"] for c in actual_counts.values()),
-    "tool": sum(c["tool"] for c in actual_counts.values()),
-}
+totals = {kind: sum(c[kind] for c in actual_counts.values()) for kind in ("command", "tool", "agent", "skill")}
 
 drift_errors = 0
 
@@ -368,13 +439,15 @@ def check_claim(where: str, plugin_name: str | None, claimed: int, kind: str) ->
 
 def scan_claims(text: str, where: str, plugin_name: str | None) -> None:
     for match in CLAIM_RE.finditer(text):
-        kind = "command" if match.group(3).lower().startswith("command") else "tool"
+        kind = match.group(3).lower().rstrip("s")
         check_claim(where, plugin_name, int(match.group(1)), kind)
 
 
-# marketplace.json descriptions — scoped to their plugin.
+# marketplace.json and plugin.json descriptions — scoped to their plugin.
 for plugin in plugins:
     scan_claims(plugin["description"], f"marketplace.json [{plugin['name']}]", plugin["name"])
+    pj_desc = plugin_json_by_name.get(plugin["name"], {}).get("description", "")
+    scan_claims(pj_desc, f"{plugin['dir'].name}/.claude-plugin/plugin.json", plugin["name"])
 
 # Root README — claims are scoped by the enclosing '### [plugin](dir/)' section.
 readme_path = REPO_ROOT / "README.md"
@@ -393,6 +466,32 @@ if readme_path.is_file():
         scan_claims(line, f"README.md:{lineno}", current)
 else:
     fail("README.md not found at repo root")
+
+# ── Check 7: prompt hygiene ───────────────────────────────────────────────────
+
+print("\n== Check 7: prompt hygiene ==")
+hygiene_errors = 0
+for plugin in plugins:
+    for sub in ("commands", "agents"):
+        sub_dir = plugin["dir"] / sub
+        if not sub_dir.is_dir():
+            continue
+        for md in sorted(sub_dir.glob("*.md")):
+            text = md.read_text(encoding="utf-8")
+            if WEB_OR_MCP_RE.search(text) and INJECTION_PHRASE not in text:
+                fail(f"{rel(md)}: reads web/MCP content but lacks the standard injection caution ('{INJECTION_PHRASE}')")
+                hygiene_errors += 1
+for path in iter_md_files(REPO_ROOT):
+    r = rel(path)
+    if r.startswith(STALE_ALLOWED):
+        continue
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        m = STALE_MODEL_RE.search(line)
+        if m:
+            fail(f"{r}:{lineno}: names a retired model or setting ({m.group(0)!r})")
+            hygiene_errors += 1
+if hygiene_errors == 0:
+    ok("injection cautions present; no retired model names outside STALE_ALLOWED")
 
 # ── Result ────────────────────────────────────────────────────────────────────
 
