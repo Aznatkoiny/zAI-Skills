@@ -14,7 +14,7 @@
 
 ### TextVectorization Layer
 ```python
-from tensorflow.keras.layers import TextVectorization
+from keras.layers import TextVectorization
 
 text_vectorization = TextVectorization(
     max_tokens=20000,           # Vocabulary size
@@ -253,23 +253,28 @@ class TransformerDecoder(layers.Layer):
         mult = tf.concat([tf.expand_dims(batch_size, -1), tf.constant([1, 1], dtype=tf.int32)], axis=0)
         return tf.tile(mask, mult)
 
-    def call(self, inputs, encoder_outputs, mask=None):
+    def call(self, inputs, encoder_outputs, mask=None, encoder_mask=None):
+        # Self-attention: causal mask, combined with the target padding mask if there is one.
         causal_mask = self.get_causal_attention_mask(inputs)
         if mask is not None:
             padding_mask = tf.cast(mask[:, tf.newaxis, :], dtype="int32")
-            padding_mask = tf.minimum(padding_mask, causal_mask)
-
-        # Self-attention (masked)
+            self_attention_mask = tf.minimum(padding_mask, causal_mask)
+        else:
+            self_attention_mask = causal_mask
         attention_output_1 = self.attention_1(
-            query=inputs, value=inputs, key=inputs, attention_mask=causal_mask)
+            query=inputs, value=inputs, key=inputs, attention_mask=self_attention_mask)
         attention_output_1 = self.layernorm_1(inputs + attention_output_1)
 
-        # Cross-attention with encoder outputs
+        # Cross-attention: mask the padded positions of the *source* sequence
+        # (the encoder's mask), not the decoder's own mask.
+        cross_attention_mask = None
+        if encoder_mask is not None:
+            cross_attention_mask = tf.cast(encoder_mask[:, tf.newaxis, :], dtype="int32")
         attention_output_2 = self.attention_2(
             query=attention_output_1,
             value=encoder_outputs,
             key=encoder_outputs,
-            attention_mask=padding_mask)
+            attention_mask=cross_attention_mask)
         attention_output_2 = self.layernorm_2(attention_output_1 + attention_output_2)
 
         proj_output = self.dense_proj(attention_output_2)
@@ -327,11 +332,12 @@ def decode_sequence(input_sentence):
 
 ## When to Use Which Approach
 
-| Data Size | Approach |
-|-----------|----------|
-| < 500 samples | Bag-of-words + Dense |
-| 500 - 5,000 | Bag-of-words or sequence model |
-| > 5,000 | Sequence models (LSTM, Transformer) |
+Chollet's rule of thumb: divide the number of training samples by the mean number of words per sample.
 
-Sequence models capture word order and are better when order matters (sentiment, QA).
-Bag-of-words is faster and works well for topic classification.
+| Ratio (samples ÷ mean words per sample) | Approach |
+|---|---|
+| Below ~1,500 | Bag-of-bigrams + Dense (fast, strong baseline) |
+| Above ~1,500 | Sequence model (Transformer or bidirectional RNN) |
+| Any size, especially small datasets | Fine-tune a pretrained model from KerasHub (`pip install keras-hub`; `import keras_hub`), which usually beats training from scratch |
+
+Sequence models capture word order, which matters for tasks like sentiment with negation or question answering; bag-of-words is faster and works well for topic classification. KerasHub's API changes between releases, so check its current docs for the model classes.

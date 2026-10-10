@@ -1,66 +1,55 @@
 ---
-description: Generate an x402 payment starter — seller (paid endpoint with 402 flow) or buyer (paying client) — with safe testnet defaults
+description: Generate a working x402 starter on testnet — a seller (an endpoint that charges per request) or a buyer (a client that pays) — on EVM (Base) or Solana
 argument-hint: "[seller | buyer] [evm | svm]"
 ---
-You are scaffolding an x402 protocol starter using the x402-payments skill.
+Scaffold an x402 starter project using the x402-payments skill bundled with this plugin.
 
-## Arguments
+## What the user asked for
 
 $ARGUMENTS
 
-Parse two choices from the arguments:
+Read two choices from it:
 
-- **Role**: `seller` (an API that requires payment) or `buyer` (a client/agent that pays for x402-protected resources).
-- **Chain**: `evm` (Base) or `svm` (Solana).
+- **Role:** `seller` (an API that charges per request) or `buyer` (a client or agent that pays).
+- **Chain:** `evm` (Base) or `svm` (Solana).
 
-If either is missing, ask the user rather than guessing. Default environment is **testnet** — Base Sepolia (`eip155:84532`) for EVM, Solana Devnet for SVM, facilitator `https://x402.org/facilitator`. Never scaffold mainnet configuration unless explicitly requested (see the safety note below).
+If either is missing, default to `seller` and `evm`. Say the assumption in one line and tell the user how to get the other variant (for example `/x402-scaffold buyer evm`). Ask only if their words point both ways.
 
-## Step 1: Load the skill
+## Ground rules
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/x402-payments/SKILL.md` first, then the reference matching the role:
+The starter is wired for **testnet**: Base Sepolia (`eip155:84532`) or Solana Devnet, with the free facilitator `https://x402.org/facilitator`. Testnet is the safe default because nothing real can be lost while the user learns. If the user explicitly asks for mainnet, still build the testnet starter, add the mainnet settings as a commented-out block taken from the skill's `references/deployment.md`, and explain what switching on would change before you write it.
 
-- Seller → `${CLAUDE_PLUGIN_ROOT}/skills/x402-payments/references/server-patterns.md` (Express/Hono/Next.js middleware, multi-route config, facilitator configuration, environment variables template).
-- Buyer → `${CLAUDE_PLUGIN_ROOT}/skills/x402-payments/references/client-patterns.md` (fetch/axios wrappers, wallet setup, lifecycle hooks, error handling, environment variables template).
-- For header/payload details or CAIP-2 network IDs, consult `${CLAUDE_PLUGIN_ROOT}/skills/x402-payments/references/protocol-spec.md`.
+Keys never go into code, the conversation, or git: `.env.example` holds placeholders, `.env` is gitignored, and the code reads keys from the environment.
 
-Follow the skill's Critical Implementation Notes exactly — in particular: register schemes **before** wrapping fetch/axios; use V2 headers; dollar-string prices (`"$0.001"`); Node.js v24+ for the TypeScript SDK.
+## Build it
 
-## Step 2: Generate the starter
+Read `${CLAUDE_PLUGIN_ROOT}/skills/x402-payments/SKILL.md`, then the reference for the role: `references/server-patterns.md` for a seller, `references/client-patterns.md` for a buyer (both under `${CLAUDE_PLUGIN_ROOT}/skills/x402-payments/`). Base the code on the skill's quick starts, which follow the official x402 examples.
 
-Create a TypeScript Node project (ask before writing into a non-empty directory):
+Create this in the current directory (if it isn't empty, ask before writing, or offer a subfolder):
 
 ```
-<project>/
-├── package.json          # "engines": { "node": ">=24" }
-├── tsconfig.json
-├── .env.example          # placeholders only — never real keys
-├── .gitignore            # must include .env
-├── README.md             # run instructions + faucet links
-└── src/
-    └── index.ts
+package.json      "type": "module", "engines": { "node": ">=22" }, scripts: { "start": "tsx src/index.ts", "typecheck": "tsc --noEmit" }
+tsconfig.json     module/moduleResolution "NodeNext", target ES2022, strict
+.env.example      placeholders only, with a comment on each variable
+.gitignore        node_modules, .env
+README.md         what it does, how to run it, how to get test USDC, what to try next
+src/index.ts
 ```
 
-**Seller (`src/index.ts`)** — follow the server-patterns reference for the chosen framework (default Express unless the user names Hono or Next.js):
+- **Seller:** Express by default (Hono or Next.js if the user names one). One paid route at a small dollar price, a free route for comparison, the testnet network for the chosen chain, and `PAY_TO` (or `SVM_PAY_TO`) read from the environment. If it's unset, exit with a message that names the variable.
+- **Buyer:** a signer from `EVM_PRIVATE_KEY` (or the Solana key pattern from the reference), `x402Client` with the chain's scheme registered and `setSpendControls({ maxAmountPerPayment: "$0.01" })`, then `wrapFetchWithPayment`. It requests a configurable URL (default `http://localhost:4021/weather`) and prints `paymentStatus` and the receipt from `x402HTTPClient.processResponse`. If the key is unset, exit with a message that names it.
 
-- `paymentMiddleware` protecting at least one example route with `scheme: "exact"`, a small dollar-string price, the testnet network ID, and `payTo` from `process.env.PAY_TO`.
-- `x402ResourceServer` + `HTTPFacilitatorClient` pointed at `https://x402.org/facilitator`.
-- Scheme registration for the chosen chain (`registerExactEvmScheme` from `@x402/evm/exact/server`, or the SVM equivalent from `@x402/svm` per the reference).
-- The protected route handler returning example JSON.
-- Dependencies per the SKILL.md Decision Tree row for the chosen framework and chain.
+Dependencies come from the skill's "Choosing pieces" table, plus `dotenv`, `tsx` and `typescript`.
 
-**Buyer (`src/index.ts`)** — follow the client-patterns reference:
+## Check it works
 
-- Signer from `process.env` (`EVM_PRIVATE_KEY` via viem's `privateKeyToAccount` for EVM; the Solana keypair pattern from the reference for SVM).
-- `x402Client` with the chain scheme registered, then `wrapFetchWithPayment` — registration first, wrapping second.
-- A request to a configurable target URL (default a localhost seller on `:4021`) and printing the payment receipt (`txHash`) via `x402HTTPClient.getPaymentSettleResponse`.
-- Basic error handling per the reference (missing funds, no matching scheme, 402 parse failures).
+If Node is available, run `node --version`, then `npm install` and `npm run typecheck`. Fix what fails. If Node is older than 22 or missing, say so plainly instead of reporting the project as ready. Don't start a buyer against a real endpoint yourself; that spends funds.
 
-**README.md** should include: install/run commands, how to get testnet USDC (faucet pointers from `${CLAUDE_PLUGIN_ROOT}/skills/x402-payments/references/deployment.md`), and for buyers, how to generate a throwaway testnet key.
+## Tell the user what's next
 
-## Step 3: Safety note (always include in your output)
+End with the two or three commands they run, and what they need first:
 
-State this to the user verbatim in substance:
+- **Seller:** a receiving address in `.env`, then `npm start`, then try it with `/x402-scaffold buyer evm` or `curl -i localhost:4021/weather` (they'll see the 402).
+- **Buyer:** a testnet key with test USDC from https://faucet.circle.com, a running seller, then `npm start`. If they need a key, offer to generate one the way `references/deployment.md` shows: written straight to `.env`, with only the address shown.
 
-> This starter is wired for **testnet only** (Base Sepolia / Solana Devnet, x402.org facilitator). Mainnet configuration — real private keys, CDP facilitator credentials, mainnet network IDs — is your explicit opt-in and is deliberately not scaffolded here. When you are ready, follow the testnet-to-mainnet migration steps in the skill's `references/deployment.md`, use a dedicated agent wallet with limited funds, and keep keys in environment variables, never in code or git.
-
-Never write a real private key into any file. `.env.example` gets placeholder values only, and `.gitignore` must exclude `.env` before anything else is committed.
+Close with one sentence: this is testnet-only; moving to mainnet means real funds and a CDP API key, and the steps are in the skill's deployment reference.

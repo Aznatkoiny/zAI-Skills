@@ -11,6 +11,54 @@ folded into the current entries below.
 
 ## ai-toolkit
 
+### [2.5.0] - 2026-10-09
+
+Prompts updated for current Claude models (Opus 5.5, Sonnet 5.5, Haiku 5.5, Fable 5.1),
+and fast-moving technical content re-checked against upstream sources.
+
+#### Changed
+- **prompt-optimizer replaced by prompt-engineer**, an exact copy of the author's
+  prompt-engineer skill (Anthropic's prompting docs as of 2026-10-09, per-model guides,
+  the "what used to help but now hurts" table). The old skill was a model generation
+  behind and gave advice that now hurts (always use xhigh effort, delete verification
+  steps, write reasoning in `<thinking>` tags). `ab_eval.py` and `evals.md` were removed
+  with it. `/optimize-prompt` and `prompt-rewriter` now follow the skill's workflow, ask
+  where the prompt runs before recommending API settings, and can draft a prompt from a
+  description.
+- **x402-payments** rewritten against x402 2.28.0 (repo now `x402-foundation/x402`): V2
+  field names (`amount`, `transaction`), renamed client hooks, `verifyPayment` /
+  `settlePayment`, CDP auth via `createCdpFacilitatorClient()`, Next.js `proxy.ts`,
+  Node 22+, `@x402/mcp`. Adds money-and-keys guidance (testnet first, keys never printed,
+  spend limits on every paying client). `/x402-scaffold` defaults to seller + EVM and checks
+  the starter builds.
+- **openclaw-setup** rewritten against OpenClaw 2026.9.9 as a thinner guide: config
+  snippets that strict validation rejected are fixed (`agents.defaults.model.primary`,
+  `agents.defaults.heartbeat`), iMessage moved from the removed BlueBubbles to
+  `@openclaw/imessage`, Node 24.16+, confirm-before-acting and secrets-handling rules,
+  and a VPS guide that secures SSH in a safe order and keeps all three Docker ports on
+  loopback. The Hostinger guide became a general `vps-setup.md` with Hostinger notes.
+  API keys are now the only recommended Anthropic auth route. `/openclaw-audit` works on
+  Docker installs and never quotes secrets.
+- Skill and agent descriptions say what each is for and not for; agents inherit the
+  session's model instead of pinning opus/sonnet.
+
+#### Fixed
+- RL scripts: `module:Class` specs now import from the current directory;
+  `eval_report.py` gains `--vecnormalize` (without it a trained agent scored worse than
+  random in testing) and `--max-steps`; `pretrain_check.py` no longer tells you to
+  normalize image observations.
+- RL guidance: entropy-loss sign, `max_grad_norm` direction, Atari install
+  (`gymnasium[atari]`), wrapper order, TD3 `batch_size` 256, SB3 >= 2.4, Optuna pruning
+  and separate eval env, ONNX export with a deterministic wrapper (tested: 200/200
+  matching actions), TorchScript and `torch.quantization` replaced by `torch.export` /
+  AOTInductor and ONNX Runtime / torchao.
+- C++ RL: C++20 (required by current LibTorch), CUDA memory statistics via the caching
+  allocator, epsilon decay, SAC entropy tuning on GPU, a missing `RolloutBuffer` and SAC
+  helpers, aggregate `Experience`; DQN/PPO/SAC snippets now compile against LibTorch 2.14.
+- Deep learning: `cache()` before `shuffle/batch/prefetch`, backend-neutral imports and
+  mixed precision, Transformer decoder masks, `LeakyReLU(negative_slope=)`, backend
+  column in the reference table.
+
 ### [2.4.0] - 2026-07-26
 
 #### Added

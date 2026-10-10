@@ -1,6 +1,6 @@
 # Deep Learning Basics
 
-Based on *Deep Learning with Python, 2nd Edition* by François Chollet.
+Based on *Deep Learning with Python* by François Chollet (the 3rd edition, 2025, with Matthew Watson, covers Keras 3 on JAX, PyTorch and TensorFlow).
 
 ## Table of Contents
 - [Tensor Operations](#tensor-operations)

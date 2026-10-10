@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import os
 import sys
 
 import numpy as np
@@ -40,6 +41,11 @@ except ImportError:
 def make_env(spec: str) -> gym.Env:
     """Instantiate the environment from a gym id or 'module:Class' spec."""
     if ":" in spec:
+        # Make `module.path:EnvClass` importable from the directory the user ran
+        # the script in. Python puts the *script's* folder on sys.path, not the
+        # current directory, so without this a project's own package can't be found.
+        if os.getcwd() not in sys.path:
+            sys.path.insert(0, os.getcwd())
         module_name, class_name = spec.split(":", 1)
         module = importlib.import_module(module_name)
         return getattr(module, class_name)()
@@ -140,6 +146,7 @@ def data_warnings(
     truncated_count: int,
     max_steps: int,
     warnings: list[str],
+    image_obs: bool = False,
 ) -> None:
     if rewards.size:
         if np.std(rewards) == 0:
@@ -163,7 +170,9 @@ def data_warnings(
                 "reward scales destabilize value learning; wrap with "
                 "NormalizeReward or clip rewards."
             )
-    if obs.size:
+    # Image observations (uint8 pixels, 0-255) are expected to be large; SB3's
+    # CnnPolicy scales them itself, and VecNormalize on pixels hurts learning.
+    if obs.size and not image_obs:
         max_abs_obs = float(np.max(np.abs(obs)))
         if max_abs_obs > 100:
             warnings.append(
@@ -259,6 +268,12 @@ def main() -> int:
     env2 = make_env(args.env_spec)
     try:
         space_warnings(env2, warnings)
+        obs_space = env2.observation_space
+        image_obs = (
+            isinstance(obs_space, spaces.Box)
+            and obs_space.dtype == np.uint8
+            and len(obs_space.shape) >= 2
+        )
     finally:
         env2.close()
     data_warnings(
@@ -270,6 +285,7 @@ def main() -> int:
         truncated_count,
         args.max_steps,
         warnings,
+        image_obs=image_obs,
     )
 
     if warnings:

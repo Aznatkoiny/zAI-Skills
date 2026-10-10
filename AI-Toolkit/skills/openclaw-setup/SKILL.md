@@ -1,203 +1,99 @@
 ---
 name: openclaw-setup
-description: Set up, install, configure, and deploy OpenClaw (formerly ClawdBot/MoltBot) — a personal AI assistant that runs on your own devices and connects to messaging channels. Use when users ask to "set up OpenClaw," "install ClawdBot," "install MoltBot," "deploy a personal AI assistant," "configure OpenClaw on Mac," "deploy OpenClaw to VPS," "set up OpenClaw on Hostinger," "connect OpenClaw to Telegram," "configure iMessage with OpenClaw," or any variation involving OpenClaw installation, gateway configuration, channel setup, Anthropic auth, or security hardening. Also triggers on "openclaw onboard," "openclaw doctor," "openclaw security audit," troubleshooting OpenClaw deployments, OpenClaw security, OpenClaw cost control, or ClawHub skills safety.
+description: Install, configure, secure and troubleshoot OpenClaw (formerly Clawdbot / Moltbot), the self-hosted personal AI assistant that answers through messaging apps. Covers installing on a Mac or Linux machine or a VPS with Docker (including Hostinger), Anthropic API setup and cost control, Telegram and iMessage channels, and hardening (gateway binding, pairing, tool limits). Use when the user mentions OpenClaw, Clawdbot or Moltbot, `openclaw onboard`, `openclaw doctor`, or setting up, fixing or hardening their OpenClaw gateway. Not for building an assistant from scratch with an SDK, generic VPS or SSH hardening unrelated to OpenClaw, or writing OpenClaw plugins. For a read-only security check of an existing install, /openclaw-audit runs the checklist.
 ---
 
-# OpenClaw Setup Skill
+# OpenClaw setup
 
-Deploy and configure OpenClaw — the open-source personal AI assistant (145k+ GitHub stars) — safely and correctly. This skill handles the full lifecycle: installation, Anthropic model auth, channel wiring (Telegram + iMessage), security hardening, cost control, and deployment to either a local Mac mini or a Hostinger VPS.
+OpenClaw runs a **Gateway** on the user's own machine or server. The Gateway connects a model provider (here, Anthropic) to messaging channels such as Telegram and iMessage, so the user can talk to an agent that can run tools on that machine. That last part is why setup is mostly about safety: anyone who can message the bot, or reach the Gateway port, can try to make it act. Your job is a working install that only its owner controls and whose spending is capped.
 
+- Docs: https://docs.openclaw.ai (source of truth for commands and config keys)
 - Source: https://github.com/openclaw/openclaw
-- Docs: https://docs.openclaw.ai
-- Created by: Peter Steinberger (founder of PSPDFKit)
 
-> Facts current as of July 2026 — verify pricing and model IDs against https://docs.claude.com before quoting them.
+## Working with the user
 
-## What is OpenClaw?
+A person is present during setup, so explain choices in plain language and let them decide. Read-only checks (`openclaw --version`, `openclaw doctor`, `openclaw status`, `ss -tlnp`) can run freely. Before each of the following, say in one line what will change and get a yes:
 
-OpenClaw is a self-hosted, conversation-first AI assistant built on LLMs. Originally launched as "Clawdbot" (November 2025), renamed to "Moltbot" (January 27, 2026) after Anthropic trademark concerns, then became "OpenClaw" (January 30, 2026). It runs a local Gateway (WebSocket control plane) on your machine or server and connects to messaging channels you already use — Telegram, iMessage, WhatsApp, Discord, Slack, and 50+ others. The assistant responds through those channels using models from Anthropic, OpenAI, or other providers.
+- running the installer (`curl … | bash`), `sudo`, or package installs;
+- editing `~/.openclaw/openclaw.json` (back it up first: `cp openclaw.json openclaw.json.bak`);
+- firewall, SSH, or Docker changes on a server, and stopping or restarting the Gateway;
+- installing third-party plugins or skills.
 
-Key facts:
-- **Runtime:** Node.js ≥22.12.0, TypeScript, pnpm monorepo
-- **Architecture:** Gateway (control plane) → Pi agent (RPC) → LLM provider
-- **Recommended model:** Anthropic Claude Opus 5 (`claude-opus-5`) via OAuth (Pro/Max subscription) for best prompt-injection resistance and long-context strength; Claude Sonnet 5 (`claude-sonnet-5`) is the cost-efficient alternative, with Claude Haiku 4.5 (`claude-haiku-4-5`) for lightweight channels and heartbeat
-- **Install method:** `curl -fsSL https://openclaw.ai/install.sh | bash` then `openclaw onboard --install-daemon`
-- **Config location:** `~/.openclaw/openclaw.json` (JSON5 format)
-- **Default port:** 18789 (WebSocket + HTTP multiplexed)
-- **Minimum context window:** 64K tokens
-- **License:** MIT
+**Secrets stay out of the chat.** API keys, bot tokens and the gateway token go straight into the onboarding wizard, an editor, or a `.env` file with `chmod 600`, typed by the user. Refer to them as `${ANTHROPIC_API_KEY}` and so on. Check that a secret is set by its presence or length, never by printing it, and don't run commands that echo one (such as `printenv TOKEN`); if the user needs to see a token, they run that command themselves.
 
-## ⚠️ CRITICAL SECURITY PREREQUISITES
+## Match the work to the request
 
-Before ANY installation, these four steps are non-negotiable:
+- **Fresh install:** the full path below.
+- **Adding a channel or changing a setting on a working install:** go straight to the relevant reference; check the version and run `openclaw doctor` afterwards. Don't walk them back through installation.
+- **Something's broken:** start with `openclaw doctor`, `openclaw status --all`, `openclaw channels status --probe` and `openclaw logs --follow`, then use the troubleshooting table.
+- **"Is my install safe?":** suggest `/openclaw-audit`, which runs the checklist read-only.
 
-1. **Set API spending limits FIRST** — Go to console.anthropic.com → Settings → Limits → set a monthly cap ($30-50/month is achievable with smart routing). A misconfigured cron job or heartbeat can cost $750+/month. Do this BEFORE pasting any API key anywhere.
+## Safety essentials (and why)
 
-2. **Version must be 2026.1.29 or later** — CVE-2026-25253 (CVSS 8.8) affects all earlier versions. It enabled 1-click remote code execution through the Control UI. After installation, verify with `openclaw --version`.
+1. **Cap spending before any key exists.** In the Claude Console (platform.claude.com → Settings → Billing → Spend limits) set a monthly limit. A runaway loop or chatty heartbeat bills by the token, and a cap is the only hard stop.
+2. **Run a current release.** OpenClaw ships security fixes often (hundreds of advisories in 2026 alone, several critical). "Current" means the latest stable or extended-stable release: compare `openclaw --version` with `npm view openclaw dist-tags`, and update with `openclaw update`. A version that was safe in January isn't safe now.
+3. **Keep the Gateway private.** Native installs bind to loopback (`gateway.bind: "loopback"`) and use token auth. Reach it remotely through an SSH tunnel or Tailscale Serve, not an open port. With Docker, the container must listen on its network interface, so the protection is publishing ports only on `127.0.0.1` on the host (see `references/vps-setup.md`); a host firewall like UFW doesn't filter Docker-published ports.
+4. **Only the owner talks to it.** DMs use `dmPolicy: "pairing"` (or an allowlist), groups require a mention, and DM sessions stay separate (`session.dmScope: "per-channel-peer"`).
+5. **Limit what the agent can do.** Start from OpenClaw's hardened baseline (`references/security-defaults.md`): messaging tool profile, exec denied or approval-gated, file tools limited to the workspace, elevated tools off. Then widen deliberately. Instructions written into `SOUL.md` are guidance to the model, not enforcement; real limits come from tool policy and sandboxing.
 
-3. **Gateway must bind to 127.0.0.1, NEVER 0.0.0.0** — Security researcher Maor Dayan found 42,665 publicly exposed OpenClaw instances via Shodan. 93.4% had critical auth bypasses. The root cause: Docker's default port publishing binds to 0.0.0.0 on VPS instances.
+## Fresh install
 
-4. **DM policy must be "pairing" or "allowlist"** — Never use `dmPolicy: "open"` unless you fully understand the risk.
+1. **Spend cap**, as above.
+2. **Choose where it runs:**
 
-See `references/security-defaults.md` for the complete security guide.
+   | Option | Good for | Reference |
+   |---|---|---|
+   | Mac (CLI or the OpenClaw.app menu-bar app, macOS 15+) | Personal use, always-on Mac mini, needed for iMessage | `references/mac-local-setup.md` |
+   | Linux VPS with Docker | 24/7 availability, Telegram; requires active hardening | `references/vps-setup.md` |
+   | Hostinger managed OpenClaw | Least admin work; Hostinger controls the host | `references/vps-setup.md` → Hostinger |
 
-## When to Use This Skill
+3. **Install:** `curl -fsSL https://openclaw.ai/install.sh | bash` (macOS, Linux, WSL2). It installs Node if needed (OpenClaw needs Node 24.16+ or 26.1+) and starts onboarding. Docker installs use the repo's `scripts/docker/setup.sh` instead.
+4. **Onboard:** `openclaw onboard --install-daemon`. Explain each wizard step and recommend the safe choice: Anthropic with an API key (`references/anthropic-auth.md`), loopback bind, token auth, pairing for DMs, and bundled skills only.
+5. **Connect channels:** `references/telegram-channel.md`, `references/imessage-channel.md` (Mac only).
+6. **Apply the hardened baseline** and check: `openclaw security audit --deep`, `openclaw doctor`, `openclaw channels status --probe`. On a server, also `ss -tlnp` to confirm nothing listens on `0.0.0.0` that shouldn't.
+7. **Test:** send the bot a DM, approve the pairing code (`openclaw pairing approve telegram <code>`), and confirm it answers.
 
-Use this skill when the user wants to:
-- Install OpenClaw from scratch on macOS or Linux
-- Deploy OpenClaw to a Hostinger VPS using Docker
-- Configure Anthropic as the model provider
-- Connect Telegram or iMessage as a messaging channel
-- Apply safe security defaults to a new or existing OpenClaw installation
-- Run post-setup health checks (`openclaw doctor`, `openclaw security audit`)
-- Troubleshoot common OpenClaw setup issues
-- Understand OpenClaw costs and optimize spending
+For scripted installs, `openclaw onboard --non-interactive` requires `--accept-risk`; see https://docs.openclaw.ai/start/wizard-cli-automation.
 
-## When NOT to Use This Skill
+## Editing config
 
-Do not use this skill for:
-- WhatsApp, Slack, Discord, Signal, or other channel setup (not covered here)
-- Advanced multi-agent routing or Canvas/A2UI configuration
-- iOS/Android node pairing or voice wake setup
-- OpenClaw skills/plugins development
-- Browser control configuration
-- Ollama/local model setup
+`~/.openclaw/openclaw.json` is JSON5 and **validated strictly**: an unknown or misplaced key stops the Gateway from starting. So don't write keys from memory or from older guides. Take them from `openclaw config schema`, the docs, or the snippets in these references (checked against 2026.9.9), back up first, check with `openclaw config validate`, and run `openclaw doctor` after every change (`openclaw doctor --fix` migrates some older formats). Two keys that moved in 2026: the model is `agents.defaults.model.primary` (not `agent.model`), and the heartbeat lives under `agents.defaults.heartbeat`.
 
-## Setup Workflow
-
-Follow this order. Each step links to its reference file.
-
-### Step 0: Set API Spending Limits
-
-Before touching anything else, go to your LLM provider's console and set a monthly spending cap. See `references/anthropic-auth.md` for details.
-
-### Step 1: Choose a Deployment Path
-
-| Path | Best For | Reference |
-|------|----------|-----------|
-| **Mac mini (local)** | Personal use, always-on home server, iMessage support, safest for non-technical users | `references/mac-local-setup.md` |
-| **Hostinger VPS** | 24/7 cloud availability, Telegram-focused, Docker isolation, requires active hardening | `references/hostinger-vps-setup.md` |
-
-If the user wants iMessage, they must use the Mac path (iMessage requires macOS with Messages signed in).
-
-### Step 2: Set Up Anthropic Auth
-
-Configure Anthropic as the primary model provider during or after onboarding.
-
-→ Read `references/anthropic-auth.md`
-
-### Step 3: Connect Channels
-
-| Channel | Platform Requirement | Reference |
-|---------|---------------------|-----------|
-| **Telegram** | Any (Mac or VPS) | `references/telegram-channel.md` |
-| **iMessage** | macOS only | `references/imessage-channel.md` |
-
-### Step 4: Apply Security Defaults
-
-Harden the installation with safe defaults before going live.
-
-→ Read `references/security-defaults.md`
-
-### Step 5: Verify
-
-```bash
-openclaw --version              # Must be 2026.1.29+
-openclaw doctor
-openclaw security audit --deep
-openclaw gateway status
-openclaw channels status --probe
-openclaw status --all
-```
-
-On VPS, verify the gateway is NOT bound to 0.0.0.0:
-```bash
-ss -tlnp | grep 18789
-# Must show 127.0.0.1:18789, NOT 0.0.0.0:18789
-```
-
-## Interactive Setup Mode
-
-When running commands for the user, Claude Code should:
-
-1. **Set spending limits first** — Walk the user through setting API caps at console.anthropic.com
-2. **Check prerequisites** — Verify Node.js ≥22.12.0, Xcode CLI tools (macOS), and gather credentials
-3. **Run the install script** — Execute the curl installer or npm global install
-4. **Verify version** — Confirm `openclaw --version` shows 2026.1.29+
-5. **Launch the onboarding wizard** — Run `openclaw onboard --install-daemon` and guide the user through each interactive prompt
-6. **Generate secure config** — Produce a `~/.openclaw/openclaw.json` with safe defaults
-7. **Warn about skills** — During the wizard's skills step, advise installing only bundled skills. ClawHub community skills should be treated with extreme caution (Cisco found 26% contain vulnerabilities; 341 malicious skills found including macOS malware installers)
-8. **Warn about heartbeat costs** — If heartbeat is enabled, recommend switching it to Haiku model or disabling it. Default Opus heartbeat costs ~$54/month.
-9. **Configure channels** — Set up Telegram bot token and/or iMessage
-10. **Run health checks** — Execute `openclaw doctor` and `openclaw security audit --deep`
-11. **Verify binding** — On VPS, run `ss -tlnp | grep 18789` to confirm loopback binding
-12. **Test connectivity** — Send a test message or open the dashboard
-
-For each interactive prompt in the wizard, explain what the option means and recommend the safe choice. Non-technical users need plain-language explanations; developers can get the concise version.
-
-## Non-Interactive Setup (for scripting)
-
-```bash
-openclaw onboard --non-interactive \
-  --mode local --auth-choice apiKey \
-  --anthropic-api-key "$ANTHROPIC_API_KEY" \
-  --gateway-port 18789 --gateway-bind loopback \
-  --install-daemon --daemon-runtime node --skip-skills
-```
-
-## Key Config Structure
-
-Minimal safe config (Anthropic + Telegram + secure defaults):
+A minimal safe starting point:
 
 ```json5
 {
-  agent: {
-    model: "anthropic/claude-opus-5"
-  },
-  gateway: {
-    bind: "loopback",
-    port: 18789,
-    auth: { mode: "token", token: "<auto-generated>" }
-  },
+  agents: { defaults: { model: { primary: "anthropic/claude-sonnet-5-5" } } },
+  gateway: { mode: "local", bind: "loopback", auth: { mode: "token" } }, // keep the token onboarding generated
+  session: { dmScope: "per-channel-peer" },
   channels: {
-    telegram: {
-      enabled: true,
-      botToken: "<from-botfather>",
-      dmPolicy: "pairing",
-      groups: { "*": { requireMention: true } }
-    }
+    telegram: { enabled: true, dmPolicy: "pairing", groups: { "*": { requireMention: true } } },
   },
-  discovery: {
-    mdns: { mode: "minimal" }
-  }
 }
 ```
 
-## Troubleshooting Quick Reference
+## Troubleshooting
 
-| Issue | Fix |
-|-------|-----|
-| `openclaw --version` < 2026.1.29 | Update immediately: `openclaw update --channel stable` — critical RCE vulnerability |
-| `node --version` < 22 | Install Node 22+ via nvm, Homebrew, or system package manager |
-| Gateway won't start | Check port 18789 not in use; run `openclaw doctor --fix` |
-| Gateway bound to 0.0.0.0 | Fix Docker port binding to `"127.0.0.1:18789:18789"` and restart |
-| Telegram 401 Unauthorized | Regenerate bot token in BotFather; update config and restart |
-| "plugin not found: telegram" | Telegram is a CHANNEL, not a plugin — config goes under `channels.telegram` |
-| Pairing code not working | `openclaw pairing approve telegram <code>` — codes expire after 1 hour |
-| iMessage not connecting | Verify Messages signed in; consider BlueBubbles for better reliability |
-| High API costs ($100+/mo) | Set spending limits; switch heartbeat to Haiku; use tiered model routing |
-| Heartbeat costing $54+/month | Switch heartbeat model to Haiku with 1-hour intervals (~$0.30/month) |
-| Security audit warnings | `openclaw security audit --fix` to auto-apply safe defaults |
-| WhatsApp status=515 error | Click Update in Control UI or restart gateway |
-| ClawHub skill suspicious | Do NOT install. 26% contain vulnerabilities per Cisco research |
+| Symptom | First thing to try |
+|---|---|
+| Gateway won't start after a config edit | `openclaw doctor`; the error names the bad key. Restore the backup or fix the key from `openclaw config schema` |
+| `node` too old | The installer provisions a supported Node; otherwise install Node 24 LTS or 26 |
+| Gateway reachable from the internet | Native: set `gateway.bind: "loopback"`. Docker: publish ports as `127.0.0.1:PORT:PORT`; see `vps-setup.md` |
+| Telegram bot silent | `openclaw channels status --probe`; check the token, then pairing (`openclaw pairing list telegram`) |
+| Pairing code rejected | Codes expire after an hour and at most 3 can be pending; send a new DM for a fresh code |
+| iMessage not working | `imsg chats --limit 1` in the Gateway's context, then the permission checklist in `imessage-channel.md` |
+| Costs higher than expected | Control UI → Usage, or `openclaw gateway usage-cost`; see `anthropic-auth.md` for heartbeat and model choices |
+| Audit warnings | Read them with the user, then `openclaw security audit --fix` for the auto-fixable ones (with their OK) |
 
-## Reference Files
+## Reference files
 
-| File | Content |
-|------|---------|
-| `references/mac-local-setup.md` | Complete Mac mini local deployment walkthrough |
-| `references/hostinger-vps-setup.md` | Hostinger VPS Docker deployment guide |
-| `references/anthropic-auth.md` | Anthropic auth, cost control, and smart model routing |
-| `references/telegram-channel.md` | Telegram bot creation and channel configuration |
-| `references/imessage-channel.md` | iMessage channel setup — BlueBubbles (recommended) + legacy |
-| `references/security-defaults.md` | CVE-2026-25253, safe defaults, hardening, incident response |
+| File | Covers |
+|---|---|
+| `references/mac-local-setup.md` | Mac install, keep-awake, LaunchAgent, remote access |
+| `references/vps-setup.md` | Linux VPS with Docker (any provider), safe SSH order, port publishing, Hostinger notes |
+| `references/anthropic-auth.md` | API key vs Claude subscription login, model choice, heartbeat and cost control |
+| `references/telegram-channel.md` | BotFather, pairing, groups, privacy mode |
+| `references/imessage-channel.md` | `@openclaw/imessage` + `imsg`, macOS permissions |
+| `references/security-defaults.md` | Hardened baseline, tool limits, skills and plugins, incident response |
+
+These notes were checked against OpenClaw 2026.9.9 (October 2026). OpenClaw changes monthly; when a command or key here disagrees with the installed version, trust `openclaw --help`, `openclaw config schema` and docs.openclaw.ai.

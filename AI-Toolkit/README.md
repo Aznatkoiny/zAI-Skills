@@ -1,130 +1,68 @@
-# AI-Toolkit
+# ai-toolkit
 
-Skills for Deep Learning, Reinforcement Learning (Python & C++), Prompt Engineering, Web3 Payments, and OpenClaw Setup — plus slash commands and agents that operationalize them.
+For developers who work on AI systems: writing prompts for Claude, training neural networks and reinforcement-learning agents, building pay-per-request APIs with x402, or running their own OpenClaw assistant. Six skills that Claude loads automatically when your request matches, plus four slash commands and two agents.
 
-## Installation
+## Install
 
-```bash
+```
+/plugin marketplace add Aznatkoiny/zAI-Skills
 /plugin install ai-toolkit@zAI-Skills
 ```
 
-## Commands
+Restart Claude Code after installing.
 
-| Command | Arguments | Description |
-|---------|-----------|-------------|
-| `/optimize-prompt` | `[prompt file path or pasted prompt]` | Diagnose and rewrite a prompt using the prompt-optimizer skill's workflow — before/after diff, parameter recommendations (model, effort, thinking), per-change rationale, and an offer to A/B-measure the result |
-| `/rl-new-project` | `[environment or task description]` | Scaffold a Python RL project: custom Gymnasium (>=1.0) env, SB3 training script with EvalCallback + VecNormalize, Optuna tuning stub, and the RL skill's validation scripts wired into a Makefile |
-| `/x402-scaffold` | `[seller \| buyer] [evm \| svm]` | Generate an x402 payment starter — seller (paid endpoint with the 402 flow) or buyer (paying client) — with testnet-only defaults; mainnet keys/config are always the user's explicit opt-in |
-| `/openclaw-audit` | *(none — audits the local install)* | Run the openclaw-setup skill's security checklist: version (CVE-2026-25253), gateway binding, auth, DM policy, file permissions, and more — pass/fail table with remediations |
+## Try it
 
-## Agents
+| If you want to… | Try |
+|---|---|
+| Improve a prompt, system prompt, skill or CLAUDE.md | `/optimize-prompt ./prompts/support_bot.md`, or ask "why does my agent stop halfway through tasks?" |
+| Start an RL project | `/rl-new-project inventory restocking with discrete actions` (or no arguments for a worked example) |
+| Fix an agent that won't learn | "My PPO reward has been flat for 500k steps", and Claude hands it to the rl-debugger agent |
+| Build a Keras model | "Build a Keras image classifier for my folder of cat and dog photos" |
+| Charge for an API per request | `/x402-scaffold seller evm`, then `npm start` |
+| Set up or check OpenClaw | "Help me install OpenClaw on my Mac mini", or `/openclaw-audit` for a read-only security check |
 
-| Agent | Model | Description |
-|-------|-------|-------------|
-| `rl-debugger` | sonnet | Diagnoses RL training failures using the debugging playbook — pre-training sanity checks via the skill's validation scripts, entropy/value-loss diagnostics, and the common failure-mode tables (flat reward, policy collapse, high variance, NaN) |
-| `prompt-rewriter` | opus | Rewrites a target prompt in an isolated context, applying the prompt-optimizer references end-to-end: symptom diagnosis, core-principle checks, proven snippets, and parameter recommendations |
+## What it needs
+
+Nothing to use the prompt skill. The others need the tools for that kind of work:
+
+| Area | Required | Optional |
+|---|---|---|
+| Prompt engineering | — | — |
+| Reinforcement learning (Python) | Python 3.10+, `stable-baselines3>=2.4`, `gymnasium>=1.0` (the skill and `/rl-new-project` set these up in a project venv) | Optuna, TensorBoard, Atari or MuJoCo extras |
+| Reinforcement learning (C++) | A C++20 compiler, CMake, LibTorch | CUDA, ONNX Runtime |
+| Deep learning | Python, Keras 3 and one backend (JAX, TensorFlow or PyTorch) | A GPU |
+| x402 payments | Node.js 22+ and a testnet wallet address (free test USDC from faucet.circle.com) | A CDP API key, only when you move to mainnet |
+| OpenClaw | A Mac or a Linux VPS, and an Anthropic API key with a spend limit | Telegram bot token, an iMessage-capable Mac |
 
 ## Skills
 
-### deep-learning
+| Skill | Use it for |
+|---|---|
+| `prompt-engineer` | Writing, reviewing, debugging and migrating prompts for current Claude models (Fable 5.1, Opus 5.5, Sonnet 5.5, Haiku 5.5), built on Anthropic's prompting docs. Includes the docs as references and a set of evaluation prompts. |
+| `reinforcement-learning` | Python RL with Gymnasium and Stable-Baselines3: environments, algorithm choice, training, debugging, evaluation, ONNX export. Ships three scripts: `validate_env.py`, `pretrain_check.py` and `eval_report.py`. |
+| `cpp-reinforcement-learning` | RL in C++ with LibTorch: DQN, PPO and SAC implementations, replay and rollout buffers, GPU memory, running Python-trained policies from C++. |
+| `deep-learning` | Keras 3 on any backend: vision, text, time series, generative models, custom training, mixed precision, multi-GPU. |
+| `x402-payments` | HTTP 402 stablecoin payments: paid endpoints, paying clients and agents with spending limits, MCP tools, testnet to mainnet. |
+| `openclaw-setup` | Installing, securing and troubleshooting OpenClaw on a Mac or VPS, with Anthropic setup, Telegram and iMessage. |
 
-Comprehensive guide for Deep Learning with Keras 3 (Multi-Backend: JAX, TensorFlow, PyTorch). Use when:
-- Building neural networks (Sequential, Functional, Subclassing APIs)
-- Working with CNNs for computer vision
-- Implementing RNNs/Transformers for NLP
-- Time series forecasting
-- Generative models (VAEs, GANs)
-- Custom training loops and callbacks
+## Commands
 
-**Reference Materials:**
-- Keras 3 migration notes
-- Computer vision patterns
-- NLP & Transformer architectures
-- Time series techniques
-- Generative deep learning
-- Best practices for production
+| Command | Does |
+|---|---|
+| `/optimize-prompt [file, pasted prompt, or description]` | Reviews and rewrites a prompt, or drafts one from a description: the improved prompt, a diff, what changed and why, API settings when relevant, and how to test it. |
+| `/rl-new-project [what the agent should learn]` | Scaffolds a project: custom environment, SB3 training with evaluation and VecNormalize, Optuna stub, the validation scripts, and a Makefile. Runs the environment checks before handing over. |
+| `/x402-scaffold [seller\|buyer] [evm\|svm]` | Generates a testnet starter (defaults to seller on EVM), installs it, and checks that it builds. |
+| `/openclaw-audit [config path or compose dir]` | Read-only security check of an OpenClaw install, native or Docker, with a pass/fail table. Never prints secrets or changes anything without asking. |
 
-**Utility Scripts:**
-- `quick_train.py` - Reusable training template
-- `visualize_filters.py` - Convnet filter visualization
+## Agents
 
-### reinforcement-learning
+Claude delegates to these on its own when a request fits. Both use whatever model your session runs.
 
-Reinforcement Learning best practices for Python using modern libraries (Stable-Baselines3, RLlib, Gymnasium). Use when:
-- Implementing RL algorithms (PPO, SAC, DQN, TD3, A2C)
-- Creating custom Gymnasium environments
-- Training, debugging, or evaluating RL agents
-- Setting up hyperparameter tuning for RL
-- Deploying RL models to production
-
-**Reference Materials:**
-- Algorithm implementations (PPO, SAC, DQN, TD3, A2C)
-- Custom environment creation
-- Training and debugging patterns
-- Evaluation and benchmarking
-- Production deployment
-
-### cpp-reinforcement-learning
-
-C++ Reinforcement Learning using libtorch (PyTorch C++ frontend) and modern C++17/20. Use when:
-- Implementing RL algorithms in C++ for performance-critical applications
-- Building production RL systems with libtorch
-- Creating replay buffers and experience storage
-- Optimizing RL training with GPU acceleration
-- Deploying RL models with ONNX Runtime
-
-**Reference Materials:**
-- Algorithm implementations with libtorch
-- Memory management patterns
-- Performance optimization
-- Testing strategies
-
-### prompt-optimizer
-
-Optimize prompts for Claude's latest models using Anthropic's official best practices. Use when:
-- Improving or creating effective prompts for Claude
-- Fixing underperforming prompts or reducing verbosity
-- Creating system prompts or controlling output formatting
-- Enhancing agentic and tool-use behaviors
-
-**Reference Materials:**
-- Prompt patterns and techniques
-- Agentic prompt design
-- Output formatting controls
-
-### x402-payments
-
-Build applications using the x402 protocol — Coinbase's open standard for HTTP-native stablecoin payments using the HTTP 402 status code. Use when:
-- Creating APIs that require USDC payments per request (seller/server side)
-- Building clients or AI agents that pay for x402-protected resources (buyer/client side)
-- Implementing MCP servers with paid tools for Claude Desktop
-- Adding payment middleware to Express, Hono, or Next.js applications
-- Working with Base (EVM) or Solana (SVM) payment flows
-- Building machine-to-machine or agent-to-agent payment systems
-
-**Reference Materials:**
-- Protocol specification (headers, payloads, CAIP-2 IDs)
-- Server patterns (Express, Hono, Next.js middleware)
-- Client patterns (fetch, axios, wallet setup)
-- Agentic patterns (AI agent payments, MCP server integration)
-- Deployment guide (testnet to mainnet migration)
-
-### openclaw-setup
-
-Set up, configure, secure, and deploy OpenClaw — the open-source personal AI assistant that connects to your messaging channels. Use when:
-- Installing OpenClaw from scratch on macOS or Linux
-- Configuring Anthropic auth, model selection, and cost controls
-- Connecting messaging channels (Telegram, iMessage)
-- Applying security hardening and safe defaults
-- Deploying to a Hostinger VPS with Docker
-- Running health checks (`openclaw doctor`, `openclaw security audit`)
-
-**Reference Materials:**
-- Mac mini local deployment walkthrough
-- Hostinger VPS Docker deployment guide
-- Anthropic auth, cost control, and smart model routing
-- Telegram and iMessage channel setup
-- Security defaults, hardening, and incident response
+| Agent | Does |
+|---|---|
+| `rl-debugger` | Works out why an RL run isn't learning: reads code and logs, runs the validation scripts, and returns the likely cause with evidence and ordered fixes. |
+| `prompt-rewriter` | Rewrites one long or high-stakes prompt in a clean context. |
 
 ## License
 

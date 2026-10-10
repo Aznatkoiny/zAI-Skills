@@ -1,337 +1,163 @@
-# Server-Side Implementation Patterns
+# x402 server patterns (seller side)
 
-## Table of Contents
+Checked against x402 2.28.0. Each pattern points at the official example it follows, in `examples/typescript/servers/` (or `fullstack/`) of https://github.com/x402-foundation/x402. When the user's installed version differs, read that example rather than trusting these snippets.
 
-1. [Express Middleware](#express-middleware)
-2. [Next.js Middleware](#nextjs-middleware)
-3. [Hono Middleware](#hono-middleware)
-4. [Multi-Route Configuration](#multi-route-configuration)
-5. [Multi-Chain Server (EVM + Solana)](#multi-chain-server)
-6. [Dynamic Pricing (Without Middleware)](#dynamic-pricing)
-7. [Delayed Settlement](#delayed-settlement)
-8. [Facilitator Configuration](#facilitator-configuration)
-9. [Bazaar Discovery Extension](#bazaar-discovery)
-10. [Environment Variables Template](#env-template)
+## Contents
+- The pieces
+- Express and Hono
+- Next.js
+- Route config: multiple routes, networks, dynamic prices
+- Custom verify and settle (no middleware)
+- Listing a resource for discovery
+- Environment template
 
-## Express Middleware
+## The pieces
 
-Source: `examples/typescript/servers/express/`
+Every seller has the same three parts:
+1. A **facilitator client**: `new HTTPFacilitatorClient({ url })` for testnet, or `createCdpFacilitatorClient()` for mainnet (`deployment.md`).
+2. A **resource server** with the schemes it accepts: `new x402ResourceServer(facilitator).register(network, new ExactEvmScheme())`. Register a wildcard like `"eip155:*"` to accept any EVM network the facilitator supports.
+3. **Middleware** for the framework, configured with which routes cost what.
+
+The middleware returns 402 with requirements for unpaid requests, verifies the payment, runs your handler, settles, and adds `PAYMENT-RESPONSE`. Routes not in the config are free.
+
+## Express and Hono
+
+Express: the quick start in `SKILL.md` (from `servers/express`). Hono is the same shape (from `servers/hono`):
 
 ```typescript
-import express from "express";
-import { paymentMiddleware } from "@x402/express";
-import { x402ResourceServer, HTTPFacilitatorClient } from "@x402/core/server";
-import { registerExactEvmScheme } from "@x402/evm/exact/server";
+import { Hono } from "hono";
+import { serve } from "@hono/node-server";
+import { paymentMiddleware, x402ResourceServer } from "@x402/hono";
+import { HTTPFacilitatorClient } from "@x402/core/server";
+import { ExactEvmScheme } from "@x402/evm/exact/server";
 
-const app = express();
-const payTo = process.env.PAY_TO!;
+const facilitator = new HTTPFacilitatorClient({ url: process.env.FACILITATOR_URL ?? "https://x402.org/facilitator" });
+const server = new x402ResourceServer(facilitator).register("eip155:84532", new ExactEvmScheme());
 
-const facilitatorClient = new HTTPFacilitatorClient({
-  url: "https://x402.org/facilitator",
-});
-const server = new x402ResourceServer(facilitatorClient);
-registerExactEvmScheme(server);
-
+const app = new Hono();
 app.use(
   paymentMiddleware(
-    {
-      "GET /weather": {
-        accepts: [
-          { scheme: "exact", price: "$0.001", network: "eip155:84532", payTo },
-        ],
-        description: "Get current weather data",
-        mimeType: "application/json",
-      },
-    },
+    { "GET /weather": { accepts: { scheme: "exact", price: "$0.001", network: "eip155:84532", payTo: process.env.PAY_TO! } } },
     server,
   ),
 );
-
-app.get("/weather", (req, res) => {
-  res.json({ report: { weather: "sunny", temperature: 70 } });
-});
-
-app.listen(4021);
+app.get("/weather", c => c.json({ weather: "sunny" }));
+serve({ fetch: app.fetch, port: 4021 });
 ```
 
-**Alternative registration style** (from CDP docs — equivalent):
-```typescript
-import { paymentMiddleware, x402ResourceServer } from "@x402/express";
-import { ExactEvmScheme } from "@x402/evm/exact/server";
-import { HTTPFacilitatorClient } from "@x402/core/server";
+Fastify, CloudFront Lambda@Edge and others have examples next to these.
 
-const server = new x402ResourceServer(facilitatorClient)
-  .register("eip155:84532", new ExactEvmScheme());
-```
+## Next.js
 
-## Next.js Middleware
-
-Source: `examples/typescript/fullstack/mainnet/`
+Next.js 16 renamed middleware to **proxy**: the file is `proxy.ts` and it exports `proxy` (from `fullstack/next/proxy.ts`).
 
 ```typescript
-// middleware.ts
+// proxy.ts
 import { paymentProxy } from "@x402/next";
 import { x402ResourceServer, HTTPFacilitatorClient } from "@x402/core/server";
-import { registerExactEvmScheme } from "@x402/evm/exact/server";
+import { ExactEvmScheme } from "@x402/evm/exact/server";
 
-const payTo = process.env.PAY_TO!;
-const facilitatorClient = new HTTPFacilitatorClient({
-  url: "https://x402.org/facilitator",
-});
-const server = new x402ResourceServer(facilitatorClient);
-registerExactEvmScheme(server);
+const server = new x402ResourceServer(new HTTPFacilitatorClient({ url: process.env.FACILITATOR_URL! }));
+server.register("eip155:*", new ExactEvmScheme());
 
-export const middleware = paymentProxy(
+export const proxy = paymentProxy(
   {
-    "/api/protected": {
-      accepts: [
-        { scheme: "exact", price: "$0.01", network: "eip155:84532", payTo },
-      ],
-      description: "Access to protected content",
-      mimeType: "application/json",
+    "/protected": {
+      accepts: [{ scheme: "exact", price: "$0.001", network: "eip155:84532", payTo: process.env.EVM_ADDRESS! }],
+      description: "Premium content",
     },
   },
   server,
 );
 
-export const config = {
-  matcher: ["/api/protected/:path*"],
-};
+export const config = { matcher: ["/protected/:path*"] };
 ```
 
-## Hono Middleware
+To charge for a single API route instead, wrap its handler with `withX402(handler, routes, server)` from `@x402/next` (see `fullstack/next/app/api/weather/route.ts`). `withX402` settles only when the handler returns a status below 400, so failed requests aren't charged. `@x402/paywall` adds a browser paywall page for human visitors.
+
+## Route config
 
 ```typescript
-import { Hono } from "hono";
-import { serve } from "@hono/node-server";
-import { paymentMiddleware } from "@x402/hono";
-import { x402ResourceServer, HTTPFacilitatorClient } from "@x402/core/server";
-import { registerExactEvmScheme } from "@x402/evm/exact/server";
-
-const app = new Hono();
-const payTo = process.env.PAY_TO!;
-
-const facilitatorClient = new HTTPFacilitatorClient({
-  url: "https://x402.org/facilitator",
-});
-const server = new x402ResourceServer(facilitatorClient);
-registerExactEvmScheme(server);
-
-app.use(
-  paymentMiddleware(
-    {
-      "/data": {
-        accepts: [
-          { scheme: "exact", price: "$0.10", network: "eip155:84532", payTo },
-        ],
-        description: "Premium data endpoint",
-      },
-    },
-    server,
-  ),
-);
-
-app.get("/data", (c) => c.json({ message: "Premium content" }));
-serve({ fetch: app.fetch, port: 3000 });
+{
+  "GET /weather": {
+    accepts: [                                   // one option, or an array
+      { scheme: "exact", price: "$0.001", network: "eip155:84532", payTo: evmAddress },
+      { scheme: "exact", price: "$0.001", network: "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1", payTo: svmAddress },
+    ],
+    description: "Weather data",
+    mimeType: "application/json",
+  },
+  "POST /analyze": { accepts: { scheme: "exact", price: "$0.05", network: "eip155:84532", payTo: evmAddress } },
+}
 ```
 
-## Multi-Route Configuration
+- Keys are `"METHOD /path"`. Unlisted routes stay free, so don't add entries for free routes.
+- `price` takes a dollar string, or a function of the request for **dynamic pricing** (`servers/advanced/dynamic-price.ts`):
+  ```typescript
+  price: context => (context.adapter.getQueryParam?.("tier") === "premium" ? "$0.005" : "$0.001"),
+  ```
+  `payTo` can be a function too (`dynamic-pay-to.ts`). Clamp anything taken from the request so a client can't set a zero or negative price.
+- For metered work, use the `upto` scheme (`servers/upto`): the client authorizes a maximum and you settle what was used.
 
-Route keys use `"METHOD /path"` format. Supports wildcards.
+## Custom verify and settle (no middleware)
 
-```typescript
-app.use(
-  paymentMiddleware(
-    {
-      "GET /free": null, // Explicitly no payment
-      "GET /cheap": {
-        accepts: [
-          { scheme: "exact", price: "$0.001", network: "eip155:84532", payTo },
-        ],
-      },
-      "GET /premium": {
-        accepts: [
-          { scheme: "exact", price: "$0.10", network: "eip155:84532", payTo },
-        ],
-      },
-      "POST /api/*": {
-        accepts: [
-          { scheme: "exact", price: "$0.01", network: "eip155:84532", payTo },
-        ],
-      },
-    },
-    server,
-  ),
-);
-```
-
-## Multi-Chain Server
-
-Source: Accept payments on both EVM and Solana.
+Use this when the framework has no adapter, or when you need control over when settlement happens. It follows `servers/custom/index.ts`; read that file for the full version.
 
 ```typescript
-import { registerExactEvmScheme } from "@x402/evm/exact/server";
-import { registerExactSvmScheme } from "@x402/svm/exact/server";
-
-const server = new x402ResourceServer(facilitatorClient);
-registerExactEvmScheme(server);
-registerExactSvmScheme(server);
-
-app.use(
-  paymentMiddleware(
-    {
-      "GET /multi": {
-        accepts: [
-          { scheme: "exact", price: "$0.001", network: "eip155:84532", payTo: evmAddress },
-          {
-            scheme: "exact",
-            price: "$0.001",
-            network: "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
-            payTo: solanaAddress,
-          },
-        ],
-      },
-    },
-    server,
-  ),
-);
-```
-
-## Dynamic Pricing
-
-Source: `examples/typescript/servers/advanced/`
-
-Handle pricing without middleware for full control over verify/settle flow.
-
-```typescript
-app.get("/dynamic-price", async (req, res) => {
-  const multiplier = parseInt(req.query.multiplier as string) || 1;
-  const basePrice = 0.001;
-  const price = `$${(basePrice * multiplier).toFixed(6)}`;
-
-  const paymentConfig = {
-    accepts: [{ scheme: "exact", price, network: "eip155:84532", payTo }],
-    description: "Dynamic pricing endpoint",
-  };
-
-  const paymentHeader = req.headers["payment-signature"] as string;
-
-  if (!paymentHeader) {
-    res.status(402).set(
-      "PAYMENT-REQUIRED",
-      Buffer.from(JSON.stringify({ x402Version: 2, ...paymentConfig })).toString("base64"),
-    );
-    return res.json({ error: "Payment required" });
-  }
-
-  const verifyResult = await server.verify(paymentHeader, paymentConfig);
-  if (!verifyResult.isValid) {
-    return res.status(402).json({ error: verifyResult.invalidReason });
-  }
-
-  // Perform work BEFORE settling (delayed settlement pattern)
-  const result = await expensiveOperation(multiplier);
-
-  const settleResult = await server.settle(paymentHeader, paymentConfig);
-  res.set("PAYMENT-RESPONSE", settleResult.encoded);
-  res.json({ result, txHash: settleResult.txHash });
-});
-```
-
-## Delayed Settlement
-
-Source: `examples/typescript/servers/advanced/`
-
-Verify first, do work, then settle. Useful when immediate response matters more than payment guarantee.
-
-```typescript
-app.get("/delayed", async (req, res) => {
-  const paymentHeader = req.headers["payment-signature"] as string;
-  if (!paymentHeader) { /* return 402 */ }
-
-  // Step 1: Verify only
-  const verifyResult = await server.verify(paymentHeader, paymentConfig);
-  if (!verifyResult.isValid) { /* return 402 */ }
-
-  // Step 2: Do expensive work
-  const result = await generateContent();
-
-  // Step 3: Settle after work completes
-  const settleResult = await server.settle(paymentHeader, paymentConfig);
-
-  res.set("PAYMENT-RESPONSE", settleResult.encoded);
-  res.json(result);
-});
-```
-
-## Facilitator Configuration
-
-```typescript
-// Testnet (no auth, free)
-const testnetFacilitator = new HTTPFacilitatorClient({
-  url: "https://x402.org/facilitator",
+const resourceServer = new x402ResourceServer(facilitator).register("eip155:84532", new ExactEvmScheme());
+const [requirements] = await resourceServer.buildPaymentRequirements({
+  scheme: "exact", price: "$0.001", network: "eip155:84532", payTo: evmAddress,
 });
 
-// Mainnet via CDP (requires API keys)
-const mainnetFacilitator = new HTTPFacilitatorClient({
-  url: "https://api.cdp.coinbase.com/platform/v2/x402",
-  createAuthHeaders: () => ({
-    Authorization: `Bearer ${process.env.CDP_API_KEY}`,
-  }),
-});
+// In the request handler:
+const header = req.headers["payment-signature"] as string | undefined;
+if (!header) {
+  const paymentRequired = resourceServer.createPaymentRequiredResponse([requirements], { url: fullUrl, description: "Weather" });
+  res.status(402).set("PAYMENT-REQUIRED", Buffer.from(JSON.stringify(paymentRequired)).toString("base64")).json({});
+  return;
+}
+const paymentPayload = JSON.parse(Buffer.from(header, "base64").toString("utf-8"));
+const verified = await resourceServer.verifyPayment(paymentPayload, requirements);
+if (!verified.isValid) return res.status(402).json({ error: verified.invalidReason });
 
-// Environment-based selection
-const facilitatorClient = new HTTPFacilitatorClient({
-  url:
-    process.env.NODE_ENV === "production"
-      ? "https://api.cdp.coinbase.com/platform/v2/x402"
-      : "https://x402.org/facilitator",
-});
+const body = await doTheWork();
+const settled = await resourceServer.settlePayment(paymentPayload, requirements);
+if (!settled.success) return res.status(402).json({ error: settled.errorReason ?? "settlement failed" });
+res.set("PAYMENT-RESPONSE", Buffer.from(JSON.stringify(settled)).toString("base64")).json(body);
 ```
 
-## Bazaar Discovery
+Decide deliberately what happens when settlement fails after the work is done. The safe default above withholds the result. If you return it anyway (for example for slow work where you settle afterwards), you're extending credit, and some requests will go unpaid. Check `settled.success` before granting anything durable, such as a session cookie.
 
-Expose endpoints for automated discovery by agents and facilitators.
+## Listing a resource for discovery
+
+To make a route discoverable by agents through the Bazaar, add the discovery extension to its config (`servers/bazaar`):
 
 ```typescript
-app.use(
-  paymentMiddleware(
-    {
-      "GET /weather": {
-        accepts: [
-          { scheme: "exact", price: "$0.001", network: "eip155:84532", payTo },
-        ],
-        description: "Real-time weather data for any city",
-        mimeType: "application/json",
-        extensions: {
-          bazaar: {
-            discoverable: true,
-            category: "weather",
-            tags: ["forecast", "real-time"],
-          },
-        },
-      },
-    },
-    server,
-  ),
-);
+import { declareDiscoveryExtension } from "@x402/extensions/bazaar";
+
+"GET /weather/:city": {
+  accepts: { scheme: "exact", price: "$0.001", network: "eip155:84532", payTo: evmAddress },
+  extensions: {
+    ...declareDiscoveryExtension({
+      pathParamsSchema: { properties: { city: { type: "string" } }, required: ["city"] },
+      output: { example: { city: "san-francisco", weather: "foggy" } },
+    }),
+  },
+},
 ```
 
-## Environment Variables Template
+Listings are served by the CDP facilitator's discovery endpoint, so they appear when settlements go through CDP.
+
+## Environment template
 
 ```bash
-# Server wallet (receives payments)
-PAY_TO=0xYourEthereumWalletAddress
-PAY_TO_SOLANA=YourSolanaWalletAddress
-
-# Facilitator
-FACILITATOR_URL=https://x402.org/facilitator
-
-# CDP API keys (mainnet only)
-CDP_API_KEY_ID=your-api-key-id
-CDP_API_KEY_SECRET=your-api-key-secret
-
-# Server
-PORT=4021
-NODE_ENV=development
+# .env — gitignored, chmod 600
+PAY_TO=0xYourReceivingAddress        # EVM address that receives payments (no private key needed to receive)
+SVM_PAY_TO=YourSolanaAddress         # only if you accept Solana
+FACILITATOR_URL=https://x402.org/facilitator   # testnet
+# Mainnet only — see deployment.md
+# CDP_API_KEY_ID=
+# CDP_API_KEY_SECRET=
 ```
+
+A seller needs only a receiving address. Keep private keys off the server unless it also pays for things.

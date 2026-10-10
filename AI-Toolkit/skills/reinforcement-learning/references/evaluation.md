@@ -14,7 +14,7 @@ Proper evaluation is critical in RL due to high variance. This guide covers metr
 | Episode Length | Task efficiency | `rollout/ep_len_mean` |
 | Policy Loss | Learning progress | `train/policy_gradient_loss` |
 | Value Loss | Value function quality | `train/value_loss` |
-| Entropy | Exploration level | `train/entropy_loss` |
+| Entropy | Exploration level (`entropy_loss` is *negative* entropy; rising toward 0 = collapse) | `train/entropy_loss` |
 | Explained Variance | Value accuracy | `train/explained_variance` |
 | Learning Rate | Schedule progress | `train/learning_rate` |
 | Clip Fraction (PPO) | Update magnitude | `train/clip_fraction` |
@@ -29,78 +29,19 @@ Proper evaluation is critical in RL due to high variance. This guide covers metr
 >
 > ```bash
 > # Trained SB3 model
-> python scripts/eval_report.py CartPole-v1 --model ppo_cartpole.zip --algo ppo \
+> python3 ${CLAUDE_PLUGIN_ROOT}/skills/reinforcement-learning/scripts/eval_report.py CartPole-v1 --model ppo_cartpole.zip --algo ppo \
 >     --episodes 100 --output eval_report.md
 >
 > # Random-policy baseline (no model)
-> python scripts/eval_report.py CartPole-v1 --episodes 50 --output baseline.md
+> python3 ${CLAUDE_PLUGIN_ROOT}/skills/reinforcement-learning/scripts/eval_report.py CartPole-v1 --episodes 50 --output baseline.md
 > ```
 >
-> The inline version below documents the pattern.
-
-```python
-from stable_baselines3.common.evaluation import evaluate_policy
-import numpy as np
-
-def comprehensive_evaluation(model, env, n_episodes=100):
-    """Comprehensive evaluation with multiple metrics."""
-
-    episode_rewards = []
-    episode_lengths = []
-    success_count = 0
-    success_defined = False
-
-    for _ in range(n_episodes):
-        obs, _ = env.reset()
-        episode_reward = 0
-        episode_length = 0
-        done = False
-        info = {}
-
-        while not done:
-            action, _ = model.predict(obs, deterministic=True)
-            obs, reward, terminated, truncated, info = env.step(action)
-            episode_reward += reward
-            episode_length += 1
-            done = terminated or truncated
-
-        # Success flag comes from the terminal step's info (one per episode)
-        if 'is_success' in info:
-            success_defined = True
-            if info['is_success']:
-                success_count += 1
-
-        episode_rewards.append(episode_reward)
-        episode_lengths.append(episode_length)
-
-    rewards = np.array(episode_rewards)
-    lengths = np.array(episode_lengths)
-
-    metrics = {
-        "mean_reward": np.mean(rewards),
-        "std_reward": np.std(rewards),
-        "min_reward": np.min(rewards),
-        "max_reward": np.max(rewards),
-        "median_reward": np.median(rewards),
-        "mean_length": np.mean(lengths),
-        "std_length": np.std(lengths),
-        "success_rate": success_count / n_episodes if success_defined else None,
-        "n_episodes": n_episodes
-    }
-
-    # Confidence interval (95%)
-    ci = 1.96 * metrics["std_reward"] / np.sqrt(n_episodes)
-    metrics["ci_95"] = ci
-    metrics["ci_lower"] = metrics["mean_reward"] - ci
-    metrics["ci_upper"] = metrics["mean_reward"] + ci
-
-    return metrics
-
-# Usage
-metrics = comprehensive_evaluation(model, eval_env, n_episodes=100)
-print(f"Mean Reward: {metrics['mean_reward']:.2f} +/- {metrics['std_reward']:.2f}")
-print(f"95% CI: [{metrics['ci_lower']:.2f}, {metrics['ci_upper']:.2f}]")
-```
+> If the model was trained with VecNormalize, add `--vecnormalize models/vecnormalize.pkl`;
+> without it the agent sees unnormalized observations and scores like a random policy.
+>
+> The pattern it implements, in short: read `is_success` from the **terminal** step's
+> `info` (once per episode, never per step), always cap episode length, and report a
+> confidence interval (`1.96 * std / sqrt(n)`) rather than a bare mean.
 
 ---
 
@@ -631,7 +572,8 @@ def load_complete_checkpoint(path, env_fn):
     norm_path = os.path.join(path, "vec_normalize.pkl")
     if os.path.exists(norm_path):
         env = VecNormalize.load(norm_path, env)
-        env.training = False
+        env.training = False      # freeze the running statistics
+        env.norm_reward = False   # report raw rewards
 
     # Load model
     model_path = os.path.join(path, "model")
@@ -646,51 +588,4 @@ def load_complete_checkpoint(path, env_fn):
 
 > **Runnable version: [`scripts/eval_report.py`](../scripts/eval_report.py)** —
 > generates this report (plus success rate and episode-length rows) from the
-> command line for any registered env or `module:EnvClass` spec. Prefer it over
-> copying this template.
-
-```python
-def generate_evaluation_report(model, env, n_episodes=100, output_path="eval_report.md"):
-    """Generate comprehensive evaluation report."""
-
-    # Run evaluation
-    metrics = comprehensive_evaluation(model, env, n_episodes)
-
-    # Generate report
-    report = f"""# Reinforcement Learning Evaluation Report
-
-## Summary
-- **Algorithm**: {type(model).__name__}
-- **Environment**: {env.spec.id if hasattr(env, 'spec') else 'Custom'}
-- **Evaluation Episodes**: {n_episodes}
-
-## Performance Metrics
-
-| Metric | Value |
-|--------|-------|
-| Mean Reward | {metrics['mean_reward']:.2f} |
-| Std Reward | {metrics['std_reward']:.2f} |
-| 95% CI | [{metrics['ci_lower']:.2f}, {metrics['ci_upper']:.2f}] |
-| Min Reward | {metrics['min_reward']:.2f} |
-| Max Reward | {metrics['max_reward']:.2f} |
-| Median Reward | {metrics['median_reward']:.2f} |
-| Mean Episode Length | {metrics['mean_length']:.1f} |
-
-## Interpretation
-
-The agent achieves a mean reward of **{metrics['mean_reward']:.2f}** with a standard deviation of {metrics['std_reward']:.2f}.
-
-The 95% confidence interval for the true mean performance is [{metrics['ci_lower']:.2f}, {metrics['ci_upper']:.2f}].
-
-## Notes
-
-- Evaluation was performed with deterministic policy
-- All episodes were run to completion (terminated or truncated)
-"""
-
-    with open(output_path, 'w') as f:
-        f.write(report)
-
-    print(f"Report saved to {output_path}")
-    return report
-```
+> command line for any registered env or `module:EnvClass` spec.

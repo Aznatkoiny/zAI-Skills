@@ -462,11 +462,15 @@ private:
 cmake_minimum_required(VERSION 3.18)
 project(rl_project)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)   # current libtorch requires C++20
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Release optimizations
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native -ffast-math")
+# Release optimizations. -O3 -DNDEBUG is the safe default.
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
+# Opt-ins, each with a catch:
+#  -march=native : faster on the build machine, but the binary may crash on older CPUs
+#  -ffast-math   : lets the compiler assume no NaN/Inf, so std::isnan() checks can be
+#                  optimized away; that hides exactly the bugs RL debugging relies on
 
 # Enable LTO for better optimization
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
@@ -476,10 +480,8 @@ find_package(Torch REQUIRED)
 add_executable(train_agent src/main.cpp)
 target_link_libraries(train_agent "${TORCH_LIBRARIES}")
 
-# Use static linking where possible
-if(NOT MSVC)
-    target_link_options(train_agent PRIVATE -static-libgcc -static-libstdc++)
-endif()
+# Avoid -static-libstdc++ here: libtorch ships as shared libraries built against the
+# system C++ runtime, and mixing a static copy with them risks ABI conflicts.
 ```
 
 ### Profile-Guided Optimization (PGO)

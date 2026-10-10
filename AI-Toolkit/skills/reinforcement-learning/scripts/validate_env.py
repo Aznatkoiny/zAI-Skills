@@ -17,7 +17,7 @@ Usage:
 
 The environment spec is either a registered Gymnasium id (``CartPole-v1``)
 or ``module.path:EnvClass`` for an unregistered custom environment class
-importable from the current working directory.
+importable from the current working directory (the script adds it to sys.path).
 
 Exits 0 when every check passes, 1 when any check fails.
 """
@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import os
 import sys
 import traceback
 
@@ -46,6 +47,11 @@ FAIL = "FAIL"
 def make_env(spec: str) -> gym.Env:
     """Instantiate the environment from a gym id or 'module:Class' spec."""
     if ":" in spec:
+        # Make `module.path:EnvClass` importable from the directory the user ran
+        # the script in. Python puts the *script's* folder on sys.path, not the
+        # current directory, so without this a project's own package can't be found.
+        if os.getcwd() not in sys.path:
+            sys.path.insert(0, os.getcwd())
         module_name, class_name = spec.split(":", 1)
         module = importlib.import_module(module_name)
         env_class = getattr(module, class_name)

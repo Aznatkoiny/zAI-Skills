@@ -57,7 +57,7 @@ public:
              double gamma = 0.99, double epsilon_start = 1.0,
              double epsilon_end = 0.01, int64_t epsilon_decay = 10000)
         : state_dim_(state_dim), action_dim_(action_dim), gamma_(gamma),
-          epsilon_(epsilon_start), epsilon_end_(epsilon_end),
+          epsilon_(epsilon_start), epsilon_start_(epsilon_start), epsilon_end_(epsilon_end),
           epsilon_decay_(epsilon_decay), step_count_(0) {
 
         device_ = torch::cuda::is_available() ? torch::kCUDA : torch::kCPU;
@@ -76,7 +76,9 @@ public:
 
     int64_t select_action(torch::Tensor state) {
         // Epsilon-greedy action selection
-        epsilon_ = epsilon_end_ + (epsilon_ - epsilon_end_) *
+        // Decay from the fixed start value. Feeding epsilon_ back into the
+        // formula would compound the decay and end exploration far too early.
+        epsilon_ = epsilon_end_ + (epsilon_start_ - epsilon_end_) *
                    std::exp(-1.0 * step_count_ / epsilon_decay_);
         step_count_++;
 
@@ -91,7 +93,8 @@ public:
         return q_values.argmax(1).item<int64_t>();
     }
 
-    void train_step(const std::vector<Experience>& batch) {
+    // Returns the batch loss so callers (and tests) can track it.
+    float train_step(const std::vector<Experience>& batch) {
         // Stack batch into tensors
         std::vector<torch::Tensor> states, next_states;
         std::vector<int64_t> actions;
@@ -133,6 +136,17 @@ public:
         // Gradient clipping
         torch::nn::utils::clip_grad_norm_(policy_net_->parameters(), 1.0);
         optimizer_->step();
+        return loss.item<float>();
+    }
+
+    torch::Tensor get_q_values(torch::Tensor states) {
+        torch::NoGradGuard no_grad;
+        return policy_net_->forward(states.to(device_));
+    }
+
+    torch::Tensor get_target_values(torch::Tensor states) {
+        torch::NoGradGuard no_grad;
+        return target_net_->forward(states.to(device_));
     }
 
     void update_target_network() {
@@ -166,7 +180,7 @@ private:
     torch::Device device_{torch::kCPU};
 
     int64_t state_dim_, action_dim_;
-    double gamma_, epsilon_, epsilon_end_;
+    double gamma_, epsilon_, epsilon_start_, epsilon_end_;
     int64_t epsilon_decay_, step_count_;
 
     std::mt19937 rng_{std::random_device{}()};
@@ -254,7 +268,59 @@ struct ActorCritic : torch::nn::Module {
 
 ### PPO Update
 
+The agent consumes a rollout buffer that stores one batch of on-policy steps and computes returns and advantages with GAE:
+
 ```cpp
+#include <tuple>
+
+class RolloutBuffer {
+public:
+    void add(torch::Tensor state, torch::Tensor action, float reward, bool done,
+             float value, torch::Tensor log_prob) {
+        states_.push_back(state);
+        actions_.push_back(action);
+        rewards_.push_back(reward);
+        dones_.push_back(done ? 1.0f : 0.0f);
+        values_.push_back(value);
+        log_probs_.push_back(log_prob.detach());
+    }
+
+    // Call after the rollout with V(s) of the state after the last step
+    // (0 if that step ended the episode).
+    void compute_gae(float last_value, double gamma, double gae_lambda) {
+        const size_t n = rewards_.size();
+        advantages_.assign(n, 0.0f);
+        returns_.assign(n, 0.0f);
+        float gae = 0.0f;
+        for (size_t i = n; i-- > 0;) {
+            const float next_value = (i + 1 < n) ? values_[i + 1] : last_value;
+            const float not_done = 1.0f - dones_[i];
+            const float delta = rewards_[i] + gamma * next_value * not_done - values_[i];
+            gae = delta + gamma * gae_lambda * not_done * gae;
+            advantages_[i] = gae;
+            returns_[i] = gae + values_[i];
+        }
+    }
+
+    // states, actions, old_log_probs, returns, advantages
+    std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+    get_tensors(torch::Device device) const {
+        return {torch::stack(states_).to(device), torch::stack(actions_).to(device),
+                torch::stack(log_probs_).to(device),
+                torch::tensor(returns_).to(device), torch::tensor(advantages_).to(device)};
+    }
+
+    void clear() {
+        states_.clear(); actions_.clear(); log_probs_.clear();
+        rewards_.clear(); dones_.clear(); values_.clear();
+        advantages_.clear(); returns_.clear();
+    }
+
+private:
+    std::vector<torch::Tensor> states_, actions_, log_probs_;
+    std::vector<float> rewards_, dones_, values_, advantages_, returns_;
+};
+
 struct PPOConfig {
     double clip_epsilon = 0.2;
     double value_loss_coef = 0.5;
@@ -287,7 +353,8 @@ public:
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8);
 
         for (int64_t epoch = 0; epoch < config_.ppo_epochs; ++epoch) {
-            auto indices = torch::randperm(states.size(0));
+            // Indices must live on the same device as the tensors they index.
+            auto indices = torch::randperm(states.size(0), torch::TensorOptions().device(device_).dtype(torch::kLong));
 
             for (int64_t start = 0; start < states.size(0); start += config_.mini_batch_size) {
                 auto end = std::min(start + config_.mini_batch_size, states.size(0));
@@ -431,7 +498,61 @@ struct GaussianPolicy : torch::nn::Module {
 
 ### SAC Agent
 
+SAC acts in a continuous space, so its transitions store the action as a tensor rather than the integer `Experience::action` used by DQN. The agent below uses this transition type, a buffer of it, and two small helpers:
+
 ```cpp
+#include <type_traits>
+
+struct ContinuousExperience {
+    torch::Tensor state;
+    torch::Tensor action;
+    float reward;
+    torch::Tensor next_state;
+    bool done;
+};
+
+// Same ring-buffer design as ReplayBuffer in memory-management.md, for ContinuousExperience.
+class ContinuousReplayBuffer {
+public:
+    explicit ContinuousReplayBuffer(size_t capacity) : capacity_(capacity) { buffer_.reserve(capacity); }
+    void push(ContinuousExperience exp) {
+        if (buffer_.size() < capacity_) buffer_.push_back(std::move(exp));
+        else buffer_[position_] = std::move(exp);
+        position_ = (position_ + 1) % capacity_;
+    }
+    std::vector<ContinuousExperience> sample(size_t batch_size) {
+        std::uniform_int_distribution<size_t> pick(0, buffer_.size() - 1);
+        std::vector<ContinuousExperience> batch;
+        batch.reserve(batch_size);
+        for (size_t i = 0; i < batch_size; ++i) batch.push_back(buffer_[pick(rng_)]);
+        return batch;
+    }
+    size_t size() const { return buffer_.size(); }
+private:
+    std::vector<ContinuousExperience> buffer_;
+    size_t capacity_, position_ = 0;
+    std::mt19937 rng_{std::random_device{}()};
+};
+
+inline std::vector<torch::Tensor> concat_params(std::vector<torch::Tensor> a,
+                                                const std::vector<torch::Tensor>& b) {
+    a.insert(a.end(), b.begin(), b.end());
+    return a;
+}
+
+// Stack one field of a batch into a tensor (scalars become a 1-D float tensor).
+template <typename Field>
+torch::Tensor stack_experiences(const std::vector<ContinuousExperience>& batch,
+                                Field ContinuousExperience::*field) {
+    std::vector<torch::Tensor> items;
+    items.reserve(batch.size());
+    for (const auto& e : batch) {
+        if constexpr (std::is_same_v<Field, torch::Tensor>) items.push_back(e.*field);
+        else items.push_back(torch::tensor(static_cast<float>(e.*field)));
+    }
+    return torch::stack(items);
+}
+
 class SACAgent {
 public:
     SACAgent(int64_t state_dim, int64_t action_dim,
@@ -468,7 +589,10 @@ public:
         // Automatic entropy tuning
         if (auto_entropy_) {
             target_entropy_ = -static_cast<float>(action_dim);
-            log_alpha_ = torch::zeros({1}, torch::requires_grad()).to(device_);
+            // Create the parameter directly on the device. `.to(device_)` on CUDA
+            // returns a non-leaf copy whose .grad() is never filled, so alpha
+            // would silently stay at 1.0.
+            log_alpha_ = torch::zeros({1}, torch::TensorOptions().device(device_).requires_grad(true));
             alpha_optimizer_ = std::make_unique<torch::optim::Adam>(
                 std::vector<torch::Tensor>{log_alpha_},
                 torch::optim::AdamOptions(lr));
@@ -488,15 +612,15 @@ public:
         }
     }
 
-    void update(ReplayBuffer& buffer, int64_t batch_size) {
+    void update(ContinuousReplayBuffer& buffer, int64_t batch_size) {
         auto batch = buffer.sample(batch_size);
 
         // Convert to tensors
-        auto states = stack_experiences(batch, &Experience::state).to(device_);
-        auto actions = stack_experiences(batch, &Experience::action).to(device_);
-        auto rewards = stack_experiences(batch, &Experience::reward).to(device_);
-        auto next_states = stack_experiences(batch, &Experience::next_state).to(device_);
-        auto dones = stack_experiences(batch, &Experience::done).to(device_);
+        auto states = stack_experiences(batch, &ContinuousExperience::state).to(device_);
+        auto actions = stack_experiences(batch, &ContinuousExperience::action).to(device_);
+        auto rewards = stack_experiences(batch, &ContinuousExperience::reward).to(device_);
+        auto next_states = stack_experiences(batch, &ContinuousExperience::next_state).to(device_);
+        auto dones = stack_experiences(batch, &ContinuousExperience::done).to(device_);
 
         // Update Q-functions
         torch::Tensor q1_loss, q2_loss;

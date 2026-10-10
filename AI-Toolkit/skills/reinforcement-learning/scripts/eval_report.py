@@ -17,6 +17,11 @@ Usage:
     python eval_report.py CartPole-v1 --model ppo_cartpole.zip --algo ppo \
         --episodes 100 --output eval_report.md
 
+    # Model trained with VecNormalize: pass the saved statistics, or the agent
+    # sees unnormalized observations and scores like a random policy
+    python eval_report.py src.env:MyEnv --model models/best.zip --algo ppo \
+        --vecnormalize models/vecnormalize.pkl
+
 Exits 0 on success, 1 on failure.
 """
 
@@ -25,6 +30,7 @@ from __future__ import annotations
 import argparse
 import datetime
 import importlib
+import os
 import sys
 
 import numpy as np
@@ -41,6 +47,11 @@ SB3_ALGOS = ("ppo", "sac", "dqn", "td3", "a2c")
 def make_env(spec: str) -> gym.Env:
     """Instantiate the environment from a gym id or 'module:Class' spec."""
     if ":" in spec:
+        # Make `module.path:EnvClass` importable from the directory the user ran
+        # the script in. Python puts the *script's* folder on sys.path, not the
+        # current directory, so without this a project's own package can't be found.
+        if os.getcwd() not in sys.path:
+            sys.path.insert(0, os.getcwd())
         module_name, class_name = spec.split(":", 1)
         module = importlib.import_module(module_name)
         return getattr(module, class_name)()
@@ -67,12 +78,28 @@ def load_model(path: str, algo: str):
     return algo_class.load(path)
 
 
+def load_obs_normalizer(path: str, env_spec: str):
+    """Load saved VecNormalize statistics and return a function that normalizes
+    one observation the way training did (frozen stats, no reward scaling)."""
+    try:
+        from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+    except ImportError:
+        print("ERROR: --vecnormalize needs stable-baselines3. Run: pip install stable-baselines3")
+        sys.exit(2)
+    vec = VecNormalize.load(path, DummyVecEnv([lambda: make_env(env_spec)]))
+    vec.training = False
+    vec.norm_reward = False
+    return vec.normalize_obs
+
+
 def evaluate(
     env: gym.Env,
     model,
     n_episodes: int,
     deterministic: bool,
     seed: int,
+    max_steps: int = 10_000,
+    normalize_obs=None,
 ) -> dict:
     """Run n_episodes and compute metrics.
 
@@ -84,6 +111,7 @@ def evaluate(
     episode_lengths: list[int] = []
     success_count = 0
     success_defined = False
+    capped_episodes = 0
 
     env.action_space.seed(seed)
     for ep in range(n_episodes):
@@ -95,13 +123,18 @@ def evaluate(
 
         while not done:
             if model is not None:
-                action, _ = model.predict(obs, deterministic=deterministic)
+                model_obs = normalize_obs(obs) if normalize_obs is not None else obs
+                action, _ = model.predict(model_obs, deterministic=deterministic)
             else:
                 action = env.action_space.sample()
             obs, reward, terminated, truncated, info = env.step(action)
             episode_reward += float(reward)
             episode_length += 1
             done = terminated or truncated
+            if not done and episode_length >= max_steps:
+                # An env without a time limit would otherwise loop forever.
+                capped_episodes += 1
+                done = True
 
         # Success flag comes from the terminal step's info (one per episode)
         if "is_success" in info:
@@ -127,6 +160,8 @@ def evaluate(
         "max_length": int(np.max(lengths)),
         "success_rate": (success_count / n_episodes) if success_defined else None,
         "n_episodes": n_episodes,
+        "capped_episodes": capped_episodes,
+        "max_steps": max_steps,
     }
     ci = 1.96 * metrics["std_reward"] / np.sqrt(n_episodes)
     metrics["ci_95"] = float(ci)
@@ -184,7 +219,8 @@ The policy achieves a mean episodic return of **{metrics['mean_reward']:.2f}**
 
 - Success is counted once per episode, from the terminal step's `info` dict
   (`is_success`), never per step.
-- Every episode ran to completion (terminated or truncated).
+- Episodes stopped by the --max-steps cap ({metrics['max_steps']} steps): {metrics['capped_episodes']}.
+  A nonzero count usually means the environment has no time limit.
 - Compare against the random-policy baseline from `pretrain_check.py` to
   confirm the agent actually learned.
 """
@@ -216,6 +252,15 @@ def main() -> int:
         help="sample stochastic actions instead of deterministic ones",
     )
     parser.add_argument(
+        "--vecnormalize",
+        default=None,
+        help="path to VecNormalize statistics saved during training (vecnormalize.pkl); "
+        "required when the model was trained with VecNormalize",
+    )
+    parser.add_argument(
+        "--max-steps", type=int, default=10_000, help="cap on steps per episode"
+    )
+    parser.add_argument(
         "--output", default="eval_report.md", help="Markdown report output path"
     )
     args = parser.parse_args()
@@ -223,9 +268,13 @@ def main() -> int:
     deterministic = not args.stochastic
     model = None
     policy_desc = "random policy (no model provided)"
+    normalize_obs = None
     if args.model:
         model = load_model(args.model, args.algo)
         policy_desc = f"{args.algo.upper()} model from {args.model}"
+        if args.vecnormalize:
+            normalize_obs = load_obs_normalizer(args.vecnormalize, args.env_spec)
+            policy_desc += f" (observations normalized with {args.vecnormalize})"
 
     try:
         env = make_env(args.env_spec)
@@ -234,7 +283,10 @@ def main() -> int:
         return 1
 
     try:
-        metrics = evaluate(env, model, args.episodes, deterministic, args.seed)
+        metrics = evaluate(
+            env, model, args.episodes, deterministic, args.seed,
+            max_steps=args.max_steps, normalize_obs=normalize_obs,
+        )
     except Exception as exc:  # noqa: BLE001
         print(f"ERROR: evaluation failed: {type(exc).__name__}: {exc}")
         return 1

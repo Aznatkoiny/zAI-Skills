@@ -1,206 +1,69 @@
-# Telegram Channel Configuration
+# Telegram channel
 
-Connect OpenClaw to Telegram so you can message your AI assistant from any device. This covers bot creation, DM pairing, and group chat setup.
+Checked against OpenClaw 2026.9.9 and https://docs.openclaw.ai/channels/telegram/setup (October 2026). Works on a Mac or a VPS.
 
-## Step 1: Create a Telegram Bot via BotFather
+## Contents
+- Create the bot
+- Give OpenClaw the token
+- Approve the first DM (pairing)
+- Groups
+- Troubleshooting
 
-1. Open Telegram and search for **@BotFather**
-2. Send `/newbot`
-3. Enter a **display name** (e.g., "My OpenClaw Assistant")
-4. Enter a **username** — must end with `bot` (e.g., `myopenclaw_bot`)
-5. BotFather returns a **bot token** in the format: `123456789:ABCdefGHIJKLMNOP...`
-6. **Save this token securely** — it's the only credential needed
+## Create the bot
 
-### Recommended BotFather Settings
+In Telegram, chat with **@BotFather** (check the handle is exactly that; impostors exist) or open its web app at https://t.me/BotFather?startapp. Run `/newbot`, pick a name and username, and BotFather replies with a token. The token is a password for the bot: the user keeps it in their password manager and doesn't paste it into this conversation.
 
-After creating the bot, send these commands to @BotFather:
+Leave BotFather's **privacy mode on** (the default). With it on, the bot only sees group messages that mention it or reply to it, which matches the mention-gated setup below and keeps the bot from reading every message in a group, where any member could try to steer it. Turn it off only if the user deliberately wants the bot to see all group traffic, and explain that trade-off.
 
-- `/setjoingroups` → Select your bot → **Allow** (lets the bot be added to groups)
-- `/setprivacy` → Select your bot → **Disable** (bot can see all group messages, not just commands)
+## Give OpenClaw the token
 
-⚠️ **After changing privacy to Disabled, you must remove and re-add the bot to each existing group** for the change to take effect. New groups added after the change work automatically.
+Have the user run this themselves, in their own terminal, so the token doesn't land in the conversation:
 
-## Step 2: Configure in OpenClaw
+```bash
+openclaw channels add --channel telegram --token <bot-token>
+```
 
-### During Onboarding
+That writes the token into config. Alternatives: `botToken` or `tokenFile` (a path to a file containing the token, preferred on servers) under `channels.telegram`, or the `TELEGRAM_BOT_TOKEN` environment variable for the default account. On Docker, run it as `docker compose run --rm openclaw-cli channels add …`.
 
-The onboarding wizard (`openclaw onboard`) will prompt for Telegram setup. Select Telegram when asked about channels, then paste your bot token.
-
-### Manual Configuration
-
-Add to `~/.openclaw/openclaw.json`:
+Then make sure the access settings are the safe ones:
 
 ```json5
 {
   channels: {
     telegram: {
       enabled: true,
-      botToken: "123456789:ABCdefGHIJKLMNOP",
-      dmPolicy: "pairing",
-      groups: {
-        "*": { requireMention: true }
-      }
-    }
-  }
+      dmPolicy: "pairing",                       // strangers can't start a conversation
+      groups: { "*": { requireMention: true } }, // in groups, answer only when mentioned
+    },
+  },
 }
 ```
 
-### Via Environment Variable
+Check: `openclaw channels status --probe`. The Gateway hot-reloads channel config; if it's offline, `openclaw gateway start`.
 
-Alternatively, set the token as an environment variable (useful for Docker/VPS):
+## Approve the first DM (pairing)
 
-```bash
-export TELEGRAM_BOT_TOKEN="123456789:ABCdefGHIJKLMNOP"
-```
-
-Then restart: `openclaw gateway restart`
-
-### ⚠️ CRITICAL: Telegram is a CHANNEL, not a Plugin
-
-This is the most common configuration mistake. The config must go under `channels.telegram`:
-
-```json5
-// ✅ CORRECT
-{ channels: { telegram: { enabled: true, botToken: "..." } } }
-
-// ❌ WRONG — will cause "plugin not found" error
-{ plugins: { entries: { telegram: { enabled: true, botToken: "..." } } } }
-```
-
-## Step 3: DM Pairing
-
-With `dmPolicy: "pairing"` (recommended), unknown senders who DM the bot receive a short pairing code. You must approve each new contact.
-
-### Pairing Flow
-
-1. Someone DMs your bot on Telegram
-2. Bot replies with a pairing code (e.g., `ABC123`)
-3. On your OpenClaw host, approve the pairing:
+The user sends the bot any message, which creates a pairing request. Then:
 
 ```bash
-# List pending pairing requests
 openclaw pairing list telegram
-
-# Approve a specific code
-openclaw pairing approve telegram ABC123
+openclaw pairing approve telegram <CODE>
 ```
 
-**Pairing details:**
-- Codes expire after **1 hour**
-- Maximum **3 pending requests** per channel at a time
-- After approval, the contact can message freely (within their session)
+Codes expire after an hour, and at most 3 can be pending; a new DM produces a fresh code. Only approve codes the user recognizes as theirs.
 
-### Docker Commands
+## Groups
 
-On a VPS with Docker, prefix with `docker compose exec`:
+Groups are off unless allowed. To use one, the user adds the bot to the group, then allows that group by its chat ID (a negative number; supergroups start with `-100`) under `channels.telegram.groups`, and allows their own Telegram user ID with `groupAllowFrom` if they want only themselves to trigger it. `openclaw logs --follow` shows the IDs when the bot receives a message, and `/whoami@<bot_username>` confirms them once the group is allowed. Keep `requireMention: true` unless there's a reason not to.
 
-```bash
-docker compose exec openclaw-gateway openclaw pairing list telegram
-docker compose exec openclaw-gateway openclaw pairing approve telegram ABC123
-```
-
-## Step 4: Group Chat Configuration
-
-Groups use isolated sessions — each group gets its own conversation context.
-
-### Mention-Gating (recommended)
-
-With `requireMention: true`, the bot only responds when @mentioned in group chats. This prevents it from responding to every message.
-
-```json5
-{
-  channels: {
-    telegram: {
-      groups: {
-        "*": { requireMention: true }  // All groups require @mention
-      }
-    }
-  }
-}
-```
-
-### Per-Group Configuration
-
-Override settings for specific groups by using the group chat ID:
-
-```json5
-{
-  channels: {
-    telegram: {
-      groups: {
-        "*": { requireMention: true },
-        "-1001234567890": { requireMention: false }  // This specific group doesn't need @mention
-      }
-    }
-  }
-}
-```
-
-### Privacy Mode Requirement
-
-If `requireMention` is set to `false` for any group, the bot must have **Telegram privacy mode disabled** (via BotFather: `/setprivacy → Disable`). Otherwise, the bot only sees messages starting with `/` or messages that @mention it.
-
-Remember: After changing privacy mode, **remove and re-add the bot** to existing groups.
-
-### History Injection
-
-When the bot is added to a group or when a new session starts, OpenClaw provides the last 50 unprocessed messages as context. This helps the bot understand the ongoing conversation.
-
-## Advanced Options
-
-### Custom Bot Commands
-
-Register slash commands with BotFather for discoverability:
-
-```
-/setcommands → Select your bot → Enter:
-new - Start a new conversation
-status - Show session status
-help - Show available commands
-```
-
-### Streaming Mode
-
-Control how responses appear in Telegram:
-
-```json5
-{
-  channels: {
-    telegram: {
-      streaming: "edit"      // Edit message in-place as tokens arrive (default)
-      // streaming: "append"  // Send complete message after generation
-    }
-  }
-}
-```
-
-### Link Previews
-
-```json5
-{
-  channels: {
-    telegram: {
-      linkPreviews: false    // Disable link previews in bot responses
-    }
-  }
-}
-```
+In groups the agent sees other people's messages as context, and those people can try to instruct it. Keep powerful tools away from group-facing agents (see `security-defaults.md`).
 
 ## Troubleshooting
 
-| Issue | Cause | Fix |
-|-------|-------|-----|
-| **401 Unauthorized** | Invalid or expired bot token | Go to BotFather → `/token` → regenerate; update config; restart gateway |
-| **Bot doesn't respond in groups** | Privacy mode enabled | BotFather → `/setprivacy → Disable`; then **remove and re-add** bot to each group |
-| **"plugin not found: telegram"** | Config in wrong location | Move config from `plugins.entries.telegram` to `channels.telegram` |
-| **Pairing code not accepted** | Code expired (1-hour limit) or max 3 pending | Ask the contact to DM again for a fresh code |
-| **"setMyCommands failed"** | DNS/firewall blocking api.telegram.org | Check DNS resolution: `nslookup api.telegram.org`; check firewall rules |
-| **Bot responds to everything in group** | `requireMention: false` | Set `requireMention: true` in group config |
-| **Multiple bots interfering** | Same token used across instances | Each OpenClaw instance needs its own bot with a unique token |
-
-## Session Behavior
-
-- **DMs** collapse to the agent's main session: `agent:main:main`
-- **Groups** get isolated sessions: `agent:<agentId>:telegram:group:<chatId>`
-- Use `/new` command in Telegram to start a fresh session
-- Session isolation prevents cross-user context leakage when `session.dmScope: "per-channel-peer"` is set (see `security-defaults.md`)
+| Symptom | Check |
+|---|---|
+| `channels status` shows an auth error | Token wrong or revoked: regenerate in BotFather (`/revoke`, then `/token`), and the user re-runs `channels add` |
+| DMs get no reply | Pairing not approved (`openclaw pairing list telegram`), or the Gateway is down (`openclaw gateway status`) |
+| Bot ignores a group | Group not allowed under `channels.telegram.groups`, or the message didn't mention the bot |
+| Bot sees only some group messages | That's privacy mode working as intended; mention the bot |
+| Config error mentioning Telegram keys | Run `openclaw doctor`; keys from older guides (`streaming: "edit"`, `linkPreviews`) are no longer valid; check `openclaw config schema` |

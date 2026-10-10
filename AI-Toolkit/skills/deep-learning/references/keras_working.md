@@ -1,5 +1,7 @@
 # Working with Keras
 
+> **Backend note.** The custom training-loop and `tf.function` sections use `tf.GradientTape` and only run with `KERAS_BACKEND="tensorflow"`; the model-building, metric, callback and serialization patterns work on every backend. For JAX or PyTorch training loops, see the backend-specific guides on keras.io.
+
 ## Table of Contents
 - [Model Building APIs](#model-building-apis)
 - [Custom Metrics](#custom-metrics)
@@ -198,7 +200,7 @@ for epoch in range(epochs):
 Override `train_step` to customize while keeping `fit()` benefits:
 
 ```python
-# Keras 3 pattern: compiled_loss/compiled_metrics were removed.
+# Keras 3 pattern: compiled_loss/compiled_metrics are deprecated (a TF-backend-only shim remains).
 # Use self.compute_loss() and update each metric explicitly.
 class CustomModel(keras.Model):
     def train_step(self, data):
@@ -237,12 +239,14 @@ def train_step(inputs, targets):
 ```
 
 ### Dataset Optimization
+Order matters: cache the raw examples, then shuffle, batch, and prefetch last. Caching after shuffling and batching would freeze the first epoch's batches and replay them every epoch.
+
 ```python
 dataset = tf.data.Dataset.from_tensor_slices((x, y))
-dataset = dataset.shuffle(buffer_size=1024)
+dataset = dataset.cache()                    # cache raw examples (if they fit in memory)
+dataset = dataset.shuffle(buffer_size=1024)  # reshuffled every epoch
 dataset = dataset.batch(32)
-dataset = dataset.prefetch(tf.data.AUTOTUNE)  # Overlap data loading with training
-dataset = dataset.cache()  # Cache in memory after first epoch
+dataset = dataset.prefetch(tf.data.AUTOTUNE) # overlap loading with training
 ```
 
 ## Model Serialization

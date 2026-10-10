@@ -36,7 +36,7 @@ make install
 cmake_minimum_required(VERSION 3.18)
 project(rl_project)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)   # current libtorch requires C++20
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find LibTorch
@@ -68,8 +68,11 @@ endif()
 # CMake automatically detects CUDA if LibTorch was built with CUDA
 find_package(Torch REQUIRED)
 
-# Verify CUDA is available
-message(STATUS "CUDA available: ${TORCH_CUDA_AVAILABLE}")
+# Report whether this libtorch build has CUDA (TorchConfig sets TORCH_CUDA_LIBRARIES
+# for CUDA builds; there is no TORCH_CUDA_AVAILABLE variable)
+if(TORCH_CUDA_LIBRARIES)
+  message(STATUS "LibTorch built with CUDA")
+endif()
 ```
 
 ### Build Commands
@@ -286,36 +289,29 @@ torch::load(model, "model.pt");
 torch::save(optimizer, "optimizer.pt");
 ```
 
-### Load Python PyTorch Models (TorchScript)
+### Load Models Exported from Python (AOTInductor)
+
+TorchScript (`torch.jit.trace` / `torch.jit.script` in Python, `torch::jit::load` in C++) is deprecated in current PyTorch. The supported path from Python to C++ is `torch.export` plus AOTInductor, which compiles the model into a `.pt2` package:
 
 ```python
-# In Python: export model
+# Python: export and compile (check the PyTorch AOTInductor docs for your version)
 import torch
-
-model = MyModel()
-model.load_state_dict(torch.load("weights.pth"))
-model.eval()
-
-# Option 1: Trace
-traced = torch.jit.trace(model, example_input)
-traced.save("model_traced.pt")
-
-# Option 2: Script
-scripted = torch.jit.script(model)
-scripted.save("model_scripted.pt")
+model = MyPolicy().eval()
+example = (torch.randn(1, obs_dim),)
+exported = torch.export.export(model, example)
+torch._inductor.aoti_compile_and_package(exported, package_path="policy.pt2")
 ```
 
 ```cpp
-// In C++: load TorchScript model
-torch::jit::script::Module model = torch::jit::load("model_traced.pt");
-model.to(device);
-model.eval();
+// C++: load and run the package
+#include <torch/csrc/inductor/aoti_package/model_package_loader.h>
 
-// Inference
-std::vector<torch::jit::IValue> inputs;
-inputs.push_back(input_tensor);
-auto output = model.forward(inputs).toTensor();
+torch::inductor::AOTIModelPackageLoader loader("policy.pt2");
+std::vector<torch::Tensor> outputs = loader.run({input_tensor});
+auto action_logits = outputs[0];
 ```
+
+The package is compiled for one device type (CPU or CUDA), so compile it on the same kind of machine you deploy to. ONNX Runtime (below) is the alternative when the deployment target isn't libtorch at all. Existing TorchScript files still load with `torch::jit::load` for now, but plan to migrate.
 
 ## Other Libraries
 
@@ -339,17 +335,9 @@ auto output_tensors = session.Run(
 );
 ```
 
-### cpprl Reference Implementation
+### Reference Implementations
 
-The `mhubii/cpprl` repository on GitHub provides reference implementations of PPO in C++ using LibTorch. Useful for:
-
-- Understanding PPO implementation patterns
-- Rollout buffer design
-- GAE (Generalized Advantage Estimation) computation
-
-```bash
-git clone https://github.com/mhubii/cpprl
-```
+There's no actively maintained, widely used C++ RL library comparable to Stable-Baselines3. Small reference implementations exist, such as `mhubii/ppo_libtorch` (PPO with LibTorch; last updated 2022), and are useful for seeing rollout-buffer and GAE patterns, but check their libtorch version before copying code. Often the better reference is a Python implementation (SB3 or CleanRL) translated to the C++ frontend, which mirrors the Python API closely.
 
 ### TensorFlow C++ API (Alternative)
 

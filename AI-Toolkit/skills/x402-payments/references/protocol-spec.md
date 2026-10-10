@@ -1,252 +1,115 @@
-# x402 Protocol Specification
+# x402 protocol reference (V2)
 
-## Table of Contents
+Checked against x402 2.28.0 and `specs/x402-specification-v2.md` in https://github.com/x402-foundation/x402 (October 2026). For anything not here, the types in `typescript/packages/core/src/types/` are the source of truth.
 
-1. [Payment Flow with Headers](#payment-flow-with-headers)
-2. [Header Structures](#header-structures)
-3. [Payment Schemes](#payment-schemes)
-4. [CAIP-2 Network Identifiers](#caip-2-network-identifiers)
-5. [Facilitator API](#facilitator-api)
-6. [V1 vs V2 Differences](#v1-vs-v2-differences)
-7. [Data Types Reference](#data-types-reference)
+## Contents
+- HTTP headers
+- Data types
+- Schemes
+- Networks and tokens
+- Facilitator API
+- V1 vs V2
 
-## Payment Flow with Headers
+## HTTP headers
 
-### 1. Initial request (no payment)
-```http
-GET /weather HTTP/1.1
-Host: api.example.com
-```
+| Header | Direction | Content |
+|---|---|---|
+| `PAYMENT-REQUIRED` | server → client, with status 402 | base64 JSON `PaymentRequired` |
+| `PAYMENT-SIGNATURE` | client → server, on the retry | base64 JSON `PaymentPayload` |
+| `PAYMENT-RESPONSE` | server → client, with the resource | base64 JSON `SettleResponse` |
 
-### 2. Server returns 402 with payment requirements
-```http
-HTTP/1.1 402 Payment Required
-PAYMENT-REQUIRED: <base64-encoded JSON PaymentRequired object>
-Content-Type: application/json
+V1 used `X-PAYMENT` and `X-PAYMENT-RESPONSE`, and put the requirements in the response body. Current SDKs and the x402.org facilitator still accept V1, so servers can serve both during a migration.
 
-{"error": "Payment required"}
-```
+## Data types
 
-### 3. Client retries with signed payment
-```http
-GET /weather HTTP/1.1
-Host: api.example.com
-PAYMENT-SIGNATURE: <base64-encoded JSON PaymentPayload object>
-```
-
-### 4. Server returns resource with settlement receipt
-```http
-HTTP/1.1 200 OK
-PAYMENT-RESPONSE: <base64-encoded JSON SettlementResponse object>
-Content-Type: application/json
-
-{"weather": "sunny", "temperature": 70}
-```
-
-## Header Structures
-
-### PAYMENT-REQUIRED (base64 JSON)
 ```typescript
-{
-  x402Version: 2,
-  accepts: [
-    {
-      scheme: "exact",
-      network: "eip155:84532",           // CAIP-2 identifier
-      maxAmountRequired: "1000",         // Atomic units (0.001 USDC = 1000)
-      resource: "/weather",
-      description: "Weather data API",
-      mimeType: "application/json",
-      payTo: "0x1234...abcd",
-      maxTimeoutSeconds: 60,
-      asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e", // USDC contract
-      extra: { name: "USD Coin", version: "2" },
-      outputSchema: null                 // Optional JSON schema
-    }
-  ],
-  error: "X-PAYMENT header is required"  // Optional error message
-}
+type PaymentRequired = {
+  x402Version: number;            // 2
+  error?: string;                 // why payment is required or was rejected
+  resource: ResourceInfo;         // { url, description?, mimeType? }
+  accepts: PaymentRequirements[]; // one entry per acceptable way to pay
+  extensions?: Record<string, unknown>;
+};
+
+type PaymentRequirements = {
+  scheme: string;            // "exact", "upto", ...
+  network: string;           // CAIP-2, e.g. "eip155:84532"
+  asset: string;             // token contract address or SPL mint
+  amount: string;            // atomic units (USDC: 6 decimals, so "1000" = $0.001)
+  payTo: string;             // recipient address
+  maxTimeoutSeconds: number;
+  extra: Record<string, unknown>; // scheme-specific, e.g. EIP-712 domain { name, version }
+};
+
+type PaymentPayload = {
+  x402Version: number;
+  resource?: ResourceInfo;
+  accepted: PaymentRequirements; // the option the client chose
+  payload: Record<string, unknown>; // scheme-specific signature data
+  extensions?: Record<string, unknown>;
+};
+
+type SettleResponse = {
+  success: boolean;
+  errorReason?: string;
+  errorMessage?: string;
+  payer?: string;
+  transaction: string;  // on-chain transaction id
+  network: string;
+  amount?: string;      // actual amount, for schemes like "upto"
+  extensions?: Record<string, unknown>;
+};
 ```
 
-### PAYMENT-SIGNATURE (base64 JSON) — EVM Exact Scheme
-```typescript
-{
-  x402Version: 2,
-  scheme: "exact",
-  network: "eip155:84532",
-  payload: {
-    signature: "0x...",  // EIP-712 typed data signature
-    authorization: {
-      from: "0xPayerAddress",
-      to: "0xRecipientAddress",
-      value: "1000",
-      validAfter: "0",
-      validBefore: "1735689600",  // Unix timestamp
-      nonce: "0x..."              // Random 32-byte hex nonce
-    }
-  }
-}
-```
+Older code and articles use `maxAmountRequired`, a string `resource`, top-level `scheme`/`network` on the payload, and `txHash`/`networkId` on the receipt. Those are V1 names; on a V2 server they read as `undefined`.
 
-### PAYMENT-RESPONSE (base64 JSON)
-```typescript
-{
-  success: true,
-  txHash: "0xabc123...",
-  networkId: "eip155:84532"
-}
-```
+## Schemes
 
-## Payment Schemes
+- **`exact`**: pay a fixed amount per request. On EVM it uses EIP-3009 `transferWithAuthorization` (gasless for the payer) for tokens that support it, and Permit2 for other ERC-20s (needs a one-time approval). On Solana it uses SPL or Token-2022 transfers.
+- **`upto`**: authorize a maximum and settle the amount actually used, for metered work such as LLM tokens. The settled amount comes back in `SettleResponse.amount`.
+- **`batch-settlement`**: escrow plus vouchers, settled in batches (EVM).
+- **`auth-capture`**: authorize now, capture later.
 
-### `exact` — Production scheme
-Pay a predetermined fixed amount per request. Uses EIP-3009 `TransferWithAuthorization` on EVM (gasless, signature-based). Uses SPL token transfers on Solana.
+Specs for each live in `specs/schemes/` in the repo; facilitators list what they support at `GET /supported`.
 
-- **Nonces**: Random 32-byte values (not sequential) — enables concurrent payments.
-- **EVM asset**: USDC contract implementing EIP-3009.
-- **Solana asset**: SPL token mint address.
+## Networks and tokens
 
-### `upto` — Proposed
-Pay up to a maximum amount based on actual consumption. Designed for usage-based billing (e.g., LLM token pricing). Not yet implemented in production.
+Networks use CAIP-2 IDs: `eip155:<chainId>` for EVM, `solana:<genesis hash prefix>` for Solana. Common ones:
 
-### `deferred` — Proposed by Cloudflare
-Batched/delayed settlement for micropayments. Designed for high-frequency, low-value transactions like pay-per-crawl. Settlement happens in aggregate rather than per-request. Supports both stablecoin and traditional payment rails.
+| Network | CAIP-2 | USDC address / mint |
+|---|---|---|
+| Base Sepolia (testnet) | `eip155:84532` | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+| Base | `eip155:8453` | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+| Arbitrum One | `eip155:42161` | `0xaf88d065e77c8cC2239327C5EDb3A432268e5831` |
+| Polygon | `eip155:137` | `0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359` |
+| Solana Devnet (testnet) | `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` | `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU` |
+| Solana | `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp` | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` |
 
-## CAIP-2 Network Identifiers
-
-| Network | CAIP-2 Identifier | Environment |
-|---------|-------------------|-------------|
-| Base Sepolia | `eip155:84532` | Testnet |
-| Base Mainnet | `eip155:8453` | Production |
-| Ethereum Mainnet | `eip155:1` | Production |
-| Polygon Mainnet | `eip155:137` | Production |
-| Avalanche Mainnet | `eip155:43114` | Production |
-| Arbitrum Mainnet | `eip155:42161` | Production |
-| Solana Devnet | `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` | Testnet |
-| Solana Mainnet | `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp` | Production |
-
-**USDC contract addresses (EVM):**
-- Base Sepolia: `0x036CbD53842c5426634e7929541eC2318f3dCF7e`
-- Base Mainnet: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
-
-**USDC mint (Solana):**
-- Devnet: `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`
-- Mainnet: `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`
+The protocol works on any EVM chain; what limits you in production is whether your facilitator settles there. The CDP facilitator covers Base, Polygon, Arbitrum, World and Solana (plus their testnets); the x402.org testnet facilitator covers Base Sepolia, Solana Devnet and several other testnets. The full, current token table is in `docs/core-concepts/network-and-token-support.mdx` in the repo. Servers can register a wildcard such as `eip155:*` to accept any EVM network their facilitator supports.
 
 ## Facilitator API
 
-Facilitators handle verification and settlement so resource servers don't need blockchain infrastructure.
+Resource servers normally reach these through the SDK (`HTTPFacilitatorClient`), so you rarely build the requests by hand.
 
-### POST /verify
-Verify a payment is valid without settling it.
-```typescript
-// Request
-{
-  x402Version: 2,
-  paymentHeader: "<base64 PAYMENT-SIGNATURE value>",
-  paymentRequirements: { /* PaymentRequirements object */ }
-}
-// Response
-{
-  isValid: boolean,
-  invalidReason: string | null
-}
-```
+| Endpoint | Request | Response |
+|---|---|---|
+| `POST /verify` | `{ x402Version, paymentPayload, paymentRequirements }` (payload as an object, not the base64 header) | `{ isValid, invalidReason?, invalidMessage?, payer? }` |
+| `POST /settle` | same as `/verify` | `SettleResponse` |
+| `GET /supported` | — | `{ kinds: [{ x402Version, scheme, network, extra? }], extensions: string[], signers: {...} }` |
+| `GET /discovery/resources`, `GET /discovery/search` | Bazaar discovery extension | listings of paid resources, each with `accepts[]` |
 
-### POST /settle
-Submit payment to the blockchain.
-```typescript
-// Request (same as /verify)
-{
-  x402Version: 2,
-  paymentHeader: "<base64 PAYMENT-SIGNATURE value>",
-  paymentRequirements: { /* PaymentRequirements object */ }
-}
-// Response
-{
-  success: boolean,
-  txHash: string | null,    // Blockchain transaction hash
-  networkId: string | null,  // CAIP-2 network
-  error: string | null
-}
-```
+Facilitator URLs:
+- Testnet: `https://x402.org/facilitator`. Free, no auth; don't use it for mainnet routes.
+- Mainnet: CDP at `https://api.cdp.coinbase.com/platform/v2/x402`, which needs JWT auth from a CDP API key. Use `createCdpFacilitatorClient()` from `@coinbase/cdp-sdk/x402` rather than building headers yourself (see `deployment.md`). Other facilitators exist, and a server can also settle on its own (`examples/typescript/servers/self-facilitation`).
+- Bazaar discovery listings live on the CDP facilitator: `https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources`. The x402.org facilitator doesn't serve them.
 
-### GET /supported
-List supported scheme+network pairs.
-```typescript
-// Response
-{
-  kinds: [
-    { scheme: "exact", network: "eip155:84532" },
-    { scheme: "exact", network: "eip155:8453" },
-    { scheme: "exact", network: "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1" }
-  ]
-}
-```
+## V1 vs V2
 
-### GET /discovery/resources (Bazaar extension)
-Discover x402-protected resources.
-```typescript
-// Response
-{
-  x402Version: 2,
-  items: [
-    {
-      resource: "https://api.example.com/weather",
-      type: "http",
-      accepts: [ /* PaymentRequirements */ ],
-      metadata: { description: "...", input: {...}, output: {...} }
-    }
-  ],
-  pagination: { limit: 20, offset: 0, total: 42 }
-}
-```
-
-**Facilitator URLs:**
-- Testnet: `https://x402.org/facilitator` (free, no auth, Base Sepolia + Solana Devnet)
-- Mainnet (CDP): `https://api.cdp.coinbase.com/platform/v2/x402` (requires CDP API keys)
-
-## V1 vs V2 Differences
-
-| Aspect | V1 | V2 (Current) |
-|--------|-----|--------------|
-| Payment header | `X-PAYMENT` | `PAYMENT-SIGNATURE` |
-| Requirements | Response body JSON | `PAYMENT-REQUIRED` header |
-| Response header | `X-PAYMENT-RESPONSE` | `PAYMENT-RESPONSE` |
-| Network format | String (`"base-sepolia"`) | CAIP-2 (`"eip155:84532"`) |
-| SDK architecture | Monolithic packages (`x402-express`) | Modular scoped packages (`@x402/express`) |
-| Scheme registration | Automatic | Plugin-driven (`registerExactEvmScheme()`) |
-| Multi-chain | Manual per-network setup | Native wildcard (`eip155:*`) |
-| Extensions | None | Bazaar discovery, lifecycle hooks, modular paywall |
-| Multi-facilitator | Single | SDK selects best match based on preferences |
-
-V2 SDK is fully backward-compatible with V1 payloads. V1 package names (`x402-express`, `x402-axios`) are deprecated but still functional.
-
-## Data Types Reference
-
-### PaymentRequirements
-```typescript
-{
-  scheme: string;              // "exact"
-  network: string;             // CAIP-2 identifier
-  maxAmountRequired: string;   // Atomic units as string (uint256)
-  resource: string;            // URL path of protected resource
-  description: string;         // Human-readable description
-  mimeType: string;            // Response MIME type
-  payTo: string;               // Recipient wallet address
-  maxTimeoutSeconds: number;   // Max server response time
-  asset: string;               // Token contract/mint address
-  extra: object | null;        // Scheme-specific data
-  outputSchema?: object | null; // Optional JSON schema for response
-}
-```
-
-### PaymentPayload (PAYMENT-SIGNATURE content)
-```typescript
-{
-  x402Version: number;
-  scheme: string;
-  network: string;
-  payload: object; // Scheme-dependent (see exact scheme above)
-}
-```
+| | V1 | V2 (current) |
+|---|---|---|
+| Headers | `X-PAYMENT`, `X-PAYMENT-RESPONSE` | `PAYMENT-SIGNATURE`, `PAYMENT-REQUIRED`, `PAYMENT-RESPONSE` |
+| Requirements | in the response body | in the `PAYMENT-REQUIRED` header |
+| Networks | names like `"base-sepolia"` | CAIP-2 IDs |
+| Packages | `x402-express`, `x402-axios`, ... (now under `typescript/packages/legacy`) | scoped `@x402/*` packages |
+| Amount field | `maxAmountRequired` | `amount` |
+| Receipt | `txHash`, `networkId` | `transaction`, `network`, `payer` |

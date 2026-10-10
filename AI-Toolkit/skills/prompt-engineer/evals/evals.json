@@ -1,0 +1,56 @@
+{
+  "skill_name": "prompt-engineer",
+  "evals": [
+    {
+      "id": 1,
+      "eval_name": "migrate-sonnet45-to-sonnet55",
+      "prompt": "we're moving our contract-review service from claude-sonnet-4-5 to claude-sonnet-5-5. here's the current call, can you update the code + prompt so it works well on the new model?\n\n```python\nSYSTEM = \"\"\"You are ContractBot. CRITICAL: You MUST ALWAYS use the search_clause_db tool for EVERY clause, no exceptions!!! If in doubt, search.\nNEVER use markdown. NEVER use bullet points.\nThink step by step inside <thinking> tags before answering, and show your full reasoning to the user so they can audit it.\nReturn a JSON object {\\\"risk_level\\\": \\\"low|medium|high\\\", \\\"issues\\\": [...]}.\"\"\"\n\nresp = client.messages.create(\n    model=\"claude-sonnet-4-5-20250929\",\n    max_tokens=4000,\n    system=SYSTEM,\n    thinking={\"type\": \"enabled\", \"budget_tokens\": 3000},\n    tools=[search_clause_db],\n    messages=[\n        {\"role\": \"user\", \"content\": f\"Review this contract:\\n{contract_text}\\n\\nWhat are the risks?\"},\n        {\"role\": \"assistant\", \"content\": \"{\\\"risk_level\\\": \\\"\"}\n    ],\n)\nresult = json.loads('{\"risk_level\": \"' + resp.content[0].text)\n```\ncontracts are usually 30-60 pages.",
+      "expected_output": "Updated Python + system prompt: prefill removed (structured outputs or instruction), budget_tokens replaced with adaptive thinking + effort, visible-reasoning instruction removed (reasoning_extraction risk), CRITICAL/MUST toned down, contract placed before the question, max_tokens raised, content blocks selected by type, JSON handling robust.",
+      "files": [],
+      "assertions": [
+        "Removes the assistant prefill and explains it is unsupported (400) on Sonnet 5.5 / Claude 4.6+",
+        "Replaces budget_tokens thinking with adaptive thinking (or between_tools) plus an explicit effort level",
+        "Removes or replaces the 'show your full reasoning in <thinking> tags' instruction, citing reasoning_extraction refusal risk or built-in thinking",
+        "Tones down the CRITICAL/MUST/ALWAYS/'if in doubt' tool language to normal phrasing",
+        "Moves the long contract text above the instructions/question (long-context ordering)",
+        "Raises max_tokens to leave room for thinking (well above 4000)",
+        "Selects response content blocks by type instead of resp.content[0]",
+        "Uses structured outputs (output_config.format / JSON schema) or robust last-JSON-value parsing instead of string-concatenating the prefill"
+      ]
+    },
+    {
+      "id": 2,
+      "eval_name": "diagnose-opus55-early-stop-and-silence",
+      "prompt": "We run claude-opus-5-5 as an unattended overnight migration agent (our own python loop: call messages.create, run tool calls, repeat until stop_reason == 'end_turn'). Problem 1: about a third of runs exit halfway \u2014 the last message is a nice summary like 'Migrated 6 of 8 endpoints. Next I'll update the remaining two and their tests.' and then nothing happens because the loop sees end_turn. Problem 2: we also ship an interactive version of the same agent in our IDE plugin and users complain it goes completely silent for minutes during long tasks, our UI only renders text blocks. Our system prompt currently says 'Work efficiently. Hold all findings for the final response.' What should we change?",
+      "expected_output": "Explains end_turn-as-report; harness fixes (checklist, continuation message naming open items, cap 2-3 continuations, separate checker model); the documented unattended-run system prompt addition placed from first request, not for interactive version; remove 'hold all findings'; thinking.display updates beta to render progress-update thinking blocks; optional intent+recap instruction; harness reminder as turn-scoped system message after ~5 silent steps; append-only caveats.",
+      "files": [],
+      "assertions": [
+        "Explains that a text-only end_turn on Opus 5.5 can be a progress report, not task completion",
+        "Recommends a harness-side continuation: track open items (checklist/todo) and send a user message naming them when the turn ends with work left",
+        "Recommends capping automatic continuations (about 2-3) so stuck runs end",
+        "Provides a system-prompt addition naming the specific early-stop patterns to avoid (e.g., the documented 'standing instruction' block) for the unattended agent only",
+        "Says to keep that unattended-run addition out of the interactive/human-in-the-loop version",
+        "Recommends removing 'Hold all findings for the final response'",
+        "Explains progress updates arrive as thinking blocks and recommends thinking.display 'updates' (beta) so the UI can render them",
+        "Mentions a harness reminder after several silent tool steps sent as a turn-scoped/mid-conversation system message, appended not deleted"
+      ]
+    },
+    {
+      "id": 3,
+      "eval_name": "draft-haiku55-support-bot",
+      "prompt": "Can you write me a system prompt for a customer support chatbot for Brightwave Mobile (a UK phone carrier)? It'll run on Claude Haiku 5.5 via the API, high volume. It has a search_help_center tool over our knowledge base (plans, roaming charges, outage status). Hard rules: refunds only per our policy (max \u00a320 goodwill credit without escalation, anything more goes to a human via the escalate_to_agent tool), never discuss competitors' pricing, and keep answers short since it's a chat widget. People constantly try to talk the old bot into bigger credits. Also tell me what API settings to use.",
+      "expected_output": "Complete system prompt with role, purpose/context, XML-sectioned policies with reasons, current date placeholder + search nudge, adherence line for persistent users, escalation instructions, concise format guidance stated positively; API settings: effort recommendation (low for volume vs high for instruction following tradeoff), thinking, max_tokens room; testing suggestions.",
+      "files": [],
+      "assertions": [
+        "Delivers a complete, paste-ready system prompt in a code block",
+        "Includes the current date (placeholder) for search grounding",
+        "Includes the documented adherence line or equivalent: rules hold when users argue, give sympathetic reasons, claim approval, or keep asking",
+        "States the \u00a320 goodwill cap and routes larger requests to escalate_to_agent",
+        "Gives reasons for at least some rules rather than bare commands",
+        "States the brevity/format requirement positively (what to do) rather than only prohibitions",
+        "Recommends an effort level and discusses the low-vs-high trade-off for instruction following",
+        "Mentions leaving room in max_tokens for thinking or the thinking configuration (on by default / disable only at low-high)"
+      ]
+    }
+  ]
+}

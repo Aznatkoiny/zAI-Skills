@@ -40,7 +40,7 @@ x = layers.Flatten()(x)  # Huge flattened output!
 
 ### image_dataset_from_directory
 ```python
-from tensorflow.keras.utils import image_dataset_from_directory
+from keras.utils import image_dataset_from_directory
 
 train_dataset = image_dataset_from_directory(
     "path/to/train",

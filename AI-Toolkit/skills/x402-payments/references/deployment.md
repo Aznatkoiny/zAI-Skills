@@ -1,251 +1,95 @@
-# Deployment Guide
+# x402 deployment: testnet, mainnet, keys
 
-## Table of Contents
+Checked against x402 2.28.0 and `@coinbase/cdp-sdk` 1.58.0 (October 2026).
 
-1. [Testnet Development Setup](#testnet-development-setup)
-2. [USDC Faucets](#usdc-faucets)
-3. [Testnet to Mainnet Migration](#testnet-to-mainnet-migration)
-4. [CDP Facilitator Setup](#cdp-facilitator-setup)
-5. [Private Key Security](#private-key-security)
-6. [Session Cookies (Skip Re-payment)](#session-cookies)
-7. [Monitoring and Observability](#monitoring)
-8. [Error Response Reference](#error-responses)
+## Contents
+- Testnet setup and faucets
+- Keys: generating, storing, funding
+- Moving to mainnet (confirm with the user first)
+- Security checklist
+- Granting access after payment (sessions)
+- Troubleshooting
 
-## Testnet Development Setup
+## Testnet setup and faucets
 
-Testnet requires no API keys. Use these defaults:
+| Setting | Value |
+|---|---|
+| Facilitator | `https://x402.org/facilitator` (free, no keys) |
+| EVM network | `eip155:84532` (Base Sepolia) |
+| Solana network | `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` (Devnet) |
+| Test USDC | https://faucet.circle.com: pick the network and USDC; 20 USDC per request, one request per network every 2 hours |
 
-| Setting | Testnet Value |
-|---------|---------------|
-| Facilitator URL | `https://x402.org/facilitator` |
-| EVM Network | `eip155:84532` (Base Sepolia) |
-| Solana Network | `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` (Devnet) |
-| USDC | Test tokens from Circle faucet |
+A seller needs only a receiving address (`PAY_TO`). A buyer needs a private key holding test USDC. Exact payments on EVM are gasless for the payer, so a Base Sepolia buyer doesn't need ETH. A Solana devnet wallet may need a little SOL (`solana airdrop 1`) depending on the setup.
 
-**Minimum testnet server `.env`:**
-```bash
-PAY_TO=0xYourEthereumAddress
-```
+## Keys: generating, storing, funding
 
-**Minimum testnet client `.env`:**
-```bash
-EVM_PRIVATE_KEY=0xYourPrivateKey
-RESOURCE_SERVER_URL=http://localhost:4021
-```
-
-## USDC Faucets
-
-### Base Sepolia (EVM)
-- **Circle Faucet**: https://faucet.circle.com — Select "Base Sepolia" and "USDC". Grants 20 USDC every 2 hours per address.
-- Also need Base Sepolia ETH for wallet creation (not for x402 payments — those are gasless). Use any Base Sepolia faucet.
-
-### Solana Devnet
-- **Circle Faucet**: https://faucet.circle.com — Select "Solana Devnet" and "USDC".
-- Devnet USDC mint: `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`
-- Also need Devnet SOL: `solana airdrop 2` via Solana CLI.
-
-## Testnet to Mainnet Migration
-
-Three changes — no code restructuring needed.
-
-### Step 1: Change network identifiers
+When you generate a key for the user, write it straight into `.env` and print only the address, so the key never appears in the conversation or in shell history:
 
 ```typescript
-// Before (testnet)
-network: "eip155:84532"      // Base Sepolia
-network: "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"  // Solana Devnet
-
-// After (mainnet)
-network: "eip155:8453"       // Base Mainnet
-network: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"  // Solana Mainnet
-```
-
-### Step 2: Switch facilitator URL
-
-```typescript
-// Before (testnet)
-const facilitatorClient = new HTTPFacilitatorClient({
-  url: "https://x402.org/facilitator",
-});
-
-// After (mainnet — CDP hosted)
-const facilitatorClient = new HTTPFacilitatorClient({
-  url: "https://api.cdp.coinbase.com/platform/v2/x402",
-});
-```
-
-### Step 3: Add CDP API credentials
-
-```bash
-CDP_API_KEY_ID=your-api-key-id
-CDP_API_KEY_SECRET=your-api-key-secret
-```
-
-Register mainnet scheme on server:
-```typescript
-const server = new x402ResourceServer(facilitatorClient)
-  .register("eip155:8453", new ExactEvmScheme()); // Base mainnet
-```
-
-## CDP Facilitator Setup
-
-The Coinbase Developer Platform facilitator handles verification and settlement for production.
-
-1. **Sign up** at https://cdp.coinbase.com
-2. **Create a project** in the CDP dashboard
-3. **Generate API credentials** (API Key ID + Secret)
-4. **Set environment variables:**
-   ```bash
-   CDP_API_KEY_ID=your-api-key-id
-   CDP_API_KEY_SECRET=your-api-key-secret
-   ```
-
-**Pricing:**
-- Free tier: 1,000 transactions per month
-- After free tier: $0.001 per transaction
-- No percentage-based fees
-
-**Facilitator URL:** `https://api.cdp.coinbase.com/platform/v2/x402`
-
-**Server configuration with auth headers:**
-```typescript
-const facilitatorClient = new HTTPFacilitatorClient({
-  url: "https://api.cdp.coinbase.com/platform/v2/x402",
-  createAuthHeaders: () => ({
-    "X-CDP-API-KEY-ID": process.env.CDP_API_KEY_ID!,
-    "X-CDP-API-KEY-SECRET": process.env.CDP_API_KEY_SECRET!,
-  }),
-});
-```
-
-## Private Key Security
-
-**Never hardcode private keys.**
-
-### Development
-```bash
-# .env file (add to .gitignore!)
-EVM_PRIVATE_KEY=0x...
-SOLANA_PRIVATE_KEY=...
-```
-
-### Production
-- Use cloud secret managers (AWS Secrets Manager, GCP Secret Manager, Vault)
-- Fund agent wallets with limited amounts only
-- Use separate wallets per agent and per environment
-- Rotate keys periodically
-- Monitor wallet balances with alerts for unusual spending
-
-### Generate a dedicated agent wallet
-```typescript
+// scripts/new-wallet.ts — run once with: npx tsx scripts/new-wallet.ts
+import { appendFileSync, chmodSync, existsSync, readFileSync } from "node:fs";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
+if (existsSync(".env") && /EVM_PRIVATE_KEY=0x/.test(readFileSync(".env", "utf8"))) {
+  throw new Error(".env already has EVM_PRIVATE_KEY; not overwriting it");
+}
 const key = generatePrivateKey();
-const account = privateKeyToAccount(key);
-console.log("Agent address:", account.address);
-console.log("Private key:", key);
-// Fund this address with only the USDC needed for operation
+appendFileSync(".env", `EVM_PRIVATE_KEY=${key}\n`);
+chmodSync(".env", 0o600);
+console.log("New wallet address (fund this from the faucet):", privateKeyToAccount(key).address);
 ```
 
-## Session Cookies
+Make sure `.env` is in `.gitignore` before anything is committed. In production, keep keys in a secret manager rather than a file, and give each agent and environment its own wallet funded with only what it needs.
 
-Source: `examples/typescript/fullstack/next-advanced/`
+## Moving to mainnet
 
-Issue a session cookie after first payment to avoid charging on every request.
+This is the point where real money moves. Before making any of these changes, tell the user what will change, which wallet will pay or receive, and how spending is capped, and get an explicit yes.
+
+1. **Network IDs:** `eip155:84532` becomes `eip155:8453` (Base); Solana Devnet becomes `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp`.
+2. **Facilitator:** the x402.org facilitator is for testnets. Use Coinbase's CDP facilitator, which authenticates with a CDP API key (create one at https://portal.cdp.coinbase.com):
+   ```typescript
+   import { createCdpFacilitatorClient } from "@coinbase/cdp-sdk/x402";
+   import { x402ResourceServer } from "@x402/core/server";
+   import { ExactEvmScheme } from "@x402/evm/exact/server";
+
+   // Reads CDP_API_KEY_ID and CDP_API_KEY_SECRET from the environment and signs requests for you.
+   const facilitator = createCdpFacilitatorClient();
+   const server = new x402ResourceServer(facilitator).register("eip155:8453", new ExactEvmScheme());
+   ```
+   Don't build CDP auth headers by hand; CDP uses short-lived JWTs that the helper generates. CDP pricing: the first 1,000 settled transactions each month are free, then $0.001 each; verification is free.
+3. **Buyers:** mainnet USDC in the paying wallet, and spend controls sized for real money (`client-patterns.md`).
+
+Keep testnet and mainnet configuration separate (for example, `NETWORK` and `FACILITATOR` chosen from an environment variable that defaults to testnet), so a missing variable never sends a development build to mainnet.
+
+## Security checklist
+
+- `.env` gitignored and `chmod 600`; no keys in code, logs, error messages, or tool output.
+- Each paying client has `setSpendControls` and, for agents, a total budget and an iteration cap.
+- The seller checks `settle` succeeded before granting anything durable.
+- Prices that depend on the request are clamped to a sane range.
+- Paid API responses and discovery listings are handled as untrusted data in any agent.
+- Wallet balances are monitored, with an alert on unusual spend.
+
+## Granting access after payment (sessions)
+
+To let a buyer pay once and then use the resource for a while, issue a session token only after settlement succeeds:
 
 ```typescript
-import { serialize } from "cookie";
-
-app.get("/premium", async (req, res) => {
-  // Check for existing session
-  const sessionToken = req.cookies?.["x402-session"];
-  if (sessionToken && isValidSession(sessionToken)) {
-    return res.json(await generateContent());
-  }
-
-  // No session — require payment
-  const paymentHeader = req.headers["payment-signature"] as string;
-  if (!paymentHeader) {
-    return res.status(402).json({ error: "Payment required" });
-  }
-
-  const verifyResult = await server.verify(paymentHeader, paymentConfig);
-  if (!verifyResult.isValid) {
-    return res.status(402).json({ error: verifyResult.invalidReason });
-  }
-
-  const settleResult = await server.settle(paymentHeader, paymentConfig);
-
-  // Issue session cookie (valid 24 hours)
-  const token = generateSessionToken(settleResult.txHash);
-  res.setHeader(
-    "Set-Cookie",
-    serialize("x402-session", token, {
-      httpOnly: true,
-      secure: true,
-      maxAge: 86400,
-      path: "/",
-    }),
-  );
-
-  res.set("PAYMENT-RESPONSE", settleResult.encoded);
-  res.json(await generateContent());
+const settled = await resourceServer.settlePayment(paymentPayload, requirements);
+if (!settled.success) return res.status(402).json({ error: settled.errorReason ?? "payment did not settle" });
+res.cookie("x402_session", signSession({ payer: settled.payer, expires: Date.now() + 24 * 3600_000 }), {
+  httpOnly: true, secure: true, sameSite: "strict",
 });
 ```
 
-### Auth-Based Pricing
+Sign the token (an HMAC or JWT over payer and expiry) so it can't be forged, and check it before the payment middleware runs. The official `servers/sign-in-with-x` example shows a wallet-signature login for returning buyers.
 
-Source: `examples/typescript/fullstack/auth_based_pricing/`
+## Troubleshooting
 
-Charge different prices based on authentication (SIWE + JWT).
-
-```typescript
-// Authenticated users: $0.01, Anonymous users: $0.10
-app.use((req, res, next) => {
-  const jwt = req.headers.authorization?.replace("Bearer ", "");
-  req.x402Price = jwt && verifyJWT(jwt) ? "$0.01" : "$0.10";
-  next();
-});
-```
-
-## Monitoring
-
-Track x402 payments with lifecycle hooks.
-
-```typescript
-client.onBeforePayment((details) => {
-  metrics.increment("x402.payment_required");
-  metrics.histogram("x402.amount_usd", parseInt(details.amount) / 1_000_000);
-  return true;
-});
-
-client.onAfterPayment(() => metrics.increment("x402.payment_success"));
-client.onPaymentError((err) => {
-  metrics.increment("x402.payment_error");
-  console.error(`[x402] ${err.message}`);
-});
-```
-
-### Key metrics
-- `x402.payment_required` — Endpoints hit without payment
-- `x402.payment_success` / `x402.payment_error` — Client-side outcomes
-- `x402.settlement_success` / `x402.settlement_failure` — Server-side outcomes
-- `x402.settlement_duration` — End-to-end time (~2 seconds typical)
-- `x402.amount_usd` — Payment size distribution
-
-## Error Response Reference
-
-| HTTP Status | Meaning | Client Action |
-|-------------|---------|---------------|
-| 402 + `PAYMENT-REQUIRED` header | Payment needed | Parse requirements, sign, retry |
-| 402 + `invalidReason` in body | Payment rejected | Check key, network, amount |
-| 400 | Malformed payment header | Verify base64 encoding |
-| 500 | Settlement failed on-chain | Retry after delay |
-| 200 + `PAYMENT-RESPONSE` header | Success | Extract txHash for receipt |
-
-**Common failure causes:**
-- Insufficient USDC balance in payer wallet
-- Wrong network (client on testnet, server expects mainnet)
-- Expired `validBefore` timestamp in payment authorization
-- Private key doesn't match the `from` address
-- Facilitator unreachable or experiencing downtime
+| Symptom | Usual cause |
+|---|---|
+| Client error `No client registered for scheme ... and network ...` | Server and client disagree on network or scheme (often testnet vs mainnet) |
+| `paymentStatus: "settle_failed"` | Payer has too little USDC on that network, or the authorization expired |
+| CDP facilitator returns 401 | `CDP_API_KEY_ID` / `CDP_API_KEY_SECRET` missing or wrong; use `createCdpFacilitatorClient()` |
+| Receipt fields print `undefined` | Code written for V1 (`txHash`); V2 uses `transaction` and `network` |
+| Buyer refuses to pay a price above $1 | Default client spend controls; the buyer must raise `maxAmountPerPayment` |

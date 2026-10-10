@@ -33,6 +33,8 @@ This reference covers the most important RL algorithms, when to use each, and ke
 
 ### Key Variants
 
+These are well-known improvements, but SB3's `DQN` implements neither: it is vanilla DQN with a target network. Using them means a custom policy/algorithm, or a library that includes them (sb3-contrib offers QR-DQN, a distributional variant).
+
 **Double DQN**: Addresses overestimation bias by decoupling action selection and evaluation.
 ```python
 # Standard DQN (overestimates)
@@ -231,7 +233,7 @@ if step % policy_delay == 0:
 |-----------|---------|-------|-------|
 | learning_rate | 1e-3 | 1e-4 to 1e-3 | Same for actor and critic |
 | buffer_size | 1e6 | 1e5 to 1e7 | Replay buffer size |
-| batch_size | 100 | 64 to 256 | Mini-batch size |
+| batch_size | 256 | 64 to 512 | Mini-batch size (SB3 default since 2.3; older guides say 100) |
 | gamma | 0.99 | 0.9 to 0.999 | Discount factor |
 | tau | 0.005 | 0.001 to 0.05 | Soft update coefficient |
 | policy_delay | 2 | 1 to 4 | Update policy every N critic updates |
@@ -257,7 +259,7 @@ model = TD3(
     env,
     learning_rate=1e-3,
     buffer_size=1_000_000,
-    batch_size=100,
+    batch_size=256,
     gamma=0.99,
     tau=0.005,
     policy_delay=2,
@@ -332,7 +334,7 @@ model.learn(total_timesteps=100_000)
 Need to train an RL agent?
 │
 ├─ Discrete actions?
-│  ├─ Sample efficiency critical? → DQN (Double/Dueling)
+│  ├─ Sample efficiency critical? → DQN (SB3's is vanilla)
 │  ├─ Stability critical? → PPO
 │  └─ Fast prototyping? → A2C
 │

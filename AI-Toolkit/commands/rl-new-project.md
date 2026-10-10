@@ -1,67 +1,66 @@
 ---
-description: Scaffold a Python RL project — custom Gymnasium env, SB3 training script with EvalCallback + VecNormalize, Optuna tuning stub, and validation targets in a Makefile
-argument-hint: "[environment or task description]"
+description: Scaffold a Python RL project — custom Gymnasium environment, Stable-Baselines3 training with evaluation and VecNormalize, an Optuna tuning stub, and Makefile targets that validate the environment before training
+argument-hint: "[what the agent should learn, e.g. 'inventory restocking, discrete actions']"
 ---
-You are scaffolding a new Python reinforcement learning project using the reinforcement-learning skill.
+Scaffold a new Python reinforcement-learning project with the reinforcement-learning skill bundled with this plugin.
 
-## Arguments
+## What the user wants the agent to learn
 
 $ARGUMENTS
 
-The arguments describe the environment or task (e.g. "inventory management with discrete restock actions", "2D drone hover, continuous thrust"). If no arguments were given, ask the user what they want the agent to learn — specifically the observation the agent sees, the actions it can take (discrete or continuous), and what success looks like — before scaffolding anything.
+If that's empty, ask one question: what should the agent learn, roughly what it observes, what it can do, and what success looks like. In the same message, offer to scaffold a worked example right away (a small grid-world "reach the goal" environment) so they can see the pieces run first. If they pick the example, go ahead without further questions.
 
-## Step 1: Load the skill
+If the description is thin, fill the gaps with sensible choices, mark them with `TODO`, and say what you assumed rather than asking a series of questions.
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/reinforcement-learning/SKILL.md` first. Then read:
+## Get the guidance
 
-- `${CLAUDE_PLUGIN_ROOT}/skills/reinforcement-learning/references/environments.md` — custom env template, validation checklist, wrappers, and the environment testing script.
-- `${CLAUDE_PLUGIN_ROOT}/skills/reinforcement-learning/references/algorithms.md` — algorithm deep-dives, for justifying the algorithm choice.
-- `${CLAUDE_PLUGIN_ROOT}/skills/reinforcement-learning/references/training.md` — hyperparameter starting points, reward engineering, normalization.
-- `${CLAUDE_PLUGIN_ROOT}/skills/reinforcement-learning/references/debugging.md` — the pre-training sanity checklist to turn into a validation script.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/reinforcement-learning/SKILL.md`. Consult `references/environments.md` (environment template and checks), `references/algorithms.md` (for the algorithm choice) and `references/training.md` (starting hyperparameters, reward design) under `${CLAUDE_PLUGIN_ROOT}/skills/reinforcement-learning/` as needed.
 
-## Step 2: Choose the algorithm
+Choose the algorithm from the skill's table: action-space type first, then whether environment steps are expensive. Default to PPO when nothing points elsewhere, since it's the most forgiving. Say which you chose and why in one or two sentences.
 
-Apply the SKILL.md Algorithm Decision Tree to the task description: action space type first (discrete vs. continuous), then sample-efficiency and stability requirements. State the chosen algorithm and cite the decision-tree branch and the relevant section of `references/algorithms.md` that justifies it. Default to PPO when the task description leaves the tradeoffs ambiguous — it is the stable choice per the skill's quick-selection table.
+## Create the project
 
-## Step 3: Generate the project
-
-Create this layout in the current directory (ask before writing if the directory is not empty):
+Create it in a new subfolder named after the task (kebab-case), unless the user asked for the current directory. If the target folder exists and isn't empty, ask before writing.
 
 ```
-<project>/
-├── pyproject.toml            # or requirements.txt — gymnasium>=1.0, stable-baselines3>=2.0, tensorboard, optuna
+<task-name>/
+├── requirements.txt     stable-baselines3[extra]>=2.4, gymnasium>=1.0, optuna
+├── .gitignore           .venv/, models/, runs/, __pycache__/
 ├── Makefile
+├── README.md            what each target does, first-run order
 ├── src/
 │   ├── __init__.py
-│   ├── env.py                # custom Gymnasium environment
-│   ├── train.py              # SB3 training entry point
-│   └── tune.py               # Optuna tuning stub
-├── scripts/
-│   ├── check_env.py          # Gymnasium API validation
-│   └── sanity_checks.py      # pre-training sanity checklist
-└── models/                   # checkpoints + VecNormalize stats (gitignored)
+│   ├── env.py           the custom Gymnasium environment
+│   ├── train.py         training entry point
+│   └── tune.py          Optuna stub
+├── scripts/             copies of the skill's validate_env.py, pretrain_check.py, eval_report.py
+└── models/              checkpoints and VecNormalize statistics (gitignored)
 ```
 
-Content requirements:
+What goes in each:
 
-1. **`src/env.py`** — a custom env following the Gymnasium >= 1.0 API exactly as shown in the skill's Custom Environment Template: `reset(self, seed=None, options=None)` returning `(obs, info)` and calling `super().reset(seed=seed)`; `step` returning the 5-tuple `(obs, reward, terminated, truncated, info)` with terminated/truncated kept distinct; explicit `observation_space` and `action_space` matching the user's task; `metadata` with render modes. Fill in plausible dynamics and rewards from the task description, marked with `TODO` comments where the user must supply real logic.
-2. **`src/train.py`** — SB3 training script with:
-   - `make_vec_env` with 4+ parallel envs,
-   - `VecNormalize` wrapping the training env (per the skill's pitfall #1: always normalize observations),
-   - an `EvalCallback` using a **separate** eval env (pitfall #4), with the eval env also VecNormalize-wrapped sharing the training statistics (`training=False`, `norm_reward=False`) and stats synced before evaluation,
-   - `VecNormalize` statistics saved alongside the model checkpoint — a model saved without its normalization stats is unusable,
-   - TensorBoard logging and seed handling (pitfall #3).
-3. **`src/tune.py`** — Optuna stub following the skill's Hyperparameter Tuning example: an `objective(trial)` suggesting learning rate (log scale), n_steps/batch size, and gamma for the chosen algorithm, short training budget, `evaluate_policy` scoring, and a `study.optimize` entry point.
-4. **`scripts/check_env.py`** — instantiate the custom env and run `gymnasium.utils.env_checker.check_env` on it, plus the space/reset/step assertions from the Environment Validation Checklist in `references/environments.md`.
-5. **`scripts/sanity_checks.py`** — the pre-training checklist from `references/debugging.md` adapted to this project: environment validation, random-policy baseline reward, observation statistics (warn if `|obs| > 100`), reward statistics (warn on very sparse rewards), action-space report, and a model forward pass.
-   - If `${CLAUDE_PLUGIN_ROOT}/skills/reinforcement-learning/scripts/` exists (check with Glob or `ls`), copy its validation scripts into the project's `scripts/` dir and wire those instead of writing your own adaptations.
-6. **`Makefile`** — targets wiring it all together: `install`, `check-env` (runs `scripts/check_env.py`), `sanity` (runs `scripts/sanity_checks.py`), `train`, `tune`, `tensorboard`, and `eval`. Use a `justfile` instead only if the user asks or the repo already uses one.
+- **`src/env.py`:** follow the skill's custom environment template exactly: `reset(seed=None, options=None)` calls `super().reset(seed=seed)` and returns `(obs, info)`; `step` returns `(obs, reward, terminated, truncated, info)` with terminated and truncated kept distinct; explicit spaces; a step limit so episodes always end. Put `info["is_success"]` on the final step if the task has a success condition. Fill in plausible dynamics and rewards, with `TODO` where the user must supply real logic.
+- **`src/train.py`:** `make_vec_env` with 4 or more envs, `VecNormalize` on the training env (skip observation normalization for image observations, as the skill explains), an `EvalCallback` on a separate eval env that is also VecNormalize-wrapped with `training=False` and `norm_reward=False` and kept in sync with the training statistics, TensorBoard logging to `runs/`, a fixed seed, and the model plus `models/vecnormalize.pkl` saved at the end.
+- **`src/tune.py`:** the skill's Optuna example adapted to the chosen algorithm, scoring on a separate eval env.
+- **`scripts/`:** copy the three scripts from `${CLAUDE_PLUGIN_ROOT}/skills/reinforcement-learning/scripts/` rather than writing new ones; they're tested.
+- **`Makefile`:** run everything from the project root with `PYTHONPATH=.` so `src.env:<Class>` imports, and through the project venv:
+  - `install`: `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`
+  - `check-env`: `.venv/bin/python scripts/validate_env.py src.env:<Class>`
+  - `sanity`: `.venv/bin/python scripts/pretrain_check.py src.env:<Class>`
+  - `train`, `tune`, `tensorboard`
+  - `eval`: `.venv/bin/python scripts/eval_report.py src.env:<Class> --model models/best_model.zip --algo <algo> --vecnormalize models/vecnormalize.pkl`
 
-## Step 4: Hand off
+  Use a `justfile` instead only if the user asks or the repo already uses one.
 
-After scaffolding, tell the user:
+## Check it
 
-1. The chosen algorithm and why (decision-tree citation).
-2. The recommended first run order: `make install` → `make check-env` → `make sanity` → `make train` — do not skip the validation targets; they catch most failures before any compute is spent.
-3. The `TODO` markers in `env.py` they must fill in (dynamics, reward).
-4. That reward shaping and hyperparameter guidance lives in `references/training.md`, and if training misbehaves, the rl-debugger agent encodes the debugging playbook.
+If Python 3 is available, run `make install`, `make check-env` and `make sanity`, and fix whatever fails, so the user starts from a project whose environment passes its own checks. Don't run `make train` yourself unless the user asks; training takes their time and compute.
+
+## Hand off
+
+Tell the user:
+
+1. The algorithm and why.
+2. The run order: `make train`, watch `make tensorboard`, then `make eval` (the setup checks already passed, or here's what's left).
+3. The `TODO`s in `src/env.py` they need to fill in.
+4. Where to look if it doesn't learn: `references/training.md` for reward design and hyperparameters, and the rl-debugger agent for diagnosis.

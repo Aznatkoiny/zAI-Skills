@@ -26,7 +26,7 @@ y = ops.sum(x, axis=1)
 ```
 
 ### 3. Cross-Framework Compatibility
-- **Data Pipelines**: `tf.data` is recommended for all backends. It produces data efficiently.
+- **Data Pipelines**: `tf.data` (needs TensorFlow installed), a PyTorch `DataLoader`, or `keras.utils.PyDataset` all work with every backend. `tf.data` is the most mature for large pipelines; `PyDataset` avoids a TensorFlow dependency.
 - **Saving**: Always use the `.keras` extension. It saves the model architecture and weights in a backend-agnostic format (zip archive).
   ```python
   model.save("my_model.keras")

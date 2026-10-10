@@ -10,8 +10,9 @@ Gymnasium (the maintained fork of OpenAI Gym) is the standard API for RL environ
 # Core gymnasium
 pip install gymnasium
 
-# Atari environments
-pip install gymnasium[atari] gymnasium[accept-rom-license]
+# Atari environments (ROMs ship inside ale-py >= 0.9; the old accept-rom-license extra is gone)
+pip install "gymnasium[atari]"
+# then, in code: import ale_py; gym.register_envs(ale_py)
 
 # MuJoCo environments
 pip install gymnasium[mujoco]
@@ -236,8 +237,8 @@ env = gym.make("CustomEnv-v0")
 > that exits nonzero on failure:
 >
 > ```bash
-> python scripts/validate_env.py CartPole-v1
-> python scripts/validate_env.py my_package.envs:CustomEnv --episodes 5 --seed 7
+> python3 ${CLAUDE_PLUGIN_ROOT}/skills/reinforcement-learning/scripts/validate_env.py CartPole-v1
+> python3 ${CLAUDE_PLUGIN_ROOT}/skills/reinforcement-learning/scripts/validate_env.py my_package.envs:CustomEnv --episodes 5 --seed 7
 > ```
 >
 > The snippets below show the underlying patterns for reference — prefer the
@@ -345,6 +346,8 @@ env = SubprocVecEnv([make_env("CartPole-v1", i) for i in range(n_envs)])
 Names below are for Gymnasium >= 1.0, which renamed `FrameStack` ->
 `FrameStackObservation` and `GrayScaleObservation` -> `GrayscaleObservation`.
 
+These are alternatives for different kinds of observation, not one chain to apply in order.
+
 ```python
 import numpy as np
 import gymnasium as gym
@@ -353,26 +356,30 @@ from gymnasium.wrappers import (
     TransformObservation,
     FrameStackObservation,
     GrayscaleObservation,
-    ResizeObservation
+    ResizeObservation,
 )
 
-# Normalize observations (running mean/std)
+# Vector observations: running mean/std normalization
 env = NormalizeObservation(env)
 
 # Custom transformation (Gymnasium >= 1.0 requires the resulting observation space)
 env = TransformObservation(
     env,
-    lambda obs: obs / 255.0,
-    gym.spaces.Box(low=0.0, high=1.0, shape=env.observation_space.shape, dtype=np.float32),
+    lambda obs: (obs / 10.0).astype(np.float32),
+    gym.spaces.Box(low=-np.inf, high=np.inf, shape=env.observation_space.shape, dtype=np.float32),
 )
-
-# Stack frames (for temporal info)
-env = FrameStackObservation(env, stack_size=4)
-
-# Image preprocessing
-env = GrayscaleObservation(env)
-env = ResizeObservation(env, shape=(84, 84))
 ```
+
+For image observations the order matters: grayscale and resize the raw uint8 frame first, then stack frames. Grayscale fails on already-stacked frames, and don't add `NormalizeObservation` to pixels (SB3's `CnnPolicy` scales uint8 images itself).
+
+```python
+env = gym.make("ALE/Pong-v5")
+env = GrayscaleObservation(env)                  # (210, 160, 3) uint8 -> (210, 160)
+env = ResizeObservation(env, shape=(84, 84))     # -> (84, 84)
+env = FrameStackObservation(env, stack_size=4)   # -> (4, 84, 84)
+```
+
+`ResizeObservation` needs OpenCV (`pip install "gymnasium[other]"`; `stable-baselines3[extra]` includes it). For standard Atari preprocessing, `gymnasium.wrappers.AtariPreprocessing` or SB3's `make_atari_env` do all of this in one step.
 
 ### Reward Wrappers
 
@@ -483,54 +490,8 @@ obs_space = spaces.MultiBinary(8)  # 8 binary values
 > (unbounded observations, constant/sparse rewards, huge action ranges):
 >
 > ```bash
-> python scripts/pretrain_check.py CartPole-v1 --episodes 20
+> python3 ${CLAUDE_PLUGIN_ROOT}/skills/reinforcement-learning/scripts/pretrain_check.py CartPole-v1 --episodes 20
 > ```
 >
 > The mean random-policy return it prints is the number a trained agent must
-> clearly beat. The inline version below is the minimal pattern for reference.
-
-```python
-import gymnasium as gym
-import numpy as np
-
-def test_environment(env_or_id, n_episodes=5, render=False):
-    """Test environment with random policy."""
-    if isinstance(env_or_id, str):
-        env = gym.make(env_or_id, render_mode="human" if render else None)
-    else:
-        env = env_or_id
-
-    episode_rewards = []
-    episode_lengths = []
-
-    for ep in range(n_episodes):
-        obs, info = env.reset()
-        total_reward = 0
-        steps = 0
-
-        while True:
-            action = env.action_space.sample()
-            obs, reward, terminated, truncated, info = env.step(action)
-            total_reward += reward
-            steps += 1
-
-            if render:
-                env.render()
-
-            if terminated or truncated:
-                break
-
-        episode_rewards.append(total_reward)
-        episode_lengths.append(steps)
-        print(f"Episode {ep+1}: reward={total_reward:.2f}, length={steps}")
-
-    print(f"\nSummary over {n_episodes} episodes:")
-    print(f"  Mean reward: {np.mean(episode_rewards):.2f} +/- {np.std(episode_rewards):.2f}")
-    print(f"  Mean length: {np.mean(episode_lengths):.1f} +/- {np.std(episode_lengths):.1f}")
-
-    env.close()
-    return episode_rewards, episode_lengths
-
-# Usage
-test_environment("CartPole-v1", n_episodes=10)
-```
+> clearly beat.

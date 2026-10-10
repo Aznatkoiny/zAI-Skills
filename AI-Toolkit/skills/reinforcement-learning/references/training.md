@@ -55,23 +55,23 @@ def objective(trial):
         verbose=0
     )
 
-    # Train
-    model.learn(total_timesteps=50_000)
-
-    # Evaluate
-    mean_reward, std_reward = evaluate_policy(
-        model, model.get_env(), n_eval_episodes=10, deterministic=True
-    )
-
-    # Report intermediate value (for pruning)
-    trial.report(mean_reward, step=50_000)
+    # Train in chunks and report after each one, so the pruner can stop
+    # unpromising trials early. Score on a separate env, not the training env.
+    eval_env = make_vec_env("CartPole-v1", n_envs=1, seed=10_000 + trial.number)
+    mean_reward = float("-inf")
+    for chunk in range(5):
+        model.learn(total_timesteps=10_000, reset_num_timesteps=False)
+        mean_reward, _ = evaluate_policy(model, eval_env, n_eval_episodes=10, deterministic=True)
+        trial.report(mean_reward, step=chunk)
+        if trial.should_prune():
+            raise optuna.TrialPruned()
 
     return mean_reward
 
 # Create study with pruning
 study = optuna.create_study(
     direction="maximize",
-    pruner=optuna.pruners.MedianPruner(n_warmup_steps=5)
+    pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=1)
 )
 
 # Optimize
@@ -227,7 +227,7 @@ model = PPO(
 )
 
 # Monitor entropy during training (via TensorBoard)
-# Look for "train/entropy_loss" - should not drop to 0
+# "train/entropy_loss" is negative entropy: it rising toward 0 early means the policy is collapsing
 ```
 
 ### Epsilon-Greedy (DQN)
@@ -272,11 +272,10 @@ model = TD3("MlpPolicy", env, action_noise=action_noise)
 
 For environments with very sparse rewards:
 
-```python
-# Using stable-baselines3-contrib
-from sb3_contrib import RecurrentPPO
+Intrinsic-motivation methods (ICM, RND) add a bonus for novel states. SB3 and sb3-contrib don't ship them, so they need a custom reward wrapper or another library; try reward shaping, a curriculum, or HER first.
 
-# Or implement intrinsic motivation
+```python
+# Sketch of the idea
 class ICMReward:
     """Intrinsic Curiosity Module reward."""
 
@@ -494,7 +493,7 @@ model = PPO(
 model.learn(
     total_timesteps=500_000,
     callback=[eval_callback, checkpoint_callback],
-    progress_bar=True
+    progress_bar=True,   # needs tqdm and rich: pip install "stable-baselines3[extra]"
 )
 
 # Final save

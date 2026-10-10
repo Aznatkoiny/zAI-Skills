@@ -6,93 +6,16 @@ Debugging RL is notoriously difficult due to high variance, delayed feedback, an
 
 ## Pre-Training Sanity Checks
 
-### Before Training: The Checklist
+### Before Training
 
-```python
-def pre_training_checklist(env, model):
-    """Run before any serious training."""
+Run the bundled scripts rather than an inline checklist; they cover the same ground and are tested:
 
-    print("=" * 50)
-    print("PRE-TRAINING SANITY CHECKS")
-    print("=" * 50)
-
-    # 1. Environment validation
-    print("\n1. Environment Validation")
-    from gymnasium.utils.env_checker import check_env
-    try:
-        check_env(env.envs[0] if hasattr(env, 'envs') else env)
-        print("   [PASS] Environment API check")
-    except Exception as e:
-        print(f"   [FAIL] Environment API: {e}")
-
-    # 2. Random policy baseline
-    print("\n2. Random Policy Baseline")
-    obs = env.reset()
-    total_rewards = []
-    for _ in range(10):
-        episode_reward = 0
-        done = False
-        while not done:
-            action = env.action_space.sample()
-            obs, reward, done, info = env.step(action)
-            episode_reward += reward
-        total_rewards.append(episode_reward)
-        obs = env.reset()
-    print(f"   Random policy mean reward: {np.mean(total_rewards):.2f} +/- {np.std(total_rewards):.2f}")
-
-    # 3. Observation statistics
-    print("\n3. Observation Statistics")
-    obs = env.reset()
-    obs_samples = [obs]
-    for _ in range(100):
-        obs, _, done, _ = env.step(env.action_space.sample())
-        obs_samples.append(obs)
-        if done:
-            obs = env.reset()
-    obs_array = np.array(obs_samples)
-    print(f"   Obs shape: {obs_array.shape}")
-    print(f"   Obs range: [{obs_array.min():.2f}, {obs_array.max():.2f}]")
-    print(f"   Obs mean: {obs_array.mean():.2f}, std: {obs_array.std():.2f}")
-    if np.abs(obs_array).max() > 100:
-        print("   [WARN] Large observation values - consider normalization")
-
-    # 4. Reward statistics
-    print("\n4. Reward Statistics")
-    rewards = []
-    obs = env.reset()
-    for _ in range(1000):
-        obs, reward, done, _ = env.step(env.action_space.sample())
-        rewards.append(reward)
-        if done:
-            obs = env.reset()
-    rewards = np.array(rewards)
-    print(f"   Reward range: [{rewards.min():.2f}, {rewards.max():.2f}]")
-    print(f"   Reward mean: {rewards.mean():.4f}, std: {rewards.std():.4f}")
-    print(f"   Nonzero rewards: {(rewards != 0).sum() / len(rewards) * 100:.1f}%")
-    if (rewards != 0).sum() < 10:
-        print("   [WARN] Very sparse rewards - learning may be difficult")
-
-    # 5. Action space check
-    print("\n5. Action Space")
-    print(f"   Type: {type(env.action_space).__name__}")
-    print(f"   Shape/Size: {env.action_space.shape if hasattr(env.action_space, 'shape') else env.action_space.n}")
-
-    # 6. Model forward pass
-    print("\n6. Model Forward Pass")
-    try:
-        obs = env.reset()
-        action, _ = model.predict(obs, deterministic=True)
-        print(f"   [PASS] Model produces valid actions: {action}")
-    except Exception as e:
-        print(f"   [FAIL] Model forward pass: {e}")
-
-    print("\n" + "=" * 50)
-
-# Usage
-env = make_vec_env("CartPole-v1", n_envs=1)
-model = PPO("MlpPolicy", env, verbose=0)
-pre_training_checklist(env, model)
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/reinforcement-learning/scripts/validate_env.py src.env:MyEnv     # API, spaces, NaNs, determinism
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/reinforcement-learning/scripts/pretrain_check.py src.env:MyEnv   # random baseline, scales, sparse rewards
 ```
+
+Run them from the project directory so `src.env:MyEnv` imports. Then confirm the model runs a forward pass on one observation (`model.predict(obs)`) before launching a long job.
 
 ---
 
@@ -202,9 +125,9 @@ def check_for_nan(model, name=""):
 
 | Cause | Diagnostic | Solution |
 |-------|------------|----------|
-| Exploding gradients | Large gradient norms | Reduce LR, increase max_grad_norm |
-| Large observations | Obs > 1000 | Normalize observations |
-| Large rewards | Reward > 1000 | Normalize rewards |
+| Exploding gradients | Large gradient norms | Reduce LR; tighten clipping by *lowering* `max_grad_norm` (e.g. 0.5 → 0.3) |
+| Large observations | \|obs\| > ~100 | Normalize observations (`VecNormalize`), except uint8 images |
+| Large rewards | \|reward\| > ~100 | Normalize or clip rewards |
 | Log of zero | In policy distribution | Add epsilon to probabilities |
 | Division by std~0 | In normalization | Add epsilon to denominator |
 
@@ -278,51 +201,18 @@ Diagnosis: Check LR, exploration, reward sparsity
 - **Low entropy**: Policy is deterministic, exploiting
 - **Zero entropy**: Policy collapse, stuck on single action
 
-### Monitoring Code
+### Monitoring Entropy
 
-```python
-from stable_baselines3.common.callbacks import BaseCallback
-
-class EntropyMonitorCallback(BaseCallback):
-    """Monitor policy entropy during training."""
-
-    def __init__(self, warning_threshold=0.1, verbose=0):
-        super().__init__(verbose)
-        self.warning_threshold = warning_threshold
-        self.entropies = []
-
-    def _on_step(self):
-        # For PPO, entropy is logged automatically
-        # Access via self.logger
-        if len(self.model.ep_info_buffer) > 0:
-            # Custom entropy calculation for inspection
-            if hasattr(self.model, 'policy'):
-                obs = self.training_env.reset()
-                with torch.no_grad():
-                    dist = self.model.policy.get_distribution(
-                        torch.tensor(obs).float()
-                    )
-                    entropy = dist.entropy().mean().item()
-                    self.entropies.append(entropy)
-
-                    if entropy < self.warning_threshold:
-                        print(f"WARNING: Low entropy ({entropy:.4f}) at step {self.num_timesteps}")
-
-        return True
-
-# Usage
-callback = EntropyMonitorCallback(warning_threshold=0.1)
-model.learn(total_timesteps=100_000, callback=callback)
-```
+You don't need a custom callback: PPO and A2C log `train/entropy_loss` to TensorBoard every update. It is the **negative** of the policy's mean entropy, so a healthy discrete policy shows a value like -0.7, and collapse shows as the value rising toward 0. Read entropy as `-entropy_loss` when comparing with the table below. For continuous (Gaussian) policies entropy can legitimately be negative, so watch the trend rather than a fixed threshold.
 
 ### Entropy Guidelines by Algorithm
 
-| Algorithm | Healthy Entropy Range | Concern Threshold |
+| Algorithm | Healthy entropy (= -entropy_loss) | Concern |
 |-----------|----------------------|-------------------|
-| PPO (discrete) | 0.3 - 2.0 | < 0.1 |
-| PPO (continuous) | 0.5 - 3.0 | < 0.2 |
-| SAC | Auto-tuned | If stuck at target |
-| A2C | 0.3 - 2.0 | < 0.1 |
+| PPO (discrete) | 0.3 - 2.0 | below ~0.1 early in training |
+| PPO (continuous) | depends on action dimension and scale | a steady fall toward its minimum before reward improves |
+| SAC | auto-tuned | `ent_coef` stuck near 0 or exploding |
+| A2C | 0.3 - 2.0 | below ~0.1 early in training |
 
 ---
 
@@ -468,7 +358,7 @@ model = SAC("MlpPolicy", env, tau=0.005)  # Slow target updates
 8. If NaN:
    ├─ Check observation/reward scale
    ├─ Reduce learning rate
-   └─ Increase gradient clipping
+   └─ Tighten gradient clipping (lower max_grad_norm)
 ```
 
 ### Minimal Reproducible Example
@@ -530,7 +420,7 @@ class DebugCallback(BaseCallback):
 | Metric | What It Shows | Warning Signs |
 |--------|---------------|---------------|
 | rollout/ep_rew_mean | Episode reward | Flat, declining |
-| train/entropy_loss | Policy randomness | Near 0 |
+| train/entropy_loss | Negative entropy (policy randomness) | Rising toward 0 early in training (collapse) |
 | train/policy_gradient_loss | Policy update magnitude | Very large/small |
 | train/value_loss | Value function error | Increasing |
 | train/explained_variance | Value function quality | Negative |

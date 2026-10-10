@@ -19,14 +19,11 @@ struct Experience {
     float reward;
     torch::Tensor next_state;
     bool done;
-
-    // Move constructor for efficiency
-    Experience(Experience&& other) noexcept = default;
-    Experience& operator=(Experience&& other) noexcept = default;
-
-    // Explicit copy (avoid accidental copies)
-    Experience(const Experience& other) = default;
-    Experience& operator=(const Experience& other) = default;
+    // No user-declared constructors: Experience stays a plain aggregate, so
+    // brace-initialization ({state, action, reward, next_state, done}) and
+    // default construction both work, and the compiler still generates
+    // efficient moves. (Declaring copy/move constructors would delete the
+    // default constructor and break aggregate initialization.)
 };
 
 class ReplayBuffer {
@@ -220,6 +217,7 @@ private:
 
 ```cpp
 #include <deque>
+#include <optional>
 
 class NStepBuffer {
 public:
@@ -362,6 +360,23 @@ void parallel_rollout(std::shared_ptr<DQNNet> main_model, int num_workers) {
 
 ## RAII Patterns
 
+### Reading CUDA memory from C++
+
+The C++ `torch::cuda` namespace only covers device count, availability, seeding and `synchronize()`. Memory statistics come from the CUDA caching allocator (`c10/cuda/CUDACachingAllocator.h`). These helpers are used by the snippets below:
+
+```cpp
+#include <c10/cuda/CUDACachingAllocator.h>
+
+inline size_t cuda_allocated_bytes(c10::DeviceIndex device = 0) {
+    // allocated_bytes[0] is the aggregate over all memory pools
+    return c10::cuda::CUDACachingAllocator::getDeviceStats(device).allocated_bytes[0].current;
+}
+inline size_t cuda_reserved_bytes(c10::DeviceIndex device = 0) {
+    return c10::cuda::CUDACachingAllocator::getDeviceStats(device).reserved_bytes[0].current;
+}
+inline void cuda_empty_cache() { c10::cuda::CUDACachingAllocator::emptyCache(); }
+```
+
 ### GPU Memory Guard
 
 ```cpp
@@ -371,7 +386,7 @@ public:
     GPUMemoryGuard() {
         // Record current memory usage
         if (torch::cuda::is_available()) {
-            initial_memory_ = torch::cuda::memory_allocated();
+            initial_memory_ = cuda_allocated_bytes();
         }
     }
 
@@ -380,13 +395,13 @@ public:
         if (torch::cuda::is_available()) {
             torch::cuda::synchronize();
             // Optional: empty cache
-            // torch::cuda::empty_cache();
+            // cuda_empty_cache();
         }
     }
 
     size_t memory_used() const {
         if (torch::cuda::is_available()) {
-            return torch::cuda::memory_allocated() - initial_memory_;
+            return cuda_allocated_bytes() - initial_memory_;
         }
         return 0;
     }
@@ -536,9 +551,9 @@ public:
 void log_memory_stats() {
     if (torch::cuda::is_available()) {
         std::cout << "Allocated: "
-                  << torch::cuda::memory_allocated() / (1024 * 1024) << " MB\n";
+                  << cuda_allocated_bytes() / (1024 * 1024) << " MB\n";
         std::cout << "Cached: "
-                  << torch::cuda::memory_reserved() / (1024 * 1024) << " MB\n";
+                  << cuda_reserved_bytes() / (1024 * 1024) << " MB\n";
     }
 }
 ```

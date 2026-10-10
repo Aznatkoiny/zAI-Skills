@@ -85,7 +85,7 @@ include(FetchContent)
 FetchContent_Declare(
     googletest
     GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG release-1.12.1
+    GIT_TAG v1.18.0   # check https://github.com/google/googletest/releases for the latest
 )
 FetchContent_MakeAvailable(googletest)
 
@@ -243,37 +243,26 @@ TEST_F(ReplayBufferTest, SampleContainsValidExperiences) {
 #include <gtest/gtest.h>
 #include "dqn_agent.h"
 
-TEST(DQNAgentTest, LossDecreases) {
+// Training on random data with a moving target makes "loss goes down" flaky.
+// Use a fixed batch of terminal transitions instead: the target is then just
+// the reward (no bootstrapping), so repeated updates must reduce the loss.
+TEST(DQNAgentTest, FitsFixedTerminalTargets) {
     SeedManager::set_global_seed(42);
 
     DQNAgent agent(4, 2);
-    ReplayBuffer buffer(1000);
-
-    // Fill buffer with random experiences
-    for (int i = 0; i < 500; ++i) {
-        buffer.push({
-            torch::randn({4}),
-            rand() % 2,
-            static_cast<float>(rand()) / RAND_MAX,
-            torch::randn({4}),
-            rand() % 10 == 0
-        });
+    std::vector<Experience> batch;
+    for (int i = 0; i < 32; ++i) {
+        batch.push_back({torch::randn({4}), i % 2, static_cast<float>(i % 3),
+                         torch::randn({4}), /*done=*/true});
     }
 
-    // Track loss over training
-    std::vector<float> losses;
-
-    for (int step = 0; step < 100; ++step) {
-        auto batch = buffer.sample(32);
-        float loss = agent.train_step(batch);
-        losses.push_back(loss);
+    float first_loss = agent.train_step(batch);
+    float last_loss = first_loss;
+    for (int step = 0; step < 200; ++step) {
+        last_loss = agent.train_step(batch);
     }
 
-    // Average loss should decrease
-    float early_avg = std::accumulate(losses.begin(), losses.begin() + 20, 0.0f) / 20;
-    float late_avg = std::accumulate(losses.end() - 20, losses.end(), 0.0f) / 20;
-
-    EXPECT_LT(late_avg, early_avg);
+    EXPECT_LT(last_loss, 0.5f * first_loss);
 }
 
 TEST(DQNAgentTest, TargetNetworkUpdates) {
@@ -428,6 +417,8 @@ public:
 
 ### Memory Leak Detection
 
+Uses the `cuda_allocated_bytes()` / `cuda_reserved_bytes()` helpers from `memory-management.md` (the `torch::cuda` namespace has no memory-statistics functions).
+
 ```cpp
 #include <iostream>
 
@@ -435,15 +426,15 @@ class MemoryTracker {
 public:
     static void start() {
         if (torch::cuda::is_available()) {
-            initial_allocated_ = torch::cuda::memory_allocated();
-            initial_reserved_ = torch::cuda::memory_reserved();
+            initial_allocated_ = cuda_allocated_bytes();
+            initial_reserved_ = cuda_reserved_bytes();
         }
     }
 
     static void check(const std::string& label) {
         if (torch::cuda::is_available()) {
-            size_t allocated = torch::cuda::memory_allocated();
-            size_t reserved = torch::cuda::memory_reserved();
+            size_t allocated = cuda_allocated_bytes();
+            size_t reserved = cuda_reserved_bytes();
 
             std::cout << "=== Memory: " << label << " ===\n";
             std::cout << "Allocated: " << (allocated - initial_allocated_) / 1e6
@@ -457,7 +448,7 @@ public:
         if (torch::cuda::is_available()) {
             torch::cuda::synchronize();
 
-            size_t current = torch::cuda::memory_allocated();
+            size_t current = cuda_allocated_bytes();
             size_t diff = current > initial_allocated_ ?
                          current - initial_allocated_ : 0;
 

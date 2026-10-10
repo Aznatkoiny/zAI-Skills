@@ -1,218 +1,142 @@
 ---
 name: reinforcement-learning
-description: |
-  Reinforcement Learning best practices for Python using modern libraries (Stable-Baselines3, RLlib, Gymnasium).
-  Use when:
-  - Implementing RL algorithms (PPO, SAC, DQN, TD3, A2C)
-  - Creating custom Gymnasium environments
-  - Training, debugging, or evaluating RL agents
-  - Setting up hyperparameter tuning for RL
-  - Deploying RL models to production
+description: Reinforcement learning in Python with Gymnasium and Stable-Baselines3 (PPO, SAC, DQN, TD3, A2C). Use when the user is building a custom Gymnasium environment, choosing an algorithm, training or tuning an agent, debugging an agent that won't learn (flat reward, collapse, NaNs), evaluating a policy, or exporting one to ONNX. Includes runnable scripts that validate an environment, sanity-check it before training, and write an evaluation report. Not for RL in C++/libtorch (use cpp-reinforcement-learning), RLHF or LLM post-training (GRPO, DPO), or supervised deep learning (use deep-learning).
 ---
 
-# Reinforcement Learning Best Practices
+# Reinforcement learning (Python)
 
-## Overview
+Help the user get an agent that actually learns, and show that it did. Most RL failures come from the environment and the setup (observation scale, reward design, termination flags, evaluation mistakes) rather than from the algorithm, so check those before reaching for exotic fixes.
 
-This skill provides comprehensive guidance for implementing reinforcement learning in Python using the modern ecosystem (Gymnasium >= 1.0, Stable-Baselines3 >= 2.x). Gymnasium has replaced OpenAI Gym as the standard environment interface. Stable-Baselines3 (SB3) is recommended for prototyping, RLlib for production/distributed training, and CleanRL for research.
+The ecosystem moves: Gymnasium 1.x replaced OpenAI Gym, and SB3 changes defaults between releases. Before writing code against a specific API, check what the user has installed (`pip show gymnasium stable-baselines3`) and match it. If a web or docs tool is available, look up any API you're unsure of rather than relying on the snippets here. Current as of October 2026: Gymnasium 1.4, Stable-Baselines3 2.9 (Gymnasium 1.x support needs SB3 2.4 or later).
 
-## When to Use
+## Choosing a library and algorithm
 
-- Building RL agents for discrete or continuous control tasks
-- Creating custom simulation environments
-- Tuning hyperparameters for RL algorithms
-- Debugging training issues (reward curves, policy collapse, numerical instability)
-- Deploying trained policies to production
+Stable-Baselines3 is the default here: reliable implementations, good defaults, and the bundled scripts target it. CleanRL suits users who want to read and modify a single-file implementation; TorchRL suits custom research algorithms. For distributed training at scale, Ray RLlib is the usual choice, but this skill doesn't cover it.
 
-## Library Selection
+| Situation | Start with | Why |
+|---|---|---|
+| Discrete actions, getting started | PPO | Stable with default settings |
+| Discrete actions, environment steps are expensive | DQN | Off-policy, reuses experience |
+| Continuous control | SAC (or TD3) | Sample-efficient; SAC tunes its own exploration |
+| Image observations | PPO with `CnnPolicy` | Handles pixels well |
+| Need fast iterations on a simple task | A2C | Simple, quick updates |
 
-| Library | Best For | Ease | Flexibility | Production |
-|---------|----------|------|-------------|------------|
-| Stable-Baselines3 | Prototyping, learning | High | Medium | Good |
-| RLlib | Production, distributed | Medium | High | Excellent |
-| CleanRL | Research, understanding | High | Low | Poor |
-| TorchRL | Custom implementations | Low | Highest | Good |
+SB3's DQN is the vanilla algorithm; it has no Double or Dueling options. If the user needs those, they need a custom policy or `sb3-contrib` (which has QR-DQN).
 
-## Algorithm Decision Tree
-
-```
-Start
-  |
-  v
-Action space type?
-  |
-  +-- Discrete --> Sample efficiency critical?
-  |                  |
-  |                  +-- Yes --> DQN (or Double/Dueling DQN)
-  |                  +-- No  --> Stability critical?
-  |                               |
-  |                               +-- Yes --> PPO
-  |                               +-- No  --> A2C (faster iterations)
-  |
-  +-- Continuous --> Sample efficiency critical?
-                       |
-                       +-- Yes --> SAC (auto entropy) or TD3
-                       +-- No  --> PPO (more stable, less efficient)
-```
-
-**Quick Selection Table:**
-
-| Scenario | Recommended | Why |
-|----------|-------------|-----|
-| Discrete actions, getting started | PPO | Stable, good defaults |
-| Continuous control | SAC or TD3 | Sample efficient, handles continuous well |
-| Sample efficiency critical | SAC, DQN | Off-policy, reuses experience |
-| Stability critical | PPO | Trust region, consistent |
-| High-dimensional obs (images) | PPO + CNN | Handles visual input well |
-| Fast iteration needed | A2C | Simpler, faster per update |
-
-## Quick Start with Stable-Baselines3
-
-### Basic Training
+## Quick start
 
 ```python
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.evaluation import evaluate_policy
 
-# Create vectorized environment (4 parallel envs)
-env = make_vec_env("CartPole-v1", n_envs=4)
-
-# Initialize and train
-model = PPO("MlpPolicy", env, verbose=1)
+train_env = make_vec_env("CartPole-v1", n_envs=4, seed=0)
+model = PPO("MlpPolicy", train_env, verbose=1, seed=0)
 model.learn(total_timesteps=100_000)
-
-# Save and load
 model.save("ppo_cartpole")
-loaded_model = PPO.load("ppo_cartpole")
 
-# Evaluate
-obs = env.reset()
-for _ in range(1000):
-    action, _ = loaded_model.predict(obs, deterministic=True)
-    obs, reward, done, info = env.step(action)
+eval_env = make_vec_env("CartPole-v1", n_envs=1, seed=123)   # separate env for evaluation
+mean, std = evaluate_policy(model, eval_env, n_eval_episodes=20, deterministic=True)
+print(f"{mean:.1f} +/- {std:.1f}")
 ```
 
-### Custom Environment Template
+## Custom environment template
 
 ```python
 import gymnasium as gym
-from gymnasium import spaces
 import numpy as np
+from gymnasium import spaces
 
 class CustomEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"]}
 
     def __init__(self, render_mode=None):
         super().__init__()
-        self.observation_space = spaces.Box(
-            low=-np.inf, high=np.inf, shape=(4,), dtype=np.float32
-        )
+        self.observation_space = spaces.Box(low=-1.0, high=1.0, shape=(4,), dtype=np.float32)
         self.action_space = spaces.Discrete(2)
         self.render_mode = render_mode
 
     def reset(self, seed=None, options=None):
-        super().reset(seed=seed)
-        self.state = self.np_random.uniform(low=-0.05, high=0.05, size=(4,))
-        return self.state.astype(np.float32), {}
+        super().reset(seed=seed)                      # seeds self.np_random
+        self.state = self.np_random.uniform(-0.05, 0.05, size=(4,)).astype(np.float32)
+        self.steps = 0
+        return self.state, {}
 
     def step(self, action):
-        # Implement environment dynamics here
-        observation = self.state.astype(np.float32)
-        reward = 1.0
-        terminated = False  # Episode ended due to task completion/failure
-        truncated = False   # Episode ended due to time limit
-        info = {}
-        return observation, reward, terminated, truncated, info
-
-    def render(self):
-        pass
+        self.steps += 1
+        # update self.state from the action here
+        reward = 0.0
+        terminated = False                # the task ended (success or failure)
+        truncated = self.steps >= 500     # a time limit cut the episode short
+        return self.state, reward, terminated, truncated, {}
 ```
 
-### Hyperparameter Tuning with Optuna
+Keep `terminated` and `truncated` distinct: algorithms bootstrap the value of a truncated state but not a terminated one, and mixing them up quietly biases learning. Give every environment a time limit, or evaluation can loop forever.
+
+## The workflow, with the bundled scripts
+
+The scripts live in this skill's `scripts/` folder, which after install is `${CLAUDE_PLUGIN_ROOT}/skills/reinforcement-learning/scripts/`. Run them from the user's project directory so a `module.path:EnvClass` spec such as `src.env:MyEnv` can be imported (the scripts add the current directory to the import path). Each also accepts a registered id such as `CartPole-v1`.
+
+1. **Validate the environment** after creating or changing it: `python3 …/validate_env.py src.env:MyEnv`. It checks Gymnasium API compliance, spaces, NaNs, determinism and termination, and exits nonzero on failure (usable in CI).
+2. **Sanity-check before training:** `python3 …/pretrain_check.py src.env:MyEnv`. It reports a random-policy baseline and warns about observation and reward scales, sparse rewards, and termination patterns. The trained agent has to beat this baseline clearly.
+3. **Train simply first:** default hyperparameters, a short run, TensorBoard on (`tensorboard_log="runs/"`). Save the VecNormalize statistics alongside the model if you normalize (`env.save("models/vecnormalize.pkl")`).
+4. **Debug** with `references/debugging.md` if learning stalls.
+5. **Tune** with Optuna once a baseline works (below).
+6. **Evaluate:** `python3 …/eval_report.py src.env:MyEnv --model models/best.zip --algo ppo --vecnormalize models/vecnormalize.pkl`. Pass `--vecnormalize` whenever training used VecNormalize: without the statistics the agent sees unnormalized inputs and scores like a random policy, which looks exactly like "it learned nothing". It writes a Markdown report (to `--output`, default `eval_report.md`).
+7. **Export** for deployment: `references/deployment.md` (ONNX is the main path).
+
+## Tuning with Optuna
 
 ```python
 import optuna
 from stable_baselines3 import PPO
+from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.evaluation import evaluate_policy
 
 def objective(trial):
-    learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-3, log=True)
-    n_steps = trial.suggest_categorical("n_steps", [256, 512, 1024, 2048])
-    gamma = trial.suggest_float("gamma", 0.9, 0.9999)
-
-    model = PPO(
-        "MlpPolicy", "CartPole-v1",
-        learning_rate=learning_rate,
-        n_steps=n_steps,
-        gamma=gamma,
-        verbose=0
-    )
+    params = {
+        "learning_rate": trial.suggest_float("learning_rate", 1e-5, 1e-3, log=True),
+        "n_steps": trial.suggest_categorical("n_steps", [256, 512, 1024, 2048]),
+        "gamma": trial.suggest_float("gamma", 0.9, 0.9999),
+    }
+    model = PPO("MlpPolicy", make_vec_env("CartPole-v1", n_envs=4, seed=trial.number), verbose=0, **params)
     model.learn(total_timesteps=50_000)
-
-    mean_reward, _ = evaluate_policy(model, model.get_env(), n_eval_episodes=10)
+    # Score on a separate env: scoring on the training env rewards overfitting to it.
+    eval_env = make_vec_env("CartPole-v1", n_envs=1, seed=10_000 + trial.number)
+    mean_reward, _ = evaluate_policy(model, eval_env, n_eval_episodes=10, deterministic=True)
     return mean_reward
 
 study = optuna.create_study(direction="maximize")
 study.optimize(objective, n_trials=50)
-print(f"Best params: {study.best_params}")
+print(study.best_params)
 ```
 
-## Core Workflow
+If training uses VecNormalize, evaluate with a VecNormalize-wrapped eval env that loads the training statistics with `training=False` and `norm_reward=False`. For pruning of bad trials, see `references/training.md`.
 
-1. **Define the environment** - Use Gymnasium API
-2. **Validate the environment** - Run `python scripts/validate_env.py <env>` (API compliance, spaces, determinism, NaN guards)
-3. **Select algorithm** - Based on action space and requirements
-4. **Pre-training sanity check** - Run `python scripts/pretrain_check.py <env>` (random-policy baseline, distribution stats, actionable warnings)
-5. **Start simple** - Default hyperparameters, short training
-6. **Monitor training** - TensorBoard, check reward curves
-7. **Debug issues** - Use the debugging playbook
-8. **Tune hyperparameters** - Optuna for systematic search
-9. **Evaluate properly** - Run `python scripts/eval_report.py <env> --model <model.zip>` (separate eval env, per-episode success tracking, Markdown report)
-10. **Deploy** - Export to ONNX/TorchScript
+## Pitfalls worth checking first
 
-## Bundled Scripts (run these instead of re-deriving snippets)
+1. **Observation scale.** Vector observations on very different scales slow or stop learning; wrap with `VecNormalize`. The exception is image observations (uint8 pixels): `CnnPolicy` scales them to [0, 1] itself, and normalizing pixels with running statistics hurts.
+2. **Learning rate.** Start from SB3's default for the algorithm (they differ: DQN 1e-4, PPO and SAC 3e-4, TD3 1e-3) and change one thing at a time.
+3. **Sparse rewards.** Prefer potential-based shaping, a curriculum, or HER for goal-based tasks. Naive intermediate rewards are a common cause of reward hacking, where the agent maximizes the bonus instead of solving the task.
+4. **Evaluating on the training env**, or without the VecNormalize statistics (see step 6).
+5. **Seeds.** Set them for reproducibility, and compare algorithms or settings across several seeds; single runs are noisy.
+6. **Entropy collapse** in PPO/A2C. SB3 logs `train/entropy_loss`, which is the *negative* of the policy's entropy, so collapse shows as `entropy_loss` rising toward 0.
 
-The validation and evaluation patterns from the reference files are packaged as
-runnable, self-contained CLIs in `scripts/`. Run them directly rather than
-re-implementing the inline snippets:
+## Reference files
 
-| Script | When to run | Usage |
-|--------|-------------|-------|
-| `scripts/validate_env.py` | After defining or changing an environment, before any training | `python scripts/validate_env.py CartPole-v1` or `python scripts/validate_env.py my_pkg.envs:CustomEnv` |
-| `scripts/pretrain_check.py` | After validation passes, before launching training | `python scripts/pretrain_check.py CartPole-v1 --episodes 20` |
-| `scripts/eval_report.py` | After training, to produce a Markdown evaluation report | `python scripts/eval_report.py CartPole-v1 --model ppo_cartpole.zip --algo ppo --episodes 100 --output eval_report.md` |
+- `references/algorithms.md`: DQN, PPO, SAC, A2C, TD3 in depth, with SB3 defaults
+- `references/environments.md`: Gymnasium setup, custom environments, wrappers, Atari and MuJoCo
+- `references/training.md`: hyperparameters, reward design, normalization, callbacks
+- `references/debugging.md`: symptoms and fixes for agents that don't learn
+- `references/evaluation.md`: metrics, logging, reproducibility
+- `references/deployment.md`: ONNX export, `torch.export`, quantization, inference safety
 
-All three accept either a registered Gymnasium id (`CartPole-v1`) or a
-`module.path:EnvClass` spec for unregistered custom environments. `validate_env.py`
-exits nonzero on any failed check, so it works as a CI gate. `eval_report.py`
-without `--model` evaluates a random policy - useful as a baseline and for
-testing the report pipeline.
-
-## Reference Files
-
-- [algorithms.md](references/algorithms.md) - Deep dive on DQN, PPO, SAC, A2C, TD3
-- [environments.md](references/environments.md) - Gymnasium setup, custom envs, wrappers
-- [training.md](references/training.md) - Hyperparameters, reward engineering, normalization
-- [debugging.md](references/debugging.md) - Failure modes, diagnostics, sanity checks
-- [evaluation.md](references/evaluation.md) - Metrics, logging, reproducibility
-- [deployment.md](references/deployment.md) - ONNX export, inference optimization, safety
-
-## Essential Dependencies
+## Installing
 
 ```bash
-pip install gymnasium stable-baselines3 tensorboard optuna
-# For Atari environments
-pip install gymnasium[atari] gymnasium[accept-rom-license]
-# For MuJoCo
-pip install gymnasium[mujoco]
+pip install "stable-baselines3[extra]>=2.4" "gymnasium>=1.0" optuna   # [extra] adds TensorBoard, progress bars, Atari wrappers
+pip install "gymnasium[atari]"     # Atari: ROMs ship with ale-py now; call gym.register_envs(ale_py) after import ale_py
+pip install "gymnasium[mujoco]"    # MuJoCo
 ```
 
-## Common Pitfalls to Avoid
-
-1. **Not normalizing observations** - Use `VecNormalize` wrapper
-2. **Wrong action space handling** - Check discrete vs continuous
-3. **Ignoring seed management** - Set seeds for reproducibility
-4. **Training and eval on same env** - Use separate eval environment
-5. **Not monitoring entropy** - Low entropy = policy collapse
-6. **Sparse rewards without shaping** - Add intermediate rewards
-7. **Too large/small learning rate** - Start with 3e-4 for most algorithms
+Use a project virtual environment (`python3 -m venv .venv` or `uv venv`) rather than the system Python.

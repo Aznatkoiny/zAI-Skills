@@ -1,29 +1,13 @@
 ---
 name: cpp-reinforcement-learning
-description: |
-  C++ Reinforcement Learning best practices using libtorch (PyTorch C++ frontend) and modern C++17/20.
-  Use when:
-  - Implementing RL algorithms in C++ for performance-critical applications
-  - Building production RL systems with libtorch
-  - Creating replay buffers and experience storage
-  - Optimizing RL training with GPU acceleration
-  - Deploying RL models with ONNX Runtime
+description: Reinforcement learning in C++ with LibTorch (the PyTorch C++ frontend) and C++20. Use when the user is implementing DQN, PPO or SAC in C++, building a replay buffer or rollout buffer in C++, fixing libtorch memory growth or GPU issues in a C++ agent, running environments in parallel threads, or loading a policy trained in Python into a C++ program (games, robotics, simulators). Not for Python RL with Gymnasium or Stable-Baselines3, including exporting a Python policy to ONNX (use reinforcement-learning), or for general deep learning (use deep-learning).
 ---
 
-# C++ Reinforcement Learning
+# C++ reinforcement learning
 
-## Overview
+Help the user build RL in C++ that is correct first and fast second. The C++ frontend mirrors PyTorch's Python API closely, so a good approach is often to get the algorithm right against a Python reference (Stable-Baselines3 or CleanRL) and then translate it, checking the outputs match.
 
-This skill covers implementing reinforcement learning algorithms in C++ using LibTorch (PyTorch C++ frontend) and modern C++17/20 features. It provides patterns for building high-performance RL systems suitable for production deployment, robotics, game AI, and real-time applications.
-
-## When to Use
-
-- Implementing DQN, PPO, SAC, or other RL algorithms in C++
-- Building performance-critical RL training pipelines
-- Creating efficient replay buffers with proper memory management
-- Deploying trained models with ONNX Runtime
-- Parallelizing environment rollouts across threads
-- Integrating RL with existing C++ codebases (games, robotics, simulations)
+LibTorch changes between releases, and current versions require C++20. Check the version the user builds against (it's in `<libtorch>/build-version`) before relying on an API, and if a docs or web tool is available, look up anything you're unsure of.
 
 ## Core Libraries
 
@@ -38,18 +22,18 @@ LibTorch provides the same tensor operations and autograd capabilities as PyTorc
 cmake_minimum_required(VERSION 3.18)
 project(rl_project)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)   # current libtorch requires C++20
 find_package(Torch REQUIRED)
 
 add_executable(train_agent src/main.cpp)
 target_link_libraries(train_agent "${TORCH_LIBRARIES}")
 ```
 
-### Secondary Libraries
+### Other pieces
 
-- **ONNX Runtime** - Cross-platform inference deployment
-- **cpprl** (mhubii/cpprl) - Reference PPO implementation
-- **Gymnasium C++ bindings** - Environment interfaces
+- **ONNX Runtime**: cross-platform inference for policies exported from Python
+- **AOTInductor (`.pt2` packages)**: the current way to run a Python-exported PyTorch model from C++; TorchScript is deprecated (see `references/libtorch.md`)
+- **Environments**: there's no standard C++ Gymnasium; most projects wrap their own simulator behind a small `reset()`/`step()` interface
 
 ## Quick Start: DQN Agent
 

@@ -116,10 +116,10 @@ final_predictions = np.argmax(predictions, axis=1)
 Use 16-bit floats for faster training on modern GPUs (Volta/Turing or newer):
 
 ```python
-from tensorflow import keras
+import keras
 
-# Enable mixed precision globally
-keras.mixed_precision.set_global_policy("mixed_float16")
+# Enable mixed precision globally (works on every backend)
+keras.config.set_dtype_policy("mixed_float16")
 
 # Build and train model as usual
 model = build_model()
@@ -130,11 +130,20 @@ model.fit(x_train, y_train, epochs=10)
 ```
 
 **Benefits**:
-- 2-3x training speedup on supported GPUs
+- Often a large speedup on GPUs with tensor cores (measure on your model)
 - Lower memory usage (can use larger batch sizes)
 - Minimal accuracy loss
 
 ## Multi-GPU Training
+
+How you spread training over several devices depends on the backend. With JAX, use Keras's own distribution API (`keras.distribution.DataParallel`, `ModelParallel`); check keras.io's distribution guide for which backends it currently supports. The `tf.distribute` strategies below are **TensorFlow-backend only**.
+
+```python
+# JAX backend: data parallelism across all local devices
+import keras
+keras.distribution.set_distribution(keras.distribution.DataParallel(devices=keras.distribution.list_devices()))
+model = build_model()   # build and compile after setting the distribution
+```
 
 ### Single Machine, Multiple GPUs
 ```python
@@ -164,6 +173,8 @@ with strategy.scope():
 ```
 
 ## TPU Training
+
+(TensorFlow backend; JAX also runs on TPUs with `keras.distribution`.)
 
 ### Using TPU on Google Colab
 ```python
@@ -202,13 +213,15 @@ def train_multiple_steps(iterator, steps):
 
 ## Data Pipeline Optimization
 
+`tf.data` (needs TensorFlow installed, works with any backend), a PyTorch `DataLoader`, or `keras.utils.PyDataset` can all feed `model.fit()` on any backend.
+
 ```python
-# Optimal data pipeline
+# Optimal data pipeline: cache raw examples first, prefetch last
 dataset = tf.data.Dataset.from_tensor_slices((x, y))
-dataset = dataset.shuffle(buffer_size=10000)
+dataset = dataset.cache()                     # if it fits in memory
+dataset = dataset.shuffle(buffer_size=10000)  # reshuffled every epoch
 dataset = dataset.batch(batch_size)
-dataset = dataset.prefetch(tf.data.AUTOTUNE)  # Overlap loading with training
-dataset = dataset.cache()  # Cache after first epoch (if fits in memory)
+dataset = dataset.prefetch(tf.data.AUTOTUNE)  # overlap loading with training
 ```
 
 For large datasets:

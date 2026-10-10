@@ -1,7 +1,7 @@
 {
   "name": "ai-toolkit",
-  "version": "2.4.0",
-  "description": "Skills for Deep Learning (Keras 3), Reinforcement Learning (Python & C++), Claude Prompt Optimization, x402 Web3 Payments, and OpenClaw Setup.",
+  "version": "2.5.0",
+  "description": "Skills, commands and agents for AI developers: prompt engineering for current Claude models, reinforcement learning in Python and C++, Keras 3 deep learning, x402 pay-per-request payments, and OpenClaw setup and security.",
   "author": {
     "name": "Antony Zaki"
   },
@@ -9,15 +9,15 @@
   "repository": "https://github.com/Aznatkoiny/zAI-Skills",
   "license": "MIT",
   "keywords": [
-    "deep-learning",
-    "reinforcement-learning",
     "prompt-engineering",
-    "x402",
+    "claude",
+    "reinforcement-learning",
+    "deep-learning",
     "keras",
-    "pytorch",
+    "stable-baselines3",
     "gymnasium",
-    "web3",
-    "machine-learning",
+    "libtorch",
+    "x402",
     "openclaw"
   ]
 }

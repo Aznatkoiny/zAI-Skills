@@ -119,6 +119,21 @@ def load_json(path: Path):
     return None
 
 
+def lenient_frontmatter(block: str):
+    data: dict = {}
+    key = None
+    for line in block.splitlines():
+        m = re.match(r"^([A-Za-z][\w-]*):\s?(.*)$", line)
+        if m:
+            key = m.group(1)
+            data[key] = m.group(2).strip()
+        elif line.strip() and key is not None and line.startswith((" ", "\t")):
+            data[key] = f"{data[key]} {line.strip()}".strip()
+        elif line.strip():
+            return None
+    return data or None
+
+
 def parse_frontmatter(path: Path):
     """Return (frontmatter_dict | None, error | None) for a markdown file."""
     text = path.read_text(encoding="utf-8")
@@ -130,7 +145,12 @@ def parse_frontmatter(path: Path):
     try:
         data = yaml.safe_load(match.group(1))
     except yaml.YAMLError as exc:
-        return None, f"frontmatter is not valid YAML — {exc}"
+        # Claude Code also accepts simple `key: value` lines whose value contains
+        # ": " without quotes (strict YAML rejects them). Accept that form too,
+        # but only when every line is a top-level key or a continuation.
+        data = lenient_frontmatter(match.group(1))
+        if data is None:
+            return None, f"frontmatter is not valid YAML — {exc}"
     if not isinstance(data, dict):
         return None, "frontmatter is not a YAML mapping"
     return data, None

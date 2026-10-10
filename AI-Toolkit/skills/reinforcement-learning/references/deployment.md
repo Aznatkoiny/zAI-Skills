@@ -8,129 +8,59 @@ Deploying RL models to production requires careful attention to model export, in
 
 ### ONNX Export
 
-ONNX (Open Neural Network Exchange) enables deployment across different frameworks and platforms.
+ONNX is the most portable target (ONNX Runtime runs on servers, edge devices, browsers, and from C++). This follows SB3's export guide. Two things matter: wrap the policy so it acts **deterministically** (calling `model.policy` directly samples random actions), and remember observation normalization isn't part of the network.
 
 ```python
-import torch
-import numpy as np
+import torch as th
 from stable_baselines3 import PPO
 
-# Train model
-model = PPO("MlpPolicy", "CartPole-v1")
-model.learn(total_timesteps=50_000)
+class OnnxableSB3Policy(th.nn.Module):
+    def __init__(self, policy):
+        super().__init__()
+        self.policy = policy
 
-# Export to ONNX
-def export_to_onnx(model, onnx_path, env):
-    """Export SB3 model to ONNX format."""
+    def forward(self, observation: th.Tensor):
+        # Includes SB3's observation preprocessing; returns (actions, values, log_prob) for PPO.
+        return self.policy(observation, deterministic=True)
 
-    # Get a sample observation
-    obs = env.observation_space.sample()
-    obs_tensor = torch.tensor(obs).float().unsqueeze(0)
+model = PPO.load("models/best.zip", device="cpu")
+onnx_policy = OnnxableSB3Policy(model.policy).eval()
+dummy = th.randn(1, *model.observation_space.shape)
 
-    # Export the policy network
-    torch.onnx.export(
-        model.policy,
-        obs_tensor,
-        onnx_path,
-        export_params=True,
-        opset_version=11,
-        do_constant_folding=True,
-        input_names=['observation'],
-        output_names=['action', 'value', 'log_prob'],
-        dynamic_axes={
-            'observation': {0: 'batch_size'},
-            'action': {0: 'batch_size'},
-            'value': {0: 'batch_size'},
-            'log_prob': {0: 'batch_size'}
-        }
-    )
-    print(f"Model exported to {onnx_path}")
-
-export_to_onnx(model, "policy.onnx", model.get_env())
-
-# Verify ONNX model
-import onnx
-onnx_model = onnx.load("policy.onnx")
-onnx.checker.check_model(onnx_model)
+# torch.distributions validates its arguments with data-dependent checks that
+# torch.export can't trace; turn validation off for the export.
+th.distributions.Distribution.set_default_validate_args(False)
+th.onnx.export(onnx_policy, (dummy,), "policy.onnx", input_names=["observation"])
 ```
+
+Tested with PyTorch 2.14 and SB3 2.9 (October 2026): the exported PPO policy matched `model.predict(deterministic=True)` on 200 of 200 observations. Notes:
+- Recent PyTorch (2.9+) uses the `dynamo` exporter by default (it needs `pip install onnx onnxscript`). Leave `opset_version` unset unless the runtime needs a specific one; `dynamic_axes` is deprecated in favor of `dynamic_shapes`.
+- If you plan to quantize with ONNX Runtime (below), export with the legacy exporter instead, `th.onnx.export(..., dynamo=False)`: ONNX Runtime's quantizer rejected the dynamo-exported graph in testing, while the legacy export quantized cleanly.
+- For SAC/TD3, export only the actor: `self.actor(observation, deterministic=True)`.
+- Continuous actions come out in the policy's normalized range; clip or unscale them to the action space yourself, as SB3's `predict()` does.
+- If training used VecNormalize, apply the same normalization before inference: save `obs_rms.mean`, `obs_rms.var` and `epsilon` from the loaded VecNormalize, and compute `clip((obs - mean) / sqrt(var + eps), -clip_obs, clip_obs)`.
+- Image policies expect channel-first input.
 
 ### ONNX Inference
 
 ```python
-import onnxruntime as ort
 import numpy as np
+import onnxruntime as ort
 
-class ONNXPolicy:
-    """Wrapper for ONNX model inference."""
+session = ort.InferenceSession("policy.onnx")
+input_name = session.get_inputs()[0].name
 
-    def __init__(self, onnx_path):
-        self.session = ort.InferenceSession(onnx_path)
-        self.input_name = self.session.get_inputs()[0].name
-
-    def predict(self, observation):
-        """Get action from observation."""
-        if isinstance(observation, np.ndarray):
-            obs = observation.astype(np.float32)
-        else:
-            obs = np.array(observation, dtype=np.float32)
-
-        if obs.ndim == 1:
-            obs = obs.reshape(1, -1)
-
-        outputs = self.session.run(None, {self.input_name: obs})
-        action = outputs[0]  # First output is action
-
-        return action[0]  # Remove batch dimension
-
-# Usage
-policy = ONNXPolicy("policy.onnx")
-obs = env.reset()[0]
-action = policy.predict(obs)
+def act(observation: np.ndarray) -> np.ndarray:
+    obs = np.asarray(observation, dtype=np.float32)[None, ...]   # add batch dimension
+    actions, values, log_prob = session.run(None, {input_name: obs})
+    return actions[0]
 ```
 
-### TorchScript Export
+Check the exported model against the original before shipping: for a few hundred observations, `act(obs)` should match `model.predict(obs, deterministic=True)[0]`.
 
-For PyTorch-native deployment:
+### PyTorch-native export (`torch.export`)
 
-```python
-import torch
-from stable_baselines3 import PPO
-
-model = PPO.load("trained_model")
-
-class TorchScriptPolicy(torch.nn.Module):
-    """Wrapper for TorchScript export."""
-
-    def __init__(self, policy):
-        super().__init__()
-        self.features_extractor = policy.features_extractor
-        self.mlp_extractor = policy.mlp_extractor
-        self.action_net = policy.action_net
-
-    def forward(self, obs):
-        features = self.features_extractor(obs)
-        latent_pi, _ = self.mlp_extractor(features)
-        return self.action_net(latent_pi)
-
-# Create wrapper and trace
-wrapper = TorchScriptPolicy(model.policy)
-wrapper.eval()
-
-# Trace with example input
-example_obs = torch.randn(1, model.observation_space.shape[0])
-traced = torch.jit.trace(wrapper, example_obs)
-
-# Save
-traced.save("policy_traced.pt")
-
-# Load and use
-loaded = torch.jit.load("policy_traced.pt")
-loaded.eval()
-
-with torch.no_grad():
-    action_logits = loaded(example_obs)
-    action = torch.argmax(action_logits, dim=1)
-```
+TorchScript (`torch.jit.trace` / `torch.jit.script`) is deprecated in current PyTorch, which warns to move to `torch.export`. For a PyTorch-native artifact, export the same wrapper with `torch.export.export(onnx_policy, (dummy,))`, and for C++ deployment compile it with AOTInductor (`torch._inductor.aoti_compile_and_package(exported, package_path="policy.pt2")`), then load the `.pt2` from C++ (see the cpp-reinforcement-learning skill). These APIs are still evolving; check the PyTorch docs for the installed version.
 
 ---
 
@@ -235,37 +165,21 @@ class GPUPolicy:
 
 ### Quantization
 
+Quantization shrinks a policy and can speed up CPU inference; the networks are small, so measure before assuming it helps. The old `torch.quantization.quantize_dynamic` API is deprecated (PyTorch is moving it to the `torchao` package). Two current options:
+
 ```python
-import torch
+# 1) ONNX Runtime dynamic quantization (export with dynamo=False first; see the ONNX notes)
+from onnxruntime.quantization import quantize_dynamic, QuantType
+from onnxruntime.quantization.shape_inference import quant_pre_process
+quant_pre_process("policy.onnx", "policy.pre.onnx", skip_symbolic_shape=True)
+quantize_dynamic("policy.pre.onnx", "policy.int8.onnx", weight_type=QuantType.QInt8)
 
-def quantize_policy(model_path, output_path):
-    """Quantize model for faster CPU inference."""
-
-    model = PPO.load(model_path)
-    policy = model.policy
-    policy.eval()
-
-    # Dynamic quantization (for CPU)
-    quantized_policy = torch.quantization.quantize_dynamic(
-        policy,
-        {torch.nn.Linear},  # Quantize linear layers
-        dtype=torch.qint8
-    )
-
-    # Save quantized model
-    torch.save(quantized_policy.state_dict(), output_path)
-
-    # Compare size
-    import os
-    original_size = os.path.getsize(model_path + ".zip")
-    quantized_size = os.path.getsize(output_path)
-    print(f"Original size: {original_size / 1024:.1f} KB")
-    print(f"Quantized size: {quantized_size / 1024:.1f} KB")
-    print(f"Compression: {original_size / quantized_size:.1f}x")
-
-    return quantized_policy
+# 2) torchao, for PyTorch-native deployment (pip install torchao)
+from torchao.quantization import quantize_, Int8DynamicActivationInt8WeightConfig
+quantize_(onnx_policy, Int8DynamicActivationInt8WeightConfig())   # API names as of torchao 0.18; check its docs
 ```
 
+Re-run the comparison against the original policy after quantizing; small value or action shifts can change behavior in sensitive tasks.
 ---
 
 ## Production Monitoring
