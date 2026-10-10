@@ -1,12 +1,15 @@
 {
   "job-intelligence": {
     "command": "node",
-    "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-servers/job-intelligence/dist/index.cjs"],
+    "args": [
+      "${CLAUDE_PLUGIN_ROOT}/mcp-servers/job-intelligence/dist/index.cjs"
+    ],
     "env": {
       "ADZUNA_APP_ID": "${ADZUNA_APP_ID:-}",
       "ADZUNA_APP_KEY": "${ADZUNA_APP_KEY:-}",
       "USAJOBS_API_KEY": "${USAJOBS_API_KEY:-}",
-      "USAJOBS_EMAIL": "${USAJOBS_EMAIL:-}"
+      "USAJOBS_EMAIL": "${USAJOBS_EMAIL:-}",
+      "JOB_INTEL_ENABLE_SCRAPERS": "${JOB_INTEL_ENABLE_SCRAPERS:-}"
     }
   }
 }

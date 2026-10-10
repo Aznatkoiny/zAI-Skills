@@ -1,7 +1,9 @@
 /**
- * job_get_salary_data — aggregates Glassdoor and Levels.fyi (both scraper
- * tier, cached 24h). Each source degrades independently and the response
- * ends with an honest Sources footer.
+ * job_get_salary_data — Levels.fyi total compensation (markdown routes, on by
+ * default) plus Glassdoor base pay (HTML scraper, only when
+ * JOB_INTEL_ENABLE_SCRAPERS=1). The two measure different things (total comp
+ * vs base pay), so summary statistics are reported per source, never mixed.
+ * Cached 24h; the response ends with an honest Sources footer.
  */
 
 import { z } from "zod";
@@ -27,7 +29,7 @@ export async function handleSalaryData(input: SalaryDataInput): Promise<string> 
   // Query both sources in parallel — services never throw; failures land in meta.
   const [glassdoor, levels] = await Promise.all([
     getGlassdoorSalaries(role, company),
-    getLevelsSalaryData(role, company, location),
+    getLevelsSalaryData(role, company),
   ]);
 
   const allSalaries: SalaryData[] = [...glassdoor.items, ...levels.items];
@@ -66,44 +68,35 @@ export async function handleSalaryData(input: SalaryDataInput): Promise<string> 
   }
   lines.push("");
 
-  // Summary statistics if we have enough data
-  const validTotals = allSalaries.map((s) => s.total_comp).filter((t): t is number => t !== null);
-  const validBases = allSalaries.map((s) => s.base).filter((b): b is number => b !== null);
-
-  if (validTotals.length >= 2 || validBases.length >= 2) {
-    lines.push("### Summary Statistics");
+  // Summary statistics per source: Levels.fyi reports total compensation and
+  // Glassdoor reports base pay, so pooling them would describe neither.
+  const statLines = (label: string, values: number[]) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    const median = sorted.length % 2 === 0
+      ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+      : sorted[Math.floor(sorted.length / 2)];
+    lines.push(`**${label}** (${values.length} figures): median ${formatDollar(median)}, range ${formatDollar(sorted[0])} - ${formatDollar(sorted[sorted.length - 1])}`);
+  };
+  // Levels.fyi rows are already medians (per level, or percentiles), so its
+  // headline figure is the median it reports, not a statistic over the rows.
+  const levelsMedian = allSalaries.find(
+    (s) => s.source === "levelsfyi" && /^(All levels \(median\)|Median, all companies)$/.test(s.level ?? "")
+  );
+  const glassdoorBases = allSalaries.filter((s) => s.source === "glassdoor").map((s) => s.base).filter((b): b is number => b !== null);
+  if (levelsMedian || glassdoorBases.length >= 2) {
+    lines.push("### Summary by source");
     lines.push("");
-
-    if (validTotals.length >= 2) {
-      const sortedTotals = validTotals.sort((a, b) => a - b);
-      const median = sortedTotals.length % 2 === 0
-        ? (sortedTotals[sortedTotals.length / 2 - 1] + sortedTotals[sortedTotals.length / 2]) / 2
-        : sortedTotals[Math.floor(sortedTotals.length / 2)];
-      const avg = validTotals.reduce((sum, v) => sum + v, 0) / validTotals.length;
-
-      lines.push("**Total Compensation:**");
-      lines.push(`- Median: ${formatDollar(median)}`);
-      lines.push(`- Average: ${formatDollar(Math.round(avg))}`);
-      lines.push(`- Range: ${formatDollar(sortedTotals[0])} - ${formatDollar(sortedTotals[sortedTotals.length - 1])}`);
-      lines.push("");
+    if (levelsMedian?.total_comp != null) {
+      lines.push(`**Levels.fyi median total compensation** (${levelsMedian.level}): ${formatDollar(levelsMedian.total_comp)}`);
     }
-
-    if (validBases.length >= 2) {
-      const sortedBases = validBases.sort((a, b) => a - b);
-      const median = sortedBases.length % 2 === 0
-        ? (sortedBases[sortedBases.length / 2 - 1] + sortedBases[sortedBases.length / 2]) / 2
-        : sortedBases[Math.floor(sortedBases.length / 2)];
-      const avg = validBases.reduce((sum, v) => sum + v, 0) / validBases.length;
-
-      lines.push("**Base Salary:**");
-      lines.push(`- Median: ${formatDollar(median)}`);
-      lines.push(`- Average: ${formatDollar(Math.round(avg))}`);
-      lines.push(`- Range: ${formatDollar(sortedBases[0])} - ${formatDollar(sortedBases[sortedBases.length - 1])}`);
-      lines.push("");
-    }
+    if (glassdoorBases.length >= 2) statLines("Glassdoor base pay", glassdoorBases);
+    lines.push("");
   }
 
-  lines.push("*Data aggregated from Glassdoor and Levels.fyi (scraper-backed, cached up to 24h). Compensation figures are self-reported and may not reflect current offers.*");
+  if (location) {
+    lines.push(`*Levels.fyi figures are US-wide (its pages have no city filter), so they don't reflect ${location} specifically.*`);
+  }
+  lines.push("*Data source: Levels.fyi (https://www.levels.fyi) for total compensation; Glassdoor for base pay when enabled. Figures are self-reported and may not reflect current offers. Cached up to 24h.*");
 
   return finalizeOutput(lines, footerLines);
 }

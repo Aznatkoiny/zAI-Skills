@@ -1,8 +1,8 @@
 /**
- * job_get_company_info — Glassdoor company profile (scraper, best-effort)
- * enriched with live open roles from the company's public Greenhouse/Lever
- * board when one exists (API, primary). Each source degrades independently
- * and the response ends with an honest Sources footer.
+ * job_get_company_info — live open roles from the company's public
+ * Greenhouse/Lever board when one exists (API, always on), plus the Glassdoor
+ * company profile (HTML scraper, only with JOB_INTEL_ENABLE_SCRAPERS=1). Each
+ * source degrades independently and the response ends with a Sources footer.
  */
 
 import { z } from "zod";
@@ -77,18 +77,11 @@ export async function handleCompanyInfo(input: CompanyInfoInput): Promise<string
       lines.push("");
     }
 
-    // Interview Process section
-    lines.push("### Interview Process");
-    lines.push("");
-
-    if (info.interview_process) {
-      lines.push(info.interview_process);
-    } else {
-      lines.push("Interview process information not available from this source. Use the `job_get_interview_experiences` tool for detailed interview data.");
-    }
+  } else if (glassdoor.meta.state === "skipped") {
+    lines.push("Ratings and company details come from Glassdoor. This source is a website scraper, which is off by default because the site restricts automated access. Use WebSearch instead; the user can opt in by setting JOB_INTEL_ENABLE_SCRAPERS=1 (after checking the site's terms) and restarting Claude Code.");
     lines.push("");
   } else {
-    lines.push(`No Glassdoor profile could be retrieved for "${company_name}" (see Sources below). Consider using WebSearch for company background.`);
+    lines.push(`No Glassdoor profile could be retrieved for "${company_name}" (see Sources below). Use WebSearch for company background.`);
     lines.push("");
   }
 

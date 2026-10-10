@@ -17,14 +17,14 @@ import { handleTrendingRoles } from "./tools/trending-roles.js";
 
 const server = new McpServer({
   name: "job-intelligence",
-  version: "1.0.0",
+  version: "1.1.0",
 });
 
 // ── Tool Registration ──
 
 server.tool(
   "job_search_jobs",
-  "Search job listings, API-first: Remotive and RemoteOK (keyless public APIs), Adzuna and USAJOBS (only when API keys are configured — otherwise skipped with a note), and the company's public Greenhouse/Lever board when the query names a well-known company. Indeed/LinkedIn/TrueUp scrapers run as best-effort fallback and may be bot-blocked. Results are deduplicated, cached (~6h), and every response ends with a per-source status footer (live / cached / skipped / failed). Fall back to WebSearch if all sources fail.",
+  "Search job listings. Returns a table of title, company, location, salary when posted, source and listing URL, plus a ~200-character snippet for the top 5 (open the URL for the full description). Sources: Remotive and RemoteOK (keyless; remote jobs only, location ignored), Adzuna (US) and USAJOBS (only when their API keys are set; these honor location), and the company's own Greenhouse/Lever board when the query names a well-known company. For a non-remote location, remote-only results are listed after location-matching ones. Indeed and TrueUp scrapers run only if the user set JOB_INTEL_ENABLE_SCRAPERS=1. Cached ~6h; the response ends with a per-source status footer (live / cached / skipped / failed). Use WebSearch when results are thin.",
   searchJobsSchema.shape,
   async (input) => {
     try {
@@ -41,7 +41,7 @@ server.tool(
 
 server.tool(
   "job_get_company_info",
-  "Get company overview, ratings, culture scores, and interview process from Glassdoor (scraper — may bot-block), plus live open roles from the company's public Greenhouse/Lever job board when one exists (API). Results are cached (~24h) and the response ends with a per-source status footer — fall back to WebSearch if sources fail.",
+  "Get a company's open roles from its public Greenhouse/Lever job board when it has one (about 30 well-known tech companies are mapped). Glassdoor ratings and company details are added only if the user set JOB_INTEL_ENABLE_SCRAPERS=1. Cached ~24h; the response ends with a per-source status footer. For company background, culture or news, use WebSearch.",
   companyInfoSchema.shape,
   async (input) => {
     try {
@@ -58,7 +58,7 @@ server.tool(
 
 server.tool(
   "job_get_salary_data",
-  "Get salary and total compensation data from Glassdoor and Levels.fyi. Includes base pay, equity, bonus, and total comp breakdowns by level. Scraper-backed: sites may bot-block, so results can be partial. Results are cached (~24h) and the response ends with a per-source status footer — fall back to WebSearch if sources fail.",
+  "Get compensation data. From Levels.fyi (always on): median total compensation per level at a company (e.g. L3-L9), or, without a company or when it has no page, role-wide percentiles and the top-paying companies. Levels.fyi figures are total comp only (no base/stock/bonus split) and US-wide (no city filter); cite them as 'Data source: Levels.fyi'. Glassdoor base pay is added only if the user set JOB_INTEL_ENABLE_SCRAPERS=1. Cached ~24h; the response ends with a per-source status footer.",
   salaryDataSchema.shape,
   async (input) => {
     try {
@@ -75,7 +75,7 @@ server.tool(
 
 server.tool(
   "job_get_interview_experiences",
-  "Get interview experiences from Glassdoor including difficulty ratings, questions asked, interview process descriptions, and offer outcomes. Scraper-backed: Glassdoor may bot-block, so results can be partial. Results are cached (~24h) and the response ends with a per-source status footer — fall back to WebSearch if it fails.",
+  "Get interview experiences from Glassdoor (difficulty, questions asked, process, offer outcome). Works only if the user set JOB_INTEL_ENABLE_SCRAPERS=1; otherwise it returns a note saying the source is off, and you should use WebSearch for interview reports instead. Cached ~24h when enabled.",
   interviewExperiencesSchema.shape,
   async (input) => {
     try {
@@ -92,7 +92,7 @@ server.tool(
 
 server.tool(
   "job_search_trending_roles",
-  "Discover trending job roles from TrueUp with growth rates, average salaries, demand levels, and which companies are hiring. Results are global (TrueUp has no location filter). Scraper-backed: the site may bot-block, so results can be partial. Results are cached (~6h) and the response ends with a per-source status footer — fall back to WebSearch if it fails.",
+  "Discover trending job roles from TrueUp (growth, salaries, hiring companies; global, no location filter). Works only if the user set JOB_INTEL_ENABLE_SCRAPERS=1; otherwise it returns a note saying the source is off, and you should use WebSearch for hiring-trend data instead. Cached ~6h when enabled.",
   trendingRolesSchema.shape,
   async (input) => {
     try {

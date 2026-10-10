@@ -57,8 +57,10 @@ WARNS="$WARNS" python3 -c "
 import json, os
 warns = os.environ.get('WARNS', '').strip()
 context = (
-    'career-profile.json validation warnings (advisory, from '
-    'scripts/validate-profile.py — fix in the profile, do not ignore silently):\n'
+    'career-profile.json check (advisory, from scripts/validate-profile.py). '
+    'If you are partway through building the profile, carry on and use this as a to-do list. '
+    'Format problems (dates, ordering) you can fix directly. Missing numbers can only come '
+    'from the user: ask them when it fits, and never estimate or invent a figure to clear a warning.\n'
     + warns
 )
 print(json.dumps({

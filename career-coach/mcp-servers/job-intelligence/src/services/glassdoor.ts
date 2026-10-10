@@ -7,7 +7,7 @@
 
 import axios from "axios";
 import * as cheerio from "cheerio";
-import { RATE_LIMITS, USER_AGENT } from "../constants.js";
+import { RATE_LIMITS, SCRAPERS_DISABLED_DETAIL, SCRAPERS_ENABLED, USER_AGENT } from "../constants.js";
 import type { CompanyInfo, InterviewExperience, SalaryData, SourceMeta, SourceResult } from "../types.js";
 import { fetchWithCache, LOOKUP_TTL_MS, toSourceResult } from "./cache.js";
 import { RateLimiter } from "./rate-limiter.js";
@@ -125,6 +125,9 @@ async function fetchCompanyInfo(company: string): Promise<CompanyInfo> {
 export async function getGlassdoorCompanyInfo(
   company: string
 ): Promise<{ meta: SourceMeta; info: CompanyInfo | null }> {
+  if (!SCRAPERS_ENABLED) {
+    return { meta: { source: "Glassdoor", tier: "scraper", state: "skipped", detail: SCRAPERS_DISABLED_DETAIL }, info: null };
+  }
   const res = await fetchWithCache<CompanyInfo>(
     "glassdoor-company",
     { company: company.toLowerCase().trim() },
@@ -240,6 +243,9 @@ export async function getGlassdoorSalaries(
   role: string,
   company?: string
 ): Promise<SourceResult<SalaryData>> {
+  if (!SCRAPERS_ENABLED) {
+    return { meta: { source: "Glassdoor", tier: "scraper", state: "skipped", detail: SCRAPERS_DISABLED_DETAIL }, items: [] };
+  }
   const res = await fetchWithCache(
     "glassdoor-salaries",
     { role: role.toLowerCase().trim(), company: company?.toLowerCase().trim() || null },
@@ -309,7 +315,7 @@ async function fetchInterviews(company: string, role?: string): Promise<Intervie
       const offerText = el.find("[class*='offer'], [data-test='offer']").first().text().trim().toLowerCase();
       let offer: boolean | null = null;
       if (offerText.includes("accepted") || offerText.includes("received") || offerText.includes("yes")) offer = true;
-      else if (offerText.includes("declined") || offerText.includes("rejected") || offerText.includes("no")) offer = false;
+      else if (/\b(declined|rejected|no)\b/.test(offerText)) offer = false;  // word match: "no" must not hit "know"/"not"
 
       // Date
       const dateText = el.find("[class*='date'], time").first().text().trim();
@@ -345,6 +351,9 @@ export async function getGlassdoorInterviews(
   company: string,
   role?: string
 ): Promise<SourceResult<InterviewExperience>> {
+  if (!SCRAPERS_ENABLED) {
+    return { meta: { source: "Glassdoor", tier: "scraper", state: "skipped", detail: SCRAPERS_DISABLED_DETAIL }, items: [] };
+  }
   const res = await fetchWithCache(
     "glassdoor-interviews",
     { company: company.toLowerCase().trim(), role: role?.toLowerCase().trim() || null },

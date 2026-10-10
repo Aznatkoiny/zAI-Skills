@@ -28,7 +28,9 @@ export async function handleTrendingRoles(input: TrendingRolesInput): Promise<st
   lines.push("");
 
   if (roles.length === 0) {
-    if (result.meta.state === "failed") {
+    if (result.meta.state === "skipped") {
+      lines.push("Trending-role data comes from TrueUp. This source is a website scraper, which is off by default because the site restricts automated access. Use WebSearch instead; the user can opt in by setting JOB_INTEL_ENABLE_SCRAPERS=1 (after checking the site's terms) and restarting Claude Code.");
+    } else if (result.meta.state === "failed") {
       lines.push(`Could not retrieve trending roles data: ${result.meta.detail || "unknown error"}`);
       lines.push("");
       lines.push("Try visiting https://www.trueup.io/trending directly, or fall back to WebSearch for market-trend data.");

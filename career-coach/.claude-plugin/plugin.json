@@ -1,7 +1,7 @@
 {
   "name": "career-coach",
-  "version": "1.3.0",
-  "description": "Career coaching and job search plugin with AI-powered resume building, interview preparation, and multi-platform job discovery. Features a Career Director orchestrator, job search automation via MCP, industry-specific formatting styles, and LaTeX resume compilation.",
+  "version": "1.4.0",
+  "description": "Career coaching for job seekers: builds a reusable career profile from your resume, finds and ranks openings against your skills, tailors resumes (Markdown or LaTeX) and cover letters, runs mock interviews, tracks applications, and compares offers.",
   "author": {
     "name": "Antony Zaki"
   },
@@ -12,9 +12,10 @@
     "career",
     "job-search",
     "resume",
+    "cover-letter",
     "interview-prep",
-    "career-coaching",
-    "linkedin",
+    "ats",
+    "salary",
     "latex-resume"
   ]
 }

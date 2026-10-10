@@ -23,10 +23,10 @@ career-best numbers impossible to miss, and keep everything else supporting.
 
 ## The Iron Rule
 
-**Every bullet must have a number.** No exceptions. A sales bullet without a metric is a
-liability — it reads as a quota missed. If the candidate cannot quantify an accomplishment,
-either extract the number in the interview (deal size? attainment? rank on team?) or cut the
-bullet. Acceptable numbers: revenue, %, quota attainment, deal count, rank, cycle length,
+**Every bullet needs a number.** In sales, a bullet without one reads as a missed quota. If
+the candidate can't quantify an accomplishment, ask for the number (deal size? attainment?
+rank on team?) or cut the bullet. Never estimate a figure for them: sales numbers get checked
+in interviews and reference calls. Acceptable numbers: revenue, %, quota attainment, deal count, rank, cycle length,
 win rate, pipeline generated, accounts, territory size, retention/expansion rates.
 
 ## Bullet Writing Rules

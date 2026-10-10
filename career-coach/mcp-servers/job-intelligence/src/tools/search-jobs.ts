@@ -4,9 +4,11 @@
  * Primary sources (queried in parallel): Remotive, RemoteOK (keyless
  * public APIs), Adzuna and USAJOBS (keyed; skipped with a note when env
  * keys are unset), plus the matching company's public Greenhouse/Lever
- * board when the query names a well-known company. The Indeed/LinkedIn/
- * TrueUp scrapers run only as best-effort fallback, and are skipped
- * entirely when the API tier already returned enough results.
+ * board when the query names a well-known company. The Indeed/TrueUp
+ * scrapers are off unless JOB_INTEL_ENABLE_SCRAPERS=1, and even then run
+ * only when the API tier didn't return enough results. Remote-only sources
+ * ignore location, so for a non-remote location search their results don't
+ * count toward "enough".
  */
 
 import { z } from "zod";
@@ -14,7 +16,6 @@ import { searchJobsSchema } from "../schemas/inputs.js";
 import { searchAdzunaJobs } from "../services/adzuna.js";
 import { findKnownCompanyInQuery, getCompanyBoardJobs } from "../services/company-boards.js";
 import { searchIndeedJobs } from "../services/indeed.js";
-import { searchLinkedInJobs } from "../services/linkedin.js";
 import { searchRemotiveJobs } from "../services/remotive.js";
 import { searchRemoteOkJobs } from "../services/remoteok.js";
 import { searchTrueUpJobs } from "../services/trueup.js";
@@ -179,10 +180,16 @@ export async function handleSearchJobs(input: SearchJobsInput): Promise<string> 
   }
 
   // ── Tier 2: scrapers, only when the APIs did not fill the request ──
-  const scraperNames = ["Indeed", "LinkedIn", "TrueUp"];
+  // For a specific (non-remote) location, remote-only listings can't satisfy
+  // the request, so they don't count toward the limit.
+  const wantsSpecificLocation = !!location && !remote && !/\bremote\b/i.test(location);
+  const locationRelevant = wantsSpecificLocation
+    ? apiListings.filter((l) => l.source !== "remotive" && l.source !== "remoteok")
+    : apiListings;
+  const scraperNames = ["Indeed", "TrueUp"];
   let scraperResults: SourceResult<JobListing>[];
 
-  if (deduplicateListings(apiListings).length >= limit) {
+  if (deduplicateListings(locationRelevant).length >= limit) {
     scraperResults = scraperNames.map((name) => ({
       meta: {
         source: name,
@@ -195,7 +202,6 @@ export async function handleSearchJobs(input: SearchJobsInput): Promise<string> 
   } else {
     scraperResults = await runSources([
       { name: "Indeed", tier: "scraper", run: () => searchIndeedJobs(enhancedQuery, location, remote, limit) },
-      { name: "LinkedIn", tier: "scraper", run: () => searchLinkedInJobs(enhancedQuery, location, remote, limit) },
       { name: "TrueUp", tier: "scraper", run: () => searchTrueUpJobs(enhancedQuery, limit) },
     ]);
   }
@@ -205,6 +211,13 @@ export async function handleSearchJobs(input: SearchJobsInput): Promise<string> 
   // Deduplicate and sort
   let finalListings = deduplicateListings(allListings);
   finalListings = sortByRelevance(finalListings, query);
+  if (wantsSpecificLocation) {
+    // Stable partition: listings that can match the requested location first.
+    finalListings = [
+      ...finalListings.filter((l) => l.source !== "remotive" && l.source !== "remoteok"),
+      ...finalListings.filter((l) => l.source === "remotive" || l.source === "remoteok"),
+    ];
+  }
 
   // Apply salary filter if specified
   if (salary_min) {
@@ -274,7 +287,11 @@ export async function handleSearchJobs(input: SearchJobsInput): Promise<string> 
     }
   }
 
-  lines.push("*API sources are queried first; scraper results are best-effort. Listings change rapidly.*");
+  if (wantsSpecificLocation) {
+    lines.push("*Remotive and RemoteOK list remote jobs only and ignore location; Adzuna (US) and USAJOBS filter by location when their keys are set. Listing snippets are short: open the listing URL for the full description.*");
+  } else {
+    lines.push("*Listing snippets are short: open the listing URL for the full description. Listings change quickly.*");
+  }
 
   return finalizeOutput(lines, footerLines);
 }

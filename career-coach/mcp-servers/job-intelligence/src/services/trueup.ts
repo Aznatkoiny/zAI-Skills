@@ -6,7 +6,7 @@
 
 import axios from "axios";
 import * as cheerio from "cheerio";
-import { RATE_LIMITS, USER_AGENT } from "../constants.js";
+import { RATE_LIMITS, SCRAPERS_DISABLED_DETAIL, SCRAPERS_ENABLED, USER_AGENT } from "../constants.js";
 import type { JobListing, SourceResult, TrendingRole } from "../types.js";
 import { fetchWithCache, SEARCH_TTL_MS, toSourceResult } from "./cache.js";
 import { RateLimiter } from "./rate-limiter.js";
@@ -91,6 +91,9 @@ export async function searchTrueUpJobs(
   query: string,
   limit: number = 10
 ): Promise<SourceResult<JobListing>> {
+  if (!SCRAPERS_ENABLED) {
+    return { meta: { source: "TrueUp", tier: "scraper", state: "skipped", detail: SCRAPERS_DISABLED_DETAIL }, items: [] };
+  }
   const res = await fetchWithCache(
     "trueup-jobs",
     { query: query.toLowerCase().trim(), limit },
@@ -174,6 +177,9 @@ async function fetchTrendingRoles(industry?: string): Promise<TrendingRole[]> {
 export async function getTrueUpTrendingRoles(
   industry?: string
 ): Promise<SourceResult<TrendingRole>> {
+  if (!SCRAPERS_ENABLED) {
+    return { meta: { source: "TrueUp", tier: "scraper", state: "skipped", detail: SCRAPERS_DISABLED_DETAIL }, items: [] };
+  }
   const res = await fetchWithCache(
     "trueup-trending",
     { industry: industry?.toLowerCase().trim() || null },

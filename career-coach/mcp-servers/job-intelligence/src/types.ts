@@ -8,7 +8,6 @@ export interface JobListing {
   posted_date: string | null;
   source:
     | "indeed"
-    | "linkedin"
     | "trueup"
     | "remotive"
     | "remoteok"

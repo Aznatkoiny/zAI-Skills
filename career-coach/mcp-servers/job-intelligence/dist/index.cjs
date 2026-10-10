@@ -63441,8 +63441,6 @@ var RATE_LIMITS = {
   // Scrapers — conservative to avoid blocks
   indeed: 0.2,
   // ~12 req/min — conservative
-  linkedin: 0.1,
-  // ~6 req/min — very conservative (aggressive blocking)
   glassdoor: 0.2,
   // ~12 req/min
   trueup: 0.5,
@@ -63450,19 +63448,22 @@ var RATE_LIMITS = {
   levelsfyi: 0.2,
   // ~12 req/min
   // Public APIs — still polite; responses are cached (see services/cache.ts)
-  remotive: 0.5,
-  // Remotive asks integrators not to poll aggressively
+  remotive: 1 / 30,
+  // Remotive blocks >2 req/min; the whole feed is fetched once per 6h anyway
   remoteok: 0.5,
   greenhouse: 1,
   lever: 1,
-  adzuna: 1,
+  adzuna: 0.4,
+  // free tier allows 25 hits/min, 250/day
   usajobs: 1
 };
 var CHARACTER_LIMIT = 5e4;
 var MAX_JOB_RESULTS = 25;
 var MAX_SALARY_COMPARISONS = 10;
-var USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36";
-var API_USER_AGENT = "job-intelligence-mcp/1.0 (career-coach Claude plugin; +https://github.com/Aznatkoiny/zAI-Skills)";
+var API_USER_AGENT = "job-intelligence-mcp/1.1 (career-coach Claude plugin; +https://github.com/Aznatkoiny/zAI-Skills)";
+var USER_AGENT = API_USER_AGENT;
+var SCRAPERS_ENABLED = process.env.JOB_INTEL_ENABLE_SCRAPERS === "1";
+var SCRAPERS_DISABLED_DETAIL = "scraper off by default \u2014 set JOB_INTEL_ENABLE_SCRAPERS=1 to enable (check the site's terms first)";
 
 // src/schemas/inputs.ts
 var searchJobsSchema = external_exports.object({
@@ -83301,6 +83302,9 @@ async function fetchIndeedJobs(query, location, remote, limit) {
   return allListings.slice(0, limit);
 }
 async function searchIndeedJobs(query, location, remote, limit = 10) {
+  if (!SCRAPERS_ENABLED) {
+    return { meta: { source: "Indeed", tier: "scraper", state: "skipped", detail: SCRAPERS_DISABLED_DETAIL }, items: [] };
+  }
   const res = await fetchWithCache(
     "indeed",
     { query: query.toLowerCase().trim(), location: location || null, remote: !!remote, limit },
@@ -83310,107 +83314,9 @@ async function searchIndeedJobs(query, location, remote, limit = 10) {
   return toSourceResult("Indeed", "scraper", res);
 }
 
-// src/services/linkedin.ts
-var limiter5 = new RateLimiter(RATE_LIMITS.linkedin);
-var LINKEDIN_JOBS_URL = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search";
-function buildLinkedInUrl(query, location, remote, start = 0) {
-  const params = new URLSearchParams();
-  params.set("keywords", query);
-  if (location) {
-    params.set("location", location);
-  }
-  if (remote) {
-    params.set("f_WT", "2");
-  }
-  params.set("start", start.toString());
-  params.set("sortBy", "R");
-  return `${LINKEDIN_JOBS_URL}?${params.toString()}`;
-}
-function parseLinkedInListings($2) {
-  const listings = [];
-  try {
-    $2("li, .base-card, .job-search-card").each((_index, element) => {
-      try {
-        const el = $2(element);
-        const titleEl = el.find("h3.base-search-card__title, .job-search-card__title, h3 a").first();
-        const title = titleEl.text().trim();
-        const linkEl = el.find("a.base-card__full-link, a[data-tracking-control-name]").first();
-        const url2 = linkEl.attr("href") || "";
-        const company = el.find("h4.base-search-card__subtitle a, .base-search-card__subtitle, .job-search-card__company-name").first().text().trim();
-        const location = el.find(".job-search-card__location, .base-search-card__metadata span").first().text().trim();
-        const salaryEl = el.find(".job-search-card__salary-info, .salary-info").first();
-        const salary = salaryEl.length > 0 ? salaryEl.text().trim() : null;
-        const dateEl = el.find("time, .job-search-card__listdate").first();
-        const posted_date = dateEl.attr("datetime") || dateEl.text().trim() || null;
-        if (title && company) {
-          listings.push({
-            title,
-            company,
-            location: location || "Not specified",
-            salary,
-            url: url2.startsWith("http") ? url2.split("?")[0] : `https://www.linkedin.com${url2.split("?")[0]}`,
-            description: "View full description on LinkedIn",
-            posted_date,
-            source: "linkedin"
-          });
-        }
-      } catch (innerErr) {
-        console.error("Error parsing individual LinkedIn listing:", innerErr);
-      }
-    });
-  } catch (err) {
-    console.error("Error parsing LinkedIn results page:", err);
-  }
-  return listings;
-}
-async function fetchLinkedInJobs(query, location, remote, limit) {
-  const allListings = [];
-  const pagesToFetch = Math.ceil(limit / 25);
-  const maxPages = Math.min(pagesToFetch, 2);
-  for (let page = 0; page < maxPages; page++) {
-    if (allListings.length >= limit) break;
-    const url2 = buildLinkedInUrl(query, location, remote, page * 25);
-    await limiter5.acquire();
-    try {
-      const response = await axios_default.get(url2, {
-        headers: {
-          "User-Agent": USER_AGENT,
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "en-US,en;q=0.9",
-          "Sec-Fetch-Mode": "navigate"
-        },
-        timeout: 15e3,
-        maxRedirects: 5
-      });
-      const $2 = load(response.data);
-      const pageListings = parseLinkedInListings($2);
-      if (pageListings.length === 0) break;
-      allListings.push(...pageListings);
-    } catch (err) {
-      if (allListings.length > 0) break;
-      const message = err instanceof Error ? err.message : String(err);
-      throw new Error(`${message} \u2014 LinkedIn aggressively blocks automated requests`);
-    }
-  }
-  if (allListings.length === 0) {
-    throw new Error("no listings parsed \u2014 likely bot-blocked or the HTML structure changed");
-  }
-  return allListings.slice(0, limit);
-}
-async function searchLinkedInJobs(query, location, remote, limit = 10) {
-  const res = await fetchWithCache(
-    "linkedin",
-    { query: query.toLowerCase().trim(), location: location || null, remote: !!remote, limit },
-    SEARCH_TTL_MS,
-    () => fetchLinkedInJobs(query, location, remote, limit)
-  );
-  return toSourceResult("LinkedIn", "scraper", res);
-}
-
 // src/services/remotive.ts
-var limiter6 = new RateLimiter(RATE_LIMITS.remotive);
+var limiter5 = new RateLimiter(RATE_LIMITS.remotive);
 var REMOTIVE_API_URL = "https://remotive.com/api/remote-jobs";
-var FETCH_CAP = 100;
 function matchesAllTerms(job, terms) {
   const haystack = [
     job.title,
@@ -83420,10 +83326,9 @@ function matchesAllTerms(job, terms) {
   ].filter(Boolean).join(" ").toLowerCase();
   return terms.every((t) => haystack.includes(t));
 }
-async function fetchRemotiveJobs(query) {
-  await limiter6.acquire();
+async function fetchRemotiveFeed() {
+  await limiter5.acquire();
   const response = await axios_default.get(REMOTIVE_API_URL, {
-    params: { search: query, limit: FETCH_CAP },
     headers: { "User-Agent": API_USER_AGENT, Accept: "application/json" },
     timeout: 15e3
   });
@@ -83431,6 +83336,9 @@ async function fetchRemotiveJobs(query) {
   if (!Array.isArray(jobs)) {
     throw new Error("unexpected Remotive response shape (no jobs array)");
   }
+  return jobs;
+}
+function toListings(jobs, query) {
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
   const listings = [];
   for (const raw of jobs) {
@@ -83450,14 +83358,9 @@ async function fetchRemotiveJobs(query) {
   return listings;
 }
 async function searchRemotiveJobs(query, limit = 10) {
-  const res = await fetchWithCache(
-    "remotive",
-    { query: query.toLowerCase().trim() },
-    SEARCH_TTL_MS,
-    () => fetchRemotiveJobs(query)
-  );
+  const res = await fetchWithCache("remotive-feed", {}, SEARCH_TTL_MS, fetchRemotiveFeed);
   if (res.ok) {
-    const items = res.value.slice(0, limit);
+    const items = toListings(res.value, query).slice(0, limit);
     return {
       meta: { source: "Remotive", tier: "api", state: res.state, count: items.length, ageMs: res.ageMs },
       items
@@ -83467,10 +83370,10 @@ async function searchRemotiveJobs(query, limit = 10) {
 }
 
 // src/services/remoteok.ts
-var limiter7 = new RateLimiter(RATE_LIMITS.remoteok);
+var limiter6 = new RateLimiter(RATE_LIMITS.remoteok);
 var REMOTEOK_API_URL = "https://remoteok.com/api";
 async function fetchRemoteOkFeed() {
-  await limiter7.acquire();
+  await limiter6.acquire();
   const response = await axios_default.get(REMOTEOK_API_URL, {
     headers: { "User-Agent": API_USER_AGENT, Accept: "application/json" },
     timeout: 15e3
@@ -83515,7 +83418,7 @@ async function searchRemoteOkJobs(query, limit = 10) {
 }
 
 // src/services/trueup.ts
-var limiter8 = new RateLimiter(RATE_LIMITS.trueup);
+var limiter7 = new RateLimiter(RATE_LIMITS.trueup);
 var TRUEUP_BASE_URL = "https://www.trueup.io";
 var TRUEUP_SEARCH_URL = `${TRUEUP_BASE_URL}/jobs`;
 var TRUEUP_TRENDING_URL = `${TRUEUP_BASE_URL}/trending`;
@@ -83524,7 +83427,7 @@ async function fetchTrueUpJobs(query, limit) {
   const params = new URLSearchParams();
   params.set("search", query);
   const url2 = `${TRUEUP_SEARCH_URL}?${params.toString()}`;
-  await limiter8.acquire();
+  await limiter7.acquire();
   const response = await axios_default.get(url2, {
     headers: {
       "User-Agent": USER_AGENT,
@@ -83572,6 +83475,9 @@ async function fetchTrueUpJobs(query, limit) {
   return listings.slice(0, limit);
 }
 async function searchTrueUpJobs(query, limit = 10) {
+  if (!SCRAPERS_ENABLED) {
+    return { meta: { source: "TrueUp", tier: "scraper", state: "skipped", detail: SCRAPERS_DISABLED_DETAIL }, items: [] };
+  }
   const res = await fetchWithCache(
     "trueup-jobs",
     { query: query.toLowerCase().trim(), limit },
@@ -83583,7 +83489,7 @@ async function searchTrueUpJobs(query, limit = 10) {
 async function fetchTrendingRoles(industry) {
   const roles = [];
   const url2 = industry ? `${TRUEUP_TRENDING_URL}?industry=${encodeURIComponent(industry)}` : TRUEUP_TRENDING_URL;
-  await limiter8.acquire();
+  await limiter7.acquire();
   const response = await axios_default.get(url2, {
     headers: {
       "User-Agent": USER_AGENT,
@@ -83630,6 +83536,9 @@ async function fetchTrendingRoles(industry) {
   return roles;
 }
 async function getTrueUpTrendingRoles(industry) {
+  if (!SCRAPERS_ENABLED) {
+    return { meta: { source: "TrueUp", tier: "scraper", state: "skipped", detail: SCRAPERS_DISABLED_DETAIL }, items: [] };
+  }
   const res = await fetchWithCache(
     "trueup-trending",
     { industry: industry?.toLowerCase().trim() || null },
@@ -83640,7 +83549,7 @@ async function getTrueUpTrendingRoles(industry) {
 }
 
 // src/services/usajobs.ts
-var limiter9 = new RateLimiter(RATE_LIMITS.usajobs);
+var limiter8 = new RateLimiter(RATE_LIMITS.usajobs);
 var USAJOBS_API_URL = "https://data.usajobs.gov/api/search";
 function formatRemuneration(rem) {
   if (!rem) return null;
@@ -83655,7 +83564,7 @@ function formatRemuneration(rem) {
   return range;
 }
 async function fetchUsaJobs(apiKey, email2, query, location, limit) {
-  await limiter9.acquire();
+  await limiter8.acquire();
   const params = {
     Keyword: query,
     ResultsPerPage: limit
@@ -83865,9 +83774,11 @@ async function handleSearchJobs(input) {
   if (remote) {
     apiListings = apiListings.filter(isRemoteListing);
   }
-  const scraperNames = ["Indeed", "LinkedIn", "TrueUp"];
+  const wantsSpecificLocation = !!location && !remote && !/\bremote\b/i.test(location);
+  const locationRelevant = wantsSpecificLocation ? apiListings.filter((l) => l.source !== "remotive" && l.source !== "remoteok") : apiListings;
+  const scraperNames = ["Indeed", "TrueUp"];
   let scraperResults;
-  if (deduplicateListings(apiListings).length >= limit) {
+  if (deduplicateListings(locationRelevant).length >= limit) {
     scraperResults = scraperNames.map((name) => ({
       meta: {
         source: name,
@@ -83880,13 +83791,18 @@ async function handleSearchJobs(input) {
   } else {
     scraperResults = await runSources([
       { name: "Indeed", tier: "scraper", run: () => searchIndeedJobs(enhancedQuery, location, remote, limit) },
-      { name: "LinkedIn", tier: "scraper", run: () => searchLinkedInJobs(enhancedQuery, location, remote, limit) },
       { name: "TrueUp", tier: "scraper", run: () => searchTrueUpJobs(enhancedQuery, limit) }
     ]);
   }
   const allListings = [...apiListings, ...scraperResults.flatMap((r) => r.items)];
   let finalListings = deduplicateListings(allListings);
   finalListings = sortByRelevance(finalListings, query);
+  if (wantsSpecificLocation) {
+    finalListings = [
+      ...finalListings.filter((l) => l.source !== "remotive" && l.source !== "remoteok"),
+      ...finalListings.filter((l) => l.source === "remotive" || l.source === "remoteok")
+    ];
+  }
   if (salary_min) {
     finalListings = finalListings.filter((listing) => {
       if (!listing.salary) return true;
@@ -83939,16 +83855,20 @@ async function handleSearchJobs(input) {
       lines.push("");
     }
   }
-  lines.push("*API sources are queried first; scraper results are best-effort. Listings change rapidly.*");
+  if (wantsSpecificLocation) {
+    lines.push("*Remotive and RemoteOK list remote jobs only and ignore location; Adzuna (US) and USAJOBS filter by location when their keys are set. Listing snippets are short: open the listing URL for the full description.*");
+  } else {
+    lines.push("*Listing snippets are short: open the listing URL for the full description. Listings change quickly.*");
+  }
   return finalizeOutput(lines, footerLines);
 }
 
 // src/services/glassdoor.ts
-var limiter10 = new RateLimiter(RATE_LIMITS.glassdoor);
+var limiter9 = new RateLimiter(RATE_LIMITS.glassdoor);
 var GLASSDOOR_BASE_URL = "https://www.glassdoor.com";
 async function fetchCompanyInfo(company) {
   const searchUrl = `${GLASSDOOR_BASE_URL}/Search/results.htm?keyword=${encodeURIComponent(company)}&typedKeyword=${encodeURIComponent(company)}&sc.keyword=${encodeURIComponent(company)}`;
-  await limiter10.acquire();
+  await limiter9.acquire();
   const searchResponse = await axios_default.get(searchUrl, {
     headers: {
       "User-Agent": USER_AGENT,
@@ -83966,7 +83886,7 @@ async function fetchCompanyInfo(company) {
       `Glassdoor search returned no overview page for "${company}" (status ${searchResponse.status}) \u2014 likely bot-blocked or the company is not listed`
     );
   }
-  await limiter10.acquire();
+  await limiter9.acquire();
   const overviewResponse = await axios_default.get(overviewUrl, {
     headers: {
       "User-Agent": USER_AGENT,
@@ -84018,6 +83938,9 @@ async function fetchCompanyInfo(company) {
   };
 }
 async function getGlassdoorCompanyInfo(company) {
+  if (!SCRAPERS_ENABLED) {
+    return { meta: { source: "Glassdoor", tier: "scraper", state: "skipped", detail: SCRAPERS_DISABLED_DETAIL }, info: null };
+  }
   const res = await fetchWithCache(
     "glassdoor-company",
     { company: company.toLowerCase().trim() },
@@ -84052,7 +83975,7 @@ async function fetchSalaries(role, company) {
   const salaries = [];
   const searchQuery = company ? `${role} ${company}` : role;
   const searchUrl = `${GLASSDOOR_BASE_URL}/Salaries/know-your-worth.htm?keyword=${encodeURIComponent(searchQuery)}`;
-  await limiter10.acquire();
+  await limiter9.acquire();
   const response = await axios_default.get(searchUrl, {
     headers: {
       "User-Agent": USER_AGENT,
@@ -84100,6 +84023,9 @@ async function fetchSalaries(role, company) {
   return withData;
 }
 async function getGlassdoorSalaries(role, company) {
+  if (!SCRAPERS_ENABLED) {
+    return { meta: { source: "Glassdoor", tier: "scraper", state: "skipped", detail: SCRAPERS_DISABLED_DETAIL }, items: [] };
+  }
   const res = await fetchWithCache(
     "glassdoor-salaries",
     { role: role.toLowerCase().trim(), company: company?.toLowerCase().trim() || null },
@@ -84112,7 +84038,7 @@ async function fetchInterviews(company, role) {
   const experiences = [];
   const searchQuery = role ? `${company} ${role} interview` : `${company} interview`;
   const searchUrl = `${GLASSDOOR_BASE_URL}/Interview/index.htm?sc.keyword=${encodeURIComponent(searchQuery)}`;
-  await limiter10.acquire();
+  await limiter9.acquire();
   const response = await axios_default.get(searchUrl, {
     headers: {
       "User-Agent": USER_AGENT,
@@ -84147,7 +84073,7 @@ async function fetchInterviews(company, role) {
       const offerText = el.find("[class*='offer'], [data-test='offer']").first().text().trim().toLowerCase();
       let offer = null;
       if (offerText.includes("accepted") || offerText.includes("received") || offerText.includes("yes")) offer = true;
-      else if (offerText.includes("declined") || offerText.includes("rejected") || offerText.includes("no")) offer = false;
+      else if (/\b(declined|rejected|no)\b/.test(offerText)) offer = false;
       const dateText = el.find("[class*='date'], time").first().text().trim();
       const date3 = dateText || null;
       experiences.push({
@@ -84170,6 +84096,9 @@ async function fetchInterviews(company, role) {
   return experiences;
 }
 async function getGlassdoorInterviews(company, role) {
+  if (!SCRAPERS_ENABLED) {
+    return { meta: { source: "Glassdoor", tier: "scraper", state: "skipped", detail: SCRAPERS_DISABLED_DETAIL }, items: [] };
+  }
   const res = await fetchWithCache(
     "glassdoor-interviews",
     { company: company.toLowerCase().trim(), role: role?.toLowerCase().trim() || null },
@@ -84228,16 +84157,11 @@ async function handleCompanyInfo(input) {
       }
       lines.push("");
     }
-    lines.push("### Interview Process");
-    lines.push("");
-    if (info.interview_process) {
-      lines.push(info.interview_process);
-    } else {
-      lines.push("Interview process information not available from this source. Use the `job_get_interview_experiences` tool for detailed interview data.");
-    }
+  } else if (glassdoor.meta.state === "skipped") {
+    lines.push("Ratings and company details come from Glassdoor. This source is a website scraper, which is off by default because the site restricts automated access. Use WebSearch instead; the user can opt in by setting JOB_INTEL_ENABLE_SCRAPERS=1 (after checking the site's terms) and restarting Claude Code.");
     lines.push("");
   } else {
-    lines.push(`No Glassdoor profile could be retrieved for "${company_name}" (see Sources below). Consider using WebSearch for company background.`);
+    lines.push(`No Glassdoor profile could be retrieved for "${company_name}" (see Sources below). Use WebSearch for company background.`);
     lines.push("");
   }
   if (board.items.length > 0) {
@@ -84259,148 +84183,130 @@ async function handleCompanyInfo(input) {
 }
 
 // src/services/levelsfyi.ts
-var limiter11 = new RateLimiter(RATE_LIMITS.levelsfyi);
+var limiter10 = new RateLimiter(RATE_LIMITS.levelsfyi);
 var LEVELS_BASE_URL = "https://www.levels.fyi";
-async function fetchLevelsSalaryData(role, company, location) {
-  const salaries = [];
-  let searchPath = "/t";
-  const roleLower = role.toLowerCase();
-  if (roleLower.includes("software engineer")) {
-    searchPath = "/t/software-engineer";
-  } else if (roleLower.includes("product manager")) {
-    searchPath = "/t/product-manager";
-  } else if (roleLower.includes("data scientist")) {
-    searchPath = "/t/data-scientist";
-  } else if (roleLower.includes("designer") || roleLower.includes("ux")) {
-    searchPath = "/t/product-designer";
-  } else if (roleLower.includes("devops") || roleLower.includes("sre")) {
-    searchPath = "/t/devops";
-  } else if (roleLower.includes("data engineer")) {
-    searchPath = "/t/data-engineer";
-  } else if (roleLower.includes("machine learning") || roleLower.includes("ml")) {
-    searchPath = "/t/machine-learning-engineer";
-  } else if (roleLower.includes("frontend") || roleLower.includes("front-end")) {
-    searchPath = "/t/front-end-engineer";
-  } else if (roleLower.includes("backend") || roleLower.includes("back-end")) {
-    searchPath = "/t/back-end-engineer";
-  } else if (roleLower.includes("mobile") || roleLower.includes("ios") || roleLower.includes("android")) {
-    searchPath = "/t/mobile-developer";
-  } else if (roleLower.includes("security")) {
-    searchPath = "/t/security-engineer";
-  } else if (roleLower.includes("engineering manager")) {
-    searchPath = "/t/engineering-manager";
-  } else {
-    const slug = role.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-    searchPath = `/t/${slug}`;
+function slugify2(text3) {
+  return text3.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+}
+function roleSlug(role) {
+  const r = role.toLowerCase();
+  const rules = [
+    [/engineering manager/, "software-engineering-manager"],
+    [/\b(machine learning|ml)\b/, "machine-learning-engineer"],
+    [/data scientist/, "data-scientist"],
+    [/data engineer/, "data-engineer"],
+    [/technical program manager|\btpm\b/, "technical-program-manager"],
+    [/product manager/, "product-manager"],
+    [/\b(designer|ux)\b/, "product-designer"],
+    [/\b(sre|site reliability|devops)\b/, "site-reliability-engineer"],
+    [/\bsecurity\b/, "security-engineer"],
+    [/solutions? architect/, "solution-architect"],
+    [/\b(software|backend|back-end|frontend|front-end|full[- ]?stack|mobile|ios|android)\b.*\b(engineer|developer)\b|\bswe\b/, "software-engineer"]
+  ];
+  for (const [pattern, slug] of rules) {
+    if (pattern.test(r)) return slug;
   }
-  if (company) {
-    const companySlug = company.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-    searchPath += `/c/${companySlug}`;
+  return slugify2(role);
+}
+function parseDollar(text3) {
+  const m = text3.replace(/,/g, "").match(/\$?\s*(\d+(?:\.\d+)?)\s*([kKmM])?/);
+  if (!m) return null;
+  let value = parseFloat(m[1]);
+  const suffix = m[2]?.toLowerCase();
+  if (suffix === "k") value *= 1e3;
+  else if (suffix === "m") value *= 1e6;
+  return Math.round(value);
+}
+function tableUnder(markdown, heading) {
+  const start = markdown.indexOf(`### ${heading}`);
+  if (start === -1) return [];
+  const rows = [];
+  for (const line of markdown.slice(start).split("\n").slice(1)) {
+    if (line.startsWith("|")) {
+      const cells = line.split("|").slice(1, -1).map((c) => c.trim());
+      if (cells.every((c) => /^-+$/.test(c))) continue;
+      rows.push(cells);
+    } else if (rows.length > 0) {
+      break;
+    }
   }
-  if (location) {
-    const locationSlug = location.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-    searchPath += `/l/${locationSlug}`;
-  }
-  const url2 = `${LEVELS_BASE_URL}${searchPath}`;
-  await limiter11.acquire();
-  const response = await axios_default.get(url2, {
-    headers: {
-      "User-Agent": USER_AGENT,
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.9"
-    },
+  return rows.slice(1);
+}
+function highlight(markdown, label) {
+  const m = markdown.match(new RegExp(`^- ${label}:\\s*([^\\n]+)$`, "m"));
+  return m ? parseDollar(m[1]) : null;
+}
+async function fetchMarkdown(path2) {
+  await limiter10.acquire();
+  const response = await axios_default.get(`${LEVELS_BASE_URL}${path2}`, {
+    headers: { "User-Agent": API_USER_AGENT, Accept: "text/markdown" },
     timeout: 15e3,
-    maxRedirects: 5,
+    maxRedirects: 3,
     validateStatus: (status) => status < 500
   });
-  const $2 = load(response.data);
-  $2("[class*='CompRow'], [class*='comp-row'], [class*='SalaryRow'], table tbody tr, [class*='entry']").each((_index, element) => {
-    try {
-      const el = $2(element);
-      const companyText = el.find("[class*='company'], [class*='Company'], td:nth-child(1) a, [data-test='company']").first().text().trim() || company || null;
-      const levelText = el.find("[class*='level'], [class*='Level'], td:nth-child(2), [data-test='level']").first().text().trim() || null;
-      const locationText = el.find("[class*='location'], [class*='Location'], td:nth-child(3), [data-test='location']").first().text().trim() || location || null;
-      const totalText = el.find("[class*='total'], [class*='Total'], td:nth-child(4), [data-test='total-comp']").first().text().trim();
-      const baseText = el.find("[class*='base'], [class*='Base'], td:nth-child(5), [data-test='base']").first().text().trim();
-      const stockText = el.find("[class*='stock'], [class*='Stock'], [class*='equity'], td:nth-child(6), [data-test='stock']").first().text().trim();
-      const bonusText = el.find("[class*='bonus'], [class*='Bonus'], td:nth-child(7), [data-test='bonus']").first().text().trim();
-      const total_comp = parseDollarAmount(totalText);
-      const base = parseDollarAmount(baseText);
-      const equity = parseDollarAmount(stockText);
-      const bonus = parseDollarAmount(bonusText);
-      if (total_comp || base) {
-        salaries.push({
-          role,
-          company: companyText,
-          location: locationText,
-          base,
-          equity,
-          bonus,
-          total_comp: total_comp || (base && equity && bonus ? base + equity + bonus : base),
-          level: levelText,
-          source: "levelsfyi"
-        });
+  if (response.status === 404) return null;
+  if (response.status >= 400) throw new Error(`HTTP ${response.status}`);
+  return String(response.data);
+}
+async function fetchLevelsSalaryData(role, company) {
+  const slug = roleSlug(role);
+  const salaries = [];
+  if (company) {
+    const md = await fetchMarkdown(`/companies/${slugify2(company)}/salaries/${slug}.md`);
+    if (md) {
+      for (const [level, comp] of tableUnder(md, "Levels Breakdown")) {
+        const total = parseDollar(comp);
+        if (total !== null) {
+          salaries.push({ role, company, location: "United States", base: null, equity: null, bonus: null, total_comp: total, level, source: "levelsfyi" });
+        }
       }
-    } catch (innerErr) {
-      console.error("Error parsing individual Levels.fyi salary entry:", innerErr);
-    }
-  });
-  if (salaries.length === 0) {
-    try {
-      const summaryTotal = $2("[class*='median'], [class*='Median'], [class*='avg'], [class*='average']").first().text().trim();
-      const summaryBase = $2("[class*='baseMedian'], [class*='basePay']").first().text().trim();
-      const summaryStock = $2("[class*='stockMedian'], [class*='stockPay']").first().text().trim();
-      const summaryBonus = $2("[class*='bonusMedian'], [class*='bonusPay']").first().text().trim();
-      if (summaryTotal || summaryBase) {
-        salaries.push({
-          role,
-          company: company || "Aggregate",
-          location: location || null,
-          base: parseDollarAmount(summaryBase),
-          equity: parseDollarAmount(summaryStock),
-          bonus: parseDollarAmount(summaryBonus),
-          total_comp: parseDollarAmount(summaryTotal),
-          level: "Median",
-          source: "levelsfyi"
-        });
+      const median = highlight(md, "Median Total Compensation");
+      if (median !== null) {
+        salaries.push({ role, company, location: "United States", base: null, equity: null, bonus: null, total_comp: median, level: "All levels (median)", source: "levelsfyi" });
       }
-    } catch {
     }
   }
   if (salaries.length === 0) {
-    throw new Error("no compensation entries parsed \u2014 likely bot-blocked or no data for this role");
+    const md = await fetchMarkdown(`/t/${slug}.md`);
+    if (md) {
+      const points = [
+        ["Median Total Compensation", "Median, all companies"],
+        ["90th Percentile", "90th percentile, all companies"]
+      ];
+      for (const [label, levelName] of points) {
+        const value = highlight(md, label);
+        if (value !== null) {
+          salaries.push({ role, company: null, location: "United States", base: null, equity: null, bonus: null, total_comp: value, level: levelName, source: "levelsfyi" });
+        }
+      }
+      const quartiles = md.match(/^- 25th \/ 75th Percentile:\s*([^/\n]+)\/\s*([^\n]+)$/m);
+      if (quartiles) {
+        const p25 = parseDollar(quartiles[1]);
+        const p75 = parseDollar(quartiles[2]);
+        if (p25 !== null) salaries.push({ role, company: null, location: "United States", base: null, equity: null, bonus: null, total_comp: p25, level: "25th percentile, all companies", source: "levelsfyi" });
+        if (p75 !== null) salaries.push({ role, company: null, location: "United States", base: null, equity: null, bonus: null, total_comp: p75, level: "75th percentile, all companies", source: "levelsfyi" });
+      }
+      for (const [, companyName, comp] of tableUnder(md, "Top Paying Companies").slice(0, 5)) {
+        const total = parseDollar(comp ?? "");
+        if (companyName && total !== null) {
+          salaries.push({ role, company: companyName, location: "United States", base: null, equity: null, bonus: null, total_comp: total, level: "Median (top-paying company)", source: "levelsfyi" });
+        }
+      }
+    }
+  }
+  if (salaries.length === 0) {
+    throw new Error(`no Levels.fyi data for role "${slug}"${company ? ` at ${company}` : ""}`);
   }
   return salaries;
 }
-async function getLevelsSalaryData(role, company, location) {
+async function getLevelsSalaryData(role, company) {
   const res = await fetchWithCache(
-    "levelsfyi",
-    {
-      role: role.toLowerCase().trim(),
-      company: company?.toLowerCase().trim() || null,
-      location: location?.toLowerCase().trim() || null
-    },
+    "levelsfyi-md",
+    { role: role.toLowerCase().trim(), company: company?.toLowerCase().trim() || null },
     LOOKUP_TTL_MS,
-    () => fetchLevelsSalaryData(role, company, location)
+    () => fetchLevelsSalaryData(role, company)
   );
-  return toSourceResult("Levels.fyi", "scraper", res);
-}
-function parseDollarAmount(text3) {
-  if (!text3) return null;
-  const cleaned = text3.replace(/[^0-9.,kKmM]/g, "").trim();
-  if (!cleaned) return null;
-  let multiplier = 1;
-  let numStr = cleaned;
-  if (cleaned.toLowerCase().endsWith("k")) {
-    multiplier = 1e3;
-    numStr = cleaned.slice(0, -1);
-  } else if (cleaned.toLowerCase().endsWith("m")) {
-    multiplier = 1e6;
-    numStr = cleaned.slice(0, -1);
-  }
-  const num = parseFloat(numStr.replace(/,/g, ""));
-  if (isNaN(num)) return null;
-  return Math.round(num * multiplier);
+  return toSourceResult("Levels.fyi", "api", res);
 }
 
 // src/tools/salary-data.ts
@@ -84414,7 +84320,7 @@ async function handleSalaryData(input) {
   const { role, company, location } = input;
   const [glassdoor, levels] = await Promise.all([
     getGlassdoorSalaries(role, company),
-    getLevelsSalaryData(role, company, location)
+    getLevelsSalaryData(role, company)
   ]);
   const allSalaries = [...glassdoor.items, ...levels.items];
   const footerLines = formatSourcesFooter([glassdoor.meta, levels.meta]);
@@ -84442,33 +84348,28 @@ async function handleSalaryData(input) {
     );
   }
   lines.push("");
-  const validTotals = allSalaries.map((s) => s.total_comp).filter((t) => t !== null);
-  const validBases = allSalaries.map((s) => s.base).filter((b) => b !== null);
-  if (validTotals.length >= 2 || validBases.length >= 2) {
-    lines.push("### Summary Statistics");
+  const statLines = (label, values) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    const median = sorted.length % 2 === 0 ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2 : sorted[Math.floor(sorted.length / 2)];
+    lines.push(`**${label}** (${values.length} figures): median ${formatDollar(median)}, range ${formatDollar(sorted[0])} - ${formatDollar(sorted[sorted.length - 1])}`);
+  };
+  const levelsMedian = allSalaries.find(
+    (s) => s.source === "levelsfyi" && /^(All levels \(median\)|Median, all companies)$/.test(s.level ?? "")
+  );
+  const glassdoorBases = allSalaries.filter((s) => s.source === "glassdoor").map((s) => s.base).filter((b) => b !== null);
+  if (levelsMedian || glassdoorBases.length >= 2) {
+    lines.push("### Summary by source");
     lines.push("");
-    if (validTotals.length >= 2) {
-      const sortedTotals = validTotals.sort((a, b) => a - b);
-      const median = sortedTotals.length % 2 === 0 ? (sortedTotals[sortedTotals.length / 2 - 1] + sortedTotals[sortedTotals.length / 2]) / 2 : sortedTotals[Math.floor(sortedTotals.length / 2)];
-      const avg = validTotals.reduce((sum, v) => sum + v, 0) / validTotals.length;
-      lines.push("**Total Compensation:**");
-      lines.push(`- Median: ${formatDollar(median)}`);
-      lines.push(`- Average: ${formatDollar(Math.round(avg))}`);
-      lines.push(`- Range: ${formatDollar(sortedTotals[0])} - ${formatDollar(sortedTotals[sortedTotals.length - 1])}`);
-      lines.push("");
+    if (levelsMedian?.total_comp != null) {
+      lines.push(`**Levels.fyi median total compensation** (${levelsMedian.level}): ${formatDollar(levelsMedian.total_comp)}`);
     }
-    if (validBases.length >= 2) {
-      const sortedBases = validBases.sort((a, b) => a - b);
-      const median = sortedBases.length % 2 === 0 ? (sortedBases[sortedBases.length / 2 - 1] + sortedBases[sortedBases.length / 2]) / 2 : sortedBases[Math.floor(sortedBases.length / 2)];
-      const avg = validBases.reduce((sum, v) => sum + v, 0) / validBases.length;
-      lines.push("**Base Salary:**");
-      lines.push(`- Median: ${formatDollar(median)}`);
-      lines.push(`- Average: ${formatDollar(Math.round(avg))}`);
-      lines.push(`- Range: ${formatDollar(sortedBases[0])} - ${formatDollar(sortedBases[sortedBases.length - 1])}`);
-      lines.push("");
-    }
+    if (glassdoorBases.length >= 2) statLines("Glassdoor base pay", glassdoorBases);
+    lines.push("");
   }
-  lines.push("*Data aggregated from Glassdoor and Levels.fyi (scraper-backed, cached up to 24h). Compensation figures are self-reported and may not reflect current offers.*");
+  if (location) {
+    lines.push(`*Levels.fyi figures are US-wide (its pages have no city filter), so they don't reflect ${location} specifically.*`);
+  }
+  lines.push("*Data source: Levels.fyi (https://www.levels.fyi) for total compensation; Glassdoor for base pay when enabled. Figures are self-reported and may not reflect current offers. Cached up to 24h.*");
   return finalizeOutput(lines, footerLines);
 }
 
@@ -84486,7 +84387,9 @@ async function handleInterviewExperiences(input) {
   lines.push(`**Experiences Found:** ${experiences.length}`);
   lines.push("");
   if (experiences.length === 0) {
-    if (result.meta.state === "failed") {
+    if (result.meta.state === "skipped") {
+      lines.push("Interview experiences come from Glassdoor. This source is a website scraper, which is off by default because the site restricts automated access. Use WebSearch instead; the user can opt in by setting JOB_INTEL_ENABLE_SCRAPERS=1 (after checking the site's terms) and restarting Claude Code.");
+    } else if (result.meta.state === "failed") {
       lines.push(`Could not retrieve interview data from Glassdoor: ${result.meta.detail || "unknown error"}`);
       lines.push("");
       lines.push("Fall back to WebSearch or visit Glassdoor directly for the latest interview experiences.");
@@ -84565,7 +84468,9 @@ async function handleTrendingRoles(input) {
   lines.push(`**Roles Found:** ${roles.length}`);
   lines.push("");
   if (roles.length === 0) {
-    if (result.meta.state === "failed") {
+    if (result.meta.state === "skipped") {
+      lines.push("Trending-role data comes from TrueUp. This source is a website scraper, which is off by default because the site restricts automated access. Use WebSearch instead; the user can opt in by setting JOB_INTEL_ENABLE_SCRAPERS=1 (after checking the site's terms) and restarting Claude Code.");
+    } else if (result.meta.state === "failed") {
       lines.push(`Could not retrieve trending roles data: ${result.meta.detail || "unknown error"}`);
       lines.push("");
       lines.push("Try visiting https://www.trueup.io/trending directly, or fall back to WebSearch for market-trend data.");
@@ -84646,11 +84551,11 @@ function parseAmount(s) {
 // src/index.ts
 var server = new McpServer({
   name: "job-intelligence",
-  version: "1.0.0"
+  version: "1.1.0"
 });
 server.tool(
   "job_search_jobs",
-  "Search job listings, API-first: Remotive and RemoteOK (keyless public APIs), Adzuna and USAJOBS (only when API keys are configured \u2014 otherwise skipped with a note), and the company's public Greenhouse/Lever board when the query names a well-known company. Indeed/LinkedIn/TrueUp scrapers run as best-effort fallback and may be bot-blocked. Results are deduplicated, cached (~6h), and every response ends with a per-source status footer (live / cached / skipped / failed). Fall back to WebSearch if all sources fail.",
+  "Search job listings. Returns a table of title, company, location, salary when posted, source and listing URL, plus a ~200-character snippet for the top 5 (open the URL for the full description). Sources: Remotive and RemoteOK (keyless; remote jobs only, location ignored), Adzuna (US) and USAJOBS (only when their API keys are set; these honor location), and the company's own Greenhouse/Lever board when the query names a well-known company. For a non-remote location, remote-only results are listed after location-matching ones. Indeed and TrueUp scrapers run only if the user set JOB_INTEL_ENABLE_SCRAPERS=1. Cached ~6h; the response ends with a per-source status footer (live / cached / skipped / failed). Use WebSearch when results are thin.",
   searchJobsSchema.shape,
   async (input) => {
     try {
@@ -84666,7 +84571,7 @@ server.tool(
 );
 server.tool(
   "job_get_company_info",
-  "Get company overview, ratings, culture scores, and interview process from Glassdoor (scraper \u2014 may bot-block), plus live open roles from the company's public Greenhouse/Lever job board when one exists (API). Results are cached (~24h) and the response ends with a per-source status footer \u2014 fall back to WebSearch if sources fail.",
+  "Get a company's open roles from its public Greenhouse/Lever job board when it has one (about 30 well-known tech companies are mapped). Glassdoor ratings and company details are added only if the user set JOB_INTEL_ENABLE_SCRAPERS=1. Cached ~24h; the response ends with a per-source status footer. For company background, culture or news, use WebSearch.",
   companyInfoSchema.shape,
   async (input) => {
     try {
@@ -84682,7 +84587,7 @@ server.tool(
 );
 server.tool(
   "job_get_salary_data",
-  "Get salary and total compensation data from Glassdoor and Levels.fyi. Includes base pay, equity, bonus, and total comp breakdowns by level. Scraper-backed: sites may bot-block, so results can be partial. Results are cached (~24h) and the response ends with a per-source status footer \u2014 fall back to WebSearch if sources fail.",
+  "Get compensation data. From Levels.fyi (always on): median total compensation per level at a company (e.g. L3-L9), or, without a company or when it has no page, role-wide percentiles and the top-paying companies. Levels.fyi figures are total comp only (no base/stock/bonus split) and US-wide (no city filter); cite them as 'Data source: Levels.fyi'. Glassdoor base pay is added only if the user set JOB_INTEL_ENABLE_SCRAPERS=1. Cached ~24h; the response ends with a per-source status footer.",
   salaryDataSchema.shape,
   async (input) => {
     try {
@@ -84698,7 +84603,7 @@ server.tool(
 );
 server.tool(
   "job_get_interview_experiences",
-  "Get interview experiences from Glassdoor including difficulty ratings, questions asked, interview process descriptions, and offer outcomes. Scraper-backed: Glassdoor may bot-block, so results can be partial. Results are cached (~24h) and the response ends with a per-source status footer \u2014 fall back to WebSearch if it fails.",
+  "Get interview experiences from Glassdoor (difficulty, questions asked, process, offer outcome). Works only if the user set JOB_INTEL_ENABLE_SCRAPERS=1; otherwise it returns a note saying the source is off, and you should use WebSearch for interview reports instead. Cached ~24h when enabled.",
   interviewExperiencesSchema.shape,
   async (input) => {
     try {
@@ -84714,7 +84619,7 @@ server.tool(
 );
 server.tool(
   "job_search_trending_roles",
-  "Discover trending job roles from TrueUp with growth rates, average salaries, demand levels, and which companies are hiring. Results are global (TrueUp has no location filter). Scraper-backed: the site may bot-block, so results can be partial. Results are cached (~6h) and the response ends with a per-source status footer \u2014 fall back to WebSearch if it fails.",
+  "Discover trending job roles from TrueUp (growth, salaries, hiring companies; global, no location filter). Works only if the user set JOB_INTEL_ENABLE_SCRAPERS=1; otherwise it returns a note saying the source is off, and you should use WebSearch for hiring-trend data instead. Cached ~6h when enabled.",
   trendingRolesSchema.shape,
   async (input) => {
     try {

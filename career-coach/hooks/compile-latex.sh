@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# compile-latex.sh — PostToolUse hook for career-coach plugin
-# Reads tool payload JSON from stdin, compiles .tex or converts .md resumes to PDF.
+# compile-latex.sh — PostToolUse hook for the career-coach plugin.
+# When a .tex or .md file under a resumes/ folder is written or edited in a
+# career-coach project, build a PDF next to it (latexmk/xelatex for .tex,
+# pandoc for .md) and tell Claude what happened through
+# hookSpecificOutput.additionalContext: the PDF path, the log to read on
+# failure, or which tool is missing. Output on stderr never reaches Claude for
+# PostToolUse hooks, which is why results are reported this way.
 
-# Read stdin into a variable
 INPUT="$(cat)"
 
-# Extract file_path from tool_input using python3. Skips the hook entirely when
-# the tool call itself failed (tool_response.success == false). Works for Write,
-# Edit and MultiEdit payloads alike — all carry tool_input.file_path.
 FILE_PATH="$(printf '%s' "$INPUT" | python3 -c "
 import sys, json
 try:
@@ -23,31 +24,35 @@ tool_input = data.get('tool_input', data.get('input', {})) or {}
 print(tool_input.get('file_path', ''))
 " 2>/dev/null || true)"
 
-# Guard: must have a file path
-if [[ -z "$FILE_PATH" ]]; then
-  exit 0
-fi
+[[ -z "$FILE_PATH" ]] && exit 0
+# Neutralize paths beginning with '-' so they can't be read as options
+[[ "$FILE_PATH" == -* ]] && FILE_PATH="./$FILE_PATH"
 
-# Guard: neutralize paths beginning with '-' so they can't be read as options
-if [[ "$FILE_PATH" == -* ]]; then
-  FILE_PATH="./$FILE_PATH"
-fi
-
-# Guard: must be under a /resumes/ path
-if [[ "$FILE_PATH" != */resumes/* ]]; then
-  exit 0
-fi
-
-# Guard: must be .md or .tex
+# Only resumes/*.md or resumes/*.tex
+[[ "$FILE_PATH" != */resumes/* ]] && exit 0
 EXT="${FILE_PATH##*.}"
-if [[ "$EXT" != "md" && "$EXT" != "tex" ]]; then
-  exit 0
-fi
+[[ "$EXT" != "md" && "$EXT" != "tex" ]] && exit 0
 
-# Derive output PDF path (same dir, same basename)
 DIR="$(dirname -- "$FILE_PATH")"
 BASENAME="$(basename -- "$FILE_PATH" ".$EXT")"
 PDF_PATH="$DIR/$BASENAME.pdf"
+LOG_PATH="$DIR/$BASENAME.build.log"
+
+# Only in career-coach projects: a career-profile.json in the project root or
+# next to the resumes folder. Keeps the hook out of unrelated repos that happen
+# to have a resumes/ directory.
+PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
+if [[ ! -f "$PROJECT_DIR/career-profile.json" && ! -f "$DIR/../career-profile.json" ]]; then
+  exit 0
+fi
+
+report() {
+  MSG="$1" python3 -c "
+import json, os
+print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PostToolUse', 'additionalContext': '[career-coach PDF build] ' + os.environ['MSG']}}))
+"
+  exit 0
+}
 
 cleanup_aux() {
   for EXT_CLEAN in aux log out fls fdb_latexmk xdv; do
@@ -55,61 +60,32 @@ cleanup_aux() {
   done
 }
 
-if [[ "$EXT" == "tex" ]]; then
-  # --- Compile .tex: prefer latexmk -xelatex (multi-pass), else single pass ---
-  if command -v latexmk &>/dev/null && command -v xelatex &>/dev/null; then
-    echo "[career-coach hook] Compiling $FILE_PATH with latexmk -xelatex ..." >&2
-    if ! latexmk -xelatex -interaction=nonstopmode -output-directory="$DIR" "$FILE_PATH" >&2; then
-      echo "[career-coach hook] LaTeX compilation failed for $FILE_PATH — see $DIR/$BASENAME.log, fix the source and save again to retry." >&2
-      exit 0
-    fi
-  else
-    if command -v xelatex &>/dev/null; then
-      LATEX_BIN="xelatex"
-    elif command -v pdflatex &>/dev/null; then
-      LATEX_BIN="pdflatex"
-    else
-      echo "[career-coach hook] xelatex/pdflatex not found. Install TeX Live or MiKTeX to auto-compile resumes." >&2
-      exit 0
-    fi
-
-    echo "[career-coach hook] Compiling $FILE_PATH with $LATEX_BIN ..." >&2
-    if ! "$LATEX_BIN" -interaction=nonstopmode -output-directory="$DIR" "$FILE_PATH" >&2; then
-      echo "[career-coach hook] LaTeX compilation failed for $FILE_PATH — see $DIR/$BASENAME.log, fix the source and save again to retry." >&2
-      exit 0
-    fi
-  fi
-
-  # Clean up auxiliary files
-  cleanup_aux
-
-  echo "[career-coach hook] PDF written to $PDF_PATH" >&2
-
-elif [[ "$EXT" == "md" ]]; then
-  # --- Convert .md to PDF with pandoc ---
-  if ! command -v pandoc &>/dev/null; then
-    echo "[career-coach hook] pandoc not found. Install pandoc to auto-convert Markdown resumes to PDF." >&2
-    exit 0
-  fi
-
-  if command -v xelatex &>/dev/null; then
-    PDF_ENGINE="xelatex"
-  elif command -v pdflatex &>/dev/null; then
-    PDF_ENGINE="pdflatex"
-  else
-    echo "[career-coach hook] xelatex/pdflatex not found. Install TeX Live or MiKTeX to compile Markdown resumes." >&2
-    exit 0
-  fi
-
-  echo "[career-coach hook] Converting $FILE_PATH to PDF with pandoc + $PDF_ENGINE ..." >&2
-  if ! pandoc "$FILE_PATH" \
-    --pdf-engine="$PDF_ENGINE" \
-    -V geometry:margin=0.75in \
-    -V fontsize=11pt \
-    -o "$PDF_PATH" >&2; then
-    echo "[career-coach hook] PDF conversion failed for $FILE_PATH — fix the source and save again to retry." >&2
-    exit 0
-  fi
-
-  echo "[career-coach hook] PDF written to $PDF_PATH" >&2
+if command -v xelatex &>/dev/null; then
+  ENGINE="xelatex"
+elif command -v pdflatex &>/dev/null; then
+  ENGINE="pdflatex"
+else
+  report "No PDF was built for $FILE_PATH: no LaTeX engine (xelatex or pdflatex) is installed. The source file is saved and usable. Tell the user, and offer options: install TeX Live (macOS: 'brew install --cask mactex-no-gui'; Ubuntu/Debian: 'sudo apt install texlive-xetex texlive-fonts-extra'), upload the .tex to Overleaf, or use the Markdown version."
 fi
+
+if [[ "$EXT" == "tex" ]]; then
+  if command -v latexmk &>/dev/null && [[ "$ENGINE" == "xelatex" ]]; then
+    BUILD=(latexmk -xelatex -interaction=nonstopmode -output-directory="$DIR" "$FILE_PATH")
+  else
+    BUILD=("$ENGINE" -interaction=nonstopmode -output-directory="$DIR" "$FILE_PATH")
+  fi
+  if ! "${BUILD[@]}" >"$LOG_PATH" 2>&1; then
+    report "LaTeX build failed for $FILE_PATH. The build log is at $LOG_PATH; read its last lines for the error, fix the source, and save again to rebuild. Templates need TeX Gyre fonts, and awesome-cv also needs fontawesome5."
+  fi
+  cleanup_aux
+else
+  if ! command -v pandoc &>/dev/null; then
+    report "No PDF was built for $FILE_PATH: pandoc isn't installed (it converts Markdown to PDF). The Markdown file is saved. Tell the user they can install pandoc (macOS: 'brew install pandoc'; Ubuntu/Debian: 'sudo apt install pandoc'), or use a LaTeX template instead (/resume-generator --template jakes-resume)."
+  fi
+  if ! pandoc "$FILE_PATH" --pdf-engine="$ENGINE" -V geometry:margin=0.75in -V fontsize=11pt -o "$PDF_PATH" >"$LOG_PATH" 2>&1; then
+    report "PDF conversion failed for $FILE_PATH. The log is at $LOG_PATH; fix the source and save again to rebuild."
+  fi
+fi
+
+rm -f -- "$LOG_PATH"
+report "PDF built: $PDF_PATH"

@@ -1,97 +1,50 @@
 ---
 name: resume-updater
-description: >
-  Conversational skill that interviews the user to capture professional
-  experience and build/update their career-profile.json. Use when the user
-  says "update my resume", "add my recent experience", "refresh my profile",
-  "capture my work history", "build my resume", "add a new job to my resume",
-  or wants to create or modify their professional profile data.
-
-  When to Use:
-  - User wants to add new experience, skills, projects, or achievements
-  - User wants to create their career profile from scratch
-  - User wants to update existing profile entries
-  - User mentions they changed jobs, got promoted, or completed a project
-
-  When NOT to Use:
-  - User wants to generate/format a resume (use /resume-generator command)
-  - User wants career advice (use career-director agent)
-  - User wants to search for jobs (use job-search agent)
+description: Builds and maintains the user's career profile (career-profile.json), the record of experience, achievements, skills and job targets that every career-coach command reads. Use when the user wants to set up their career profile, pastes or points to an existing resume or LinkedIn text to import, adds a new job, promotion or project, or wants to strengthen achievements with numbers. Not for producing a formatted resume or cover letter (use /resume-generator or /cover-letter), checking a resume against a job posting (/ats-check), or career strategy (career-director agent).
 ---
 
-# Resume Updater
+# Resume updater
 
-You are conducting a structured interview to capture the user's professional experience. Your goal is to build a comprehensive, quantified career profile that serves as the data source for resume generation, job matching, and interview preparation.
+Build and keep current the user's `career-profile.json`: an accurate, quantified record of their career that resumes, cover letters, job matching and interview prep all draw on. The quality of everything downstream depends on two things here: the facts are the user's own, and achievements carry real numbers wherever the user can supply them.
 
-## Before You Start
+Read `references/working-files.md` for where files live and the honesty rule that applies to everything you write.
 
-1. Read `career-profile.json` if it exists in the project root
-2. If it doesn't exist, tell the user you'll create one from scratch
-3. Determine what the user wants to update (new role, update existing, full rebuild)
+## Start from what the user already has
 
-## Interview Protocol
+Check for `career-profile.json` in the project root.
 
-Ask ONE question at a time. Wait for the user's response before proceeding. Use multiple-choice when possible (via AskUserQuestion tool).
+- **No profile yet:** ask first whether they have a resume, LinkedIn "About/Experience" text, or a file you can read (PDF, DOCX converted to text, Markdown). Importing takes a minute; building from scratch takes a long interview.
+  - **If they paste or point to one:** parse it into the schema in `references/career-profile-schema.md`. Show a short summary of what you captured (roles, dates, how many achievements have numbers), write the file, and then ask only about the gaps that matter most: target roles and locations, achievements without numbers, and anything ambiguous like overlapping dates.
+  - **If they have nothing to import:** run the intake in `references/profile-intake-questions.md`. Ask about one topic at a time so they can give full answers, but group simple fields (name, email, location, links) into one question.
+- **Profile exists:** read it, show the user what's relevant to their request, and change only what they asked to change. Preserve everything else exactly.
 
-### For a New Experience Entry
+## Capturing a role
 
-Follow this sequence:
+For each role, get company, title, dates (YYYY-MM), a line of context (what the company does, team and size), 3-5 responsibilities, the skills used, and the achievements. Achievements deserve the most time because they're what a reader remembers:
 
-1. **Company and Role**: "What company and job title?"
-2. **Dates**: "When did you start? Are you still there?"
-3. **Context**: "What does the company do? What team were you on? How big was the team?"
-4. **Responsibilities**: "What were your 3-5 main responsibilities?"
-5. **Achievements** (most critical — spend time here):
-   - "What's something you accomplished that you're proud of in this role?"
-   - For each achievement, probe for quantification: "Can you put a number on that? Percentage improvement? Revenue impact? Time saved? Scale handled?"
-   - Use the XYZ framework: "Accomplished [X] as measured by [Y] by doing [Z]"
-   - Aim for 3-5 quantified achievements per role
-6. **Skills**: "What technologies, tools, or methodologies did you use?"
-7. **Projects**: "Any notable projects worth highlighting separately?"
+- Ask what they're proud of in the role, then probe for a number: percentage improvement, revenue, time saved, scale handled, before and after. The XYZ shape helps: "Accomplished X, as measured by Y, by doing Z" (`references/achievement-frameworks.md` has more prompts by role type).
+- Probe once or twice. If no honest number exists (some real achievements don't have one), save the statement and method with an empty `metric`, tell the user it'll show up as a to-do, and move on. Never estimate a number for them; a made-up metric on a resume can cost them an offer when it's questioned in an interview.
 
-### For Profile Updates
+What good looks like:
 
-- Read the existing entry first
-- Show the user what's currently there
-- Ask what they want to change
-- Validate the changes maintain the achievement framework quality
+- Weak: "Improved system performance." No measure, no method.
+- Strong: "Reduced API latency 40% (200ms to 120ms) by adding a Redis cache to the three most-queried endpoints."
 
-### For Full Profile Rebuild
+## Targets and style
 
-Follow the sections in order:
-1. Personal info
-2. Professional summary
-3. Target roles and preferences
-4. Experience (most recent first, detailed interview per role)
-5. Education
-6. Skills inventory
-7. Projects
-8. Volunteer/leadership
+Make sure the profile has `target.roles` (at most 5), locations, remote preference, a salary range if they're willing to share it, and `preferences.industry_style`. Infer the style from their target roles and history, confirm it with the user (AskUserQuestion works well here), and save it; every resume and interview command uses it. Custom styles go in the project's `./industry-styles/` folder (see `references/working-files.md`).
 
-## Achievement Quality Gate
+Publications, patents and talks go in `publications`.
 
-Before saving any achievement, verify it meets this standard:
+## Saving
 
-**Weak** (reject and probe further):
-- "Improved system performance" — no metric, no method
-- "Led a team" — no scope, no outcome
+Write `career-profile.json` in the project root following the schema exactly, and preserve existing data. Saving triggers an automatic check: the plugin's hook reports formatting problems and achievements still missing numbers. Fix formatting issues directly; treat missing numbers as questions for the user, never as something to fill in yourself. After saving, tell the user what changed and what the most useful next step is, for example `/resume-generator` or `/job-hunt`.
 
-**Strong** (accept):
-- "Reduced API latency by 40% (from 200ms to 120ms) by implementing a Redis caching layer for the 3 most-queried endpoints" — has metric, method, and specifics
-- "Led a team of 8 engineers to deliver the payment processing system 2 weeks ahead of schedule, handling $2M+ daily transaction volume" — has scope, outcome, and scale
+## Reference files
 
-When the user gives a weak achievement, say: "That's a good start. Can we quantify it? For example, how much did performance improve? What was the before and after? What specific approach did you use?"
-
-## Saving Data
-
-- Write to `career-profile.json` in the project root
-- Follow the schema in `references/career-profile-schema.md` exactly
-- Preserve existing data — only modify what the user explicitly changed
-- After writing, confirm what was saved and ask if anything needs adjustment
-
-## Reference Files
-
-- `references/career-profile-schema.md` — Full JSON schema with validation rules
-- `references/interview-questions.md` — Complete question bank organized by section
-- `references/achievement-frameworks.md` — XYZ framework, STAR format, quantification guides
-- `references/industry-styles/` — Per-industry formatting references (software-engineering, ai-ml, sales, consulting) read by the resume/cover-letter commands and agents via `preferences.industry_style`
+- `references/career-profile-schema.md`: the JSON schema and validation rules
+- `references/profile-intake-questions.md`: questions by profile section, for building or filling gaps
+- `references/achievement-frameworks.md`: XYZ and STAR, quantification prompts by role type
+- `references/working-files.md`: file locations, the honesty rule, industry-style lookup, tracker schemas
+- `references/industry-styles/`: per-industry formatting, tone, keywords and interview weighting
+- `references/negotiation-guide.md`: used by `/compare-offers`

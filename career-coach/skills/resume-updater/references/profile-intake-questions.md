@@ -1,6 +1,6 @@
-# Interview Question Bank
+# Profile intake questions
 
-A complete set of interview questions organized by career profile section. Ask ONE question at a time and wait for the user's answer before proceeding to the next question. Use follow-up probes freely — especially in the Achievements section.
+Questions for building or filling gaps in `career-profile.json`, organized by profile section. (These gather the user's history; they are not mock-interview questions.) Ask about one topic at a time so the user can answer properly, and group simple contact fields together. Use follow-up probes freely, especially for achievements. When a resume was imported, ask only about what's missing.
 
 ---
 
@@ -96,7 +96,7 @@ A complete set of interview questions organized by career profile section. Ask O
 
 ## Skills Inventory
 
-1. "Let's build out your skills section. What programming languages are you proficient in? Rate each as Beginner, Intermediate, or Expert if you can."
+1. "Let's build out your skills section. Which programming languages do you use regularly enough to be interviewed on?"
 2. "What cloud platforms or infrastructure tools do you work with? (e.g., AWS, GCP, Azure, Terraform, Kubernetes)"
 3. "What databases do you have meaningful experience with — relational, NoSQL, time-series, graph?"
 4. "Are there any domain-specific skills worth calling out — machine learning, security, compliance frameworks, financial systems, healthcare data standards?"
@@ -115,4 +115,4 @@ A complete set of interview questions organized by career profile section. Ask O
 
 1. "Have you done any volunteer work, community involvement, or pro-bono work that's relevant to your professional identity?"
 2. "Have you held any leadership roles outside of work — board positions, conference talks, meetup organizing, open-source maintainership?"
-3. "Are there any publications, patents, podcasts, or public speaking engagements you'd like to include?"
+3. "Are there any publications, patents, podcasts, or public speaking engagements you'd like to include?" (These go in `publications`.)

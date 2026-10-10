@@ -27,7 +27,9 @@ export async function handleInterviewExperiences(input: InterviewExperiencesInpu
   lines.push("");
 
   if (experiences.length === 0) {
-    if (result.meta.state === "failed") {
+    if (result.meta.state === "skipped") {
+      lines.push("Interview experiences come from Glassdoor. This source is a website scraper, which is off by default because the site restricts automated access. Use WebSearch instead; the user can opt in by setting JOB_INTEL_ENABLE_SCRAPERS=1 (after checking the site's terms) and restarting Claude Code.");
+    } else if (result.meta.state === "failed") {
       lines.push(`Could not retrieve interview data from Glassdoor: ${result.meta.detail || "unknown error"}`);
       lines.push("");
       lines.push("Fall back to WebSearch or visit Glassdoor directly for the latest interview experiences.");

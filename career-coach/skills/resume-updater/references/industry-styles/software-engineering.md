@@ -36,7 +36,7 @@ skills appear earliest.
 
 ## Bullet Writing Rules
 
-- Every achievement bullet needs a quantified metric. Prefer these metric families:
+- Every achievement bullet needs a quantified metric. Use the numbers the profile actually has; if a strong bullet has none, write it without one and list it for the user to supply a figure. Never estimate one. Prefer these metric families:
   - **Scale**: requests/sec (RPS), daily active users (DAU), data volume (TB/PB), QPS, node count
   - **Performance**: latency (p50/p95/p99), throughput, load time
   - **Reliability**: uptime (99.9x%), error rate reduction, MTTR, incident count

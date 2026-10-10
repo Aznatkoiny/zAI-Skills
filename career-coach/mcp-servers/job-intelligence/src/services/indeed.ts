@@ -6,7 +6,7 @@
 
 import axios from "axios";
 import * as cheerio from "cheerio";
-import { RATE_LIMITS, USER_AGENT } from "../constants.js";
+import { RATE_LIMITS, SCRAPERS_DISABLED_DETAIL, SCRAPERS_ENABLED, USER_AGENT } from "../constants.js";
 import type { JobListing, SourceResult } from "../types.js";
 import { fetchWithCache, SEARCH_TTL_MS, toSourceResult } from "./cache.js";
 import { RateLimiter } from "./rate-limiter.js";
@@ -138,6 +138,9 @@ export async function searchIndeedJobs(
   remote?: boolean,
   limit: number = 10
 ): Promise<SourceResult<JobListing>> {
+  if (!SCRAPERS_ENABLED) {
+    return { meta: { source: "Indeed", tier: "scraper", state: "skipped", detail: SCRAPERS_DISABLED_DETAIL }, items: [] };
+  }
   const res = await fetchWithCache(
     "indeed",
     { query: query.toLowerCase().trim(), location: location || null, remote: !!remote, limit },

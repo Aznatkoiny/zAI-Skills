@@ -94,7 +94,7 @@ read as moving goalposts.
   "Confirming what we discussed: $X base, $Y sign-on, L5, 6-month review — please
   send the updated letter."
 - For equity: get the grant in **number of shares/units and the vesting schedule**,
-  not just a dollar value, plus the strike price and latest 409A/preferred price for
+  not just a dollar value, plus the strike price and latest 409A (common stock) value for
   options. A dollar value at an arbitrary internal valuation is not comparable data.
 
 ## Common Mistakes

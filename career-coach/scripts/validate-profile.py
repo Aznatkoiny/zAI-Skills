@@ -9,7 +9,7 @@ skills/resume-updater/references/career-profile-schema.md:
      graduation may be YYYY or YYYY-MM)
   3. Experience in reverse-chronological order (most recent start_date first)
   4. Maximum 5 target roles
-  5. Every achievement has a non-empty `metric`
+  5. Every achievement is quantified: a non-empty `metric`, or a number in the statement
 
 Output: a completeness scorecard plus one `WARN` line per finding (missing
 metrics are listed per role). This validator is ADVISORY: it always exits 0
@@ -163,13 +163,15 @@ def validate(profile):
                 statement = (ach.get("statement") or "").strip()
             else:
                 statement = str(ach)
-            if metric:
+            # A number in the statement itself ("Cut p95 latency 40%") counts as
+            # quantified even when the separate `metric` field is empty.
+            if metric or re.search(r"\d", statement):
                 ach_with_metric += 1
             else:
                 label = statement[:60] + ("..." if len(statement) > 60 else "")
                 missing.append((j, label or "<no statement>"))
         for j, label in missing:
-            warn(warnings, f"{who}: achievement [{j}] has no metric — \"{label}\"")
+            warn(warnings, f"{who}: achievement [{j}] has no number yet — \"{label}\"")
     score("all achievements have metrics",
           total_ach > 0 and ach_with_metric == total_ach,
           f"{ach_with_metric}/{total_ach} quantified")

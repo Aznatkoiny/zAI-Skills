@@ -1,6 +1,6 @@
 ---
 description: Flag stale applications and due next-actions from the tracker and draft follow-up emails
-argument-hint: "[none — reads applications.json]"
+argument-hint: "[company (optional) — otherwise reviews every application]"
 ---
 Review the user's application tracker for anything that needs a nudge, and draft the follow-up emails.
 
@@ -10,7 +10,7 @@ $ARGUMENTS
 
 This command takes no required arguments — it reads `applications.json` from the project root. If arguments name a specific company, limit the review to that company's entries.
 
-If `applications.json` doesn't exist or has no applications, say so and suggest `/job-hunt` to start populating it.
+If `applications.json` doesn't exist or is empty, say so and offer two ways to start: paste a list of applications they've already sent (company, role, date, stage, contact) and you'll create the tracker from it, or run `/job-hunt` to find new ones. The tracker schema is in `${CLAUDE_PLUGIN_ROOT}/skills/resume-updater/references/working-files.md`.
 
 ## Protocol
 
@@ -32,7 +32,7 @@ Show a table:
 
 ### 3. Draft follow-up emails
 
-For each flagged active entry, draft a short follow-up email. Match the tone rules of the user's industry style — read `preferences.industry_style` from `career-profile.json` and the corresponding file at `${CLAUDE_PLUGIN_ROOT}/skills/resume-updater/references/industry-styles/<industry_style>.md`, applying the same tone and no-generic-phrases rules the `/cover-letter` command uses.
+For each flagged active entry, draft a short follow-up email in the tone of the user's industry style (lookup rules in `working-files.md`), avoiding stock phrases the same way `/cover-letter` does.
 
 Email rules:
 - 60-120 words; subject line included

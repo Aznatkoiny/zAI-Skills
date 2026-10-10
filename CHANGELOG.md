@@ -78,6 +78,43 @@ and fast-moving technical content re-checked against upstream sources.
 
 ## career-coach
 
+### [1.4.0] - 2026-10-09
+
+#### Fixed
+- **Agents can use the job-data tools again.** Their `tools:` lists used the bare
+  `mcp__job-intelligence__…` names, which match nothing for a plugin-bundled server, so
+  job-search and interview-prep silently had no MCP tools. Now plugin-scoped
+  (`mcp__plugin_career-coach_job-intelligence__…`); verified live.
+- First run no longer dead-ends: `/job-hunt`, `/resume-generator`, `/cover-letter`,
+  `/ats-check` and `/mock-interview` explain what's missing and offer to build the profile
+  from a pasted resume, or run without one where that's possible.
+- Fabrication pressure removed: commands, style files and the profile hook no longer push
+  for a metric on every bullet; missing numbers are listed for the user instead, and cover
+  letters use a placeholder rather than an invented motivation.
+- PDF hook reports its result to Claude (built, failed with log path, or LaTeX missing with
+  install hints) instead of writing only to stderr, and only runs in career-coach folders.
+- Live mock interviews run in the main conversation (`/mock-interview`); the interview-prep
+  agent now builds prep packs.
+- Option values use the 409A (common) price, not the preferred price.
+
+#### Changed
+- **resume-updater** imports an existing resume or LinkedIn text and asks only about gaps;
+  the achievement quality gate has an honest way out; `publications` added to the schema;
+  `interview-questions.md` renamed `profile-intake-questions.md`.
+- **Job-data server 1.1.0:** LinkedIn scraper removed (robots.txt and terms prohibit it);
+  Glassdoor, Indeed and TrueUp scrapers are off unless `JOB_INTEL_ENABLE_SCRAPERS=1`; all
+  requests use an honest User-Agent; Levels.fyi data now comes from its sanctioned
+  markdown routes (per-level total compensation, with attribution); Remotive is fetched once
+  per 6h within its documented limits; for city searches, remote-only results no longer
+  crowd out location-aware sources; tool descriptions state exactly what each returns.
+- career-director is a coaching analyst (no delegation briefs, no state file); all agents
+  inherit the session model.
+- Shared rules (file locations, tracker and prep-notes schemas, industry-style lookup with
+  a project-local `./industry-styles/` override, honesty rule) live in one reference,
+  `working-files.md`.
+- README rewritten: who it's for, first steps, required vs optional setup and keys. Removed
+  the Claude-in-Chrome auto-apply claim (no agent had those tools).
+
 ### [1.3.0] - 2026-07-26
 
 #### Added

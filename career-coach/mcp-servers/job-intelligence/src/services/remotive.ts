@@ -2,12 +2,12 @@
  * Remotive public API — keyless JSON, remote jobs only.
  * https://remotive.com/api/remote-jobs?search=<q>&limit=<n>
  *
- * Primary (API-tier) source for job_search_jobs. Remotive's server-side
- * `search` matches very loosely (verified live: a "python developer" search
- * returned mostly unrelated roles), so we re-filter client-side and require
- * every query term to appear in the job's title/company/tags/description.
- * Responses are cached for 6h; Remotive explicitly asks integrators not to
- * poll aggressively.
+ * Primary (API-tier) source for job_search_jobs. Remotive's docs block
+ * clients that call more than twice a minute and advise fetching at most ~4
+ * times a day, so we fetch the whole feed once and cache it for 6h, then
+ * filter locally (every query term must appear in title/company/tags/
+ * description). Remotive's own `search` matched loosely anyway. Listings link
+ * back to Remotive and name it as the source, as its terms require.
  */
 
 import axios from "axios";
@@ -20,10 +20,6 @@ import { stripHtml, truncate } from "./text-utils.js";
 const limiter = new RateLimiter(RATE_LIMITS.remotive);
 
 const REMOTIVE_API_URL = "https://remotive.com/api/remote-jobs";
-
-// Fetch more than the caller's limit so the client-side relevance filter
-// has candidates to work with; cache is keyed by query only.
-const FETCH_CAP = 100;
 
 interface RemotiveJob {
   id?: number;
@@ -51,11 +47,10 @@ function matchesAllTerms(job: RemotiveJob, terms: string[]): boolean {
   return terms.every((t) => haystack.includes(t));
 }
 
-async function fetchRemotiveJobs(query: string): Promise<JobListing[]> {
+async function fetchRemotiveFeed(): Promise<RemotiveJob[]> {
   await limiter.acquire();
 
   const response = await axios.get(REMOTIVE_API_URL, {
-    params: { search: query, limit: FETCH_CAP },
     headers: { "User-Agent": API_USER_AGENT, Accept: "application/json" },
     timeout: 15_000,
   });
@@ -65,9 +60,13 @@ async function fetchRemotiveJobs(query: string): Promise<JobListing[]> {
     throw new Error("unexpected Remotive response shape (no jobs array)");
   }
 
+  return jobs as RemotiveJob[];
+}
+
+function toListings(jobs: RemotiveJob[], query: string): JobListing[] {
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
   const listings: JobListing[] = [];
-  for (const raw of jobs as RemotiveJob[]) {
+  for (const raw of jobs) {
     if (!raw?.title || !raw.company_name) continue;
     if (!matchesAllTerms(raw, terms)) continue;
     listings.push({
@@ -93,14 +92,9 @@ export async function searchRemotiveJobs(
   query: string,
   limit: number = 10
 ): Promise<SourceResult<JobListing>> {
-  const res = await fetchWithCache(
-    "remotive",
-    { query: query.toLowerCase().trim() },
-    SEARCH_TTL_MS,
-    () => fetchRemotiveJobs(query)
-  );
+  const res = await fetchWithCache("remotive-feed", {}, SEARCH_TTL_MS, fetchRemotiveFeed);
   if (res.ok) {
-    const items = res.value.slice(0, limit);
+    const items = toListings(res.value, query).slice(0, limit);
     return {
       meta: { source: "Remotive", tier: "api", state: res.state, count: items.length, ageMs: res.ageMs },
       items,

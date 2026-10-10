@@ -1,158 +1,85 @@
-# Career Coach — Claude Code Plugin
+# career-coach
 
-AI-powered career coaching, job search, and resume building plugin for Claude Code. Features a Career Director orchestrator, multi-platform job discovery via MCP, interview preparation, and LaTeX resume compilation.
+For job seekers who want help with the whole search: turning an existing resume into a reusable career profile, finding and ranking openings, tailoring resumes and cover letters, practicing interviews, and comparing offers. Everything works from one file, `career-profile.json`, which the plugin builds with you.
 
-## Prerequisites
+## Install
 
-- **Claude Code** CLI
-- **Node.js** 18+ (for MCP server)
-- **Optional:** LaTeX distribution (`texlive`, `mactex`) for PDF resume compilation
-- **Optional:** Pandoc for Markdown-to-PDF conversion
-- **Optional:** The **Claude in Chrome** browser extension for browser-based job application automation (Anthropic's official extension — see the Claude in Chrome section of Anthropic's documentation for setup)
-
-## Installation
-
-```bash
-# Add the marketplace
+```
 /plugin marketplace add Aznatkoiny/zAI-Skills
-
-# Install the plugin
 /plugin install career-coach@zAI-Skills
 ```
 
-Then restart Claude Code.
+Restart Claude Code after installing. Start Claude in a dedicated folder for your job search: the plugin keeps its files (profile, tracker, resumes) in the folder you're working in.
 
-The Job Intelligence MCP server ships as a prebuilt bundle (`mcp-servers/job-intelligence/dist/index.cjs`) and works immediately after install — no build step required.
+## Try it
 
-To rebuild it from source (development only):
+1. **Set up your profile from your resume.** Paste your resume (or LinkedIn experience text) and say "set up my career profile from this". Claude builds `career-profile.json` and then asks only about what's missing, mostly the numbers behind your achievements and the roles you're targeting.
+2. **Find jobs:** `/job-hunt staff platform engineer, remote`. You get a ranked report scored against your skills, plus entries in an application tracker.
+3. **Tailor a resume:** `/resume-generator https://jobs.example.com/posting --template jakes-resume`.
 
-```bash
-cd career-coach/mcp-servers/job-intelligence
-npm install && npm run build
-```
+You don't have to start with step 1: `/job-hunt`, `/cover-letter` and `/ats-check` can run from a role or a pasted resume and will offer to build the profile along the way.
 
-## Quick Start
+## What it needs
 
-1. **Build your career profile** — Run the resume updater skill by asking Claude to update your resume. It will interview you to capture your experience, achievements, and career goals into `career-profile.json`.
+| | |
+|---|---|
+| **Required** | Node.js 18+ (runs the bundled job-data server) and Python 3 (hooks and scripts). |
+| Optional: PDF output | A LaTeX install with XeLaTeX (macOS: `brew install --cask mactex-no-gui`; Ubuntu/Debian: `sudo apt install texlive-xetex texlive-fonts-extra`). Pandoc for Markdown-to-PDF. Without these you still get `.md`/`.tex` files, and Claude tells you no PDF was built. |
+| Optional: location-aware job search | Free API keys for Adzuna (US jobs; https://developer.adzuna.com/signup, free tier 250 requests/day) and USAJOBS (US federal jobs; https://developer.usajobs.gov/apirequest/). Without them, search uses Remotive and RemoteOK, which list **remote jobs only** and ignore location, plus company job boards. |
+| Optional: scraped sources | Glassdoor (company ratings, interview reports), Indeed and TrueUp are off by default because these sites restrict automated access. You can opt in with `JOB_INTEL_ENABLE_SCRAPERS=1` after checking their terms; expect them to be blocked often. |
 
-2. **Set your industry style** — Tell Claude your industry (software-engineering, ai-ml, sales, consulting). It's stored as `preferences.industry_style` in `career-profile.json` and selects the matching formatting reference for resumes, cover letters, coaching, and interview prep.
+Set keys in your shell profile (for example `export ADZUNA_APP_ID=...`) or under `env` in `~/.claude/settings.json`, then restart Claude Code:
 
-3. **Search for jobs** — Ask the Career Director to find jobs matching your profile. It delegates to the Job Search agent which queries Indeed, LinkedIn, TrueUp, Glassdoor, and Levels.fyi.
+| Variable | Purpose |
+|---|---|
+| `ADZUNA_APP_ID`, `ADZUNA_APP_KEY` | Adzuna job search |
+| `USAJOBS_API_KEY`, `USAJOBS_EMAIL` | USAJOBS search (the email must be the one you registered with) |
+| `JOB_INTEL_ENABLE_SCRAPERS` | `1` to enable the Glassdoor, Indeed and TrueUp scrapers |
 
-4. **Generate tailored resumes** — Use `/resume-generator` with a job description to produce a targeted resume.
+## Commands
 
-5. **Prepare for interviews** — Ask for interview prep to activate the Interview Prep agent with mock interviews, behavioral question practice, and company-specific coaching.
+| Command | Does |
+|---|---|
+| `/job-hunt [role, location]` | Searches, reads the top listings, scores them against your skills, adds Levels.fyi compensation, writes `job-search-results.md`, and seeds `applications.json`. |
+| `/resume-generator [posting or company/role] [--template <name>] [--output-dir <dir>]` | A resume from your profile, optionally tailored, as Markdown or one of six LaTeX templates, with a PDF when LaTeX is installed. Lists any bullets that need a number from you. |
+| `/cover-letter [posting or company/role]` | A 250-400 word letter tied to your real achievements; leaves a marked placeholder where only you can supply the reason you want the job. |
+| `/ats-check [posting] [resume file]` | Keyword coverage of your resume against a posting, with a truthful rewrite for each gap. |
+| `/mock-interview [company/role] [type]` | Live practice, one question at a time, with feedback and a saved scorecard. |
+| `/compare-offers [details]` | 4-year totals with stated assumptions, cost-of-living adjustment, market benchmarks and negotiation talking points. |
+| `/follow-ups [company]` | Flags stale applications and drafts follow-up emails (you send them). Can create the tracker from a list you paste. |
+| `/validate-profile [path]` | Checks your profile and turns the findings into fixes. |
 
-## Components
+## Skill and agents
 
-### Agents
+- **resume-updater** (skill): builds and maintains `career-profile.json`, by import or interview. Triggers on "set up my career profile", "I started a new job", "add my promotion", and similar.
+- **career-director** (agent): career strategy, such as switching fields, gap analysis for a target level, or management versus IC. Returns a recommendation and a plan.
+- **job-search** (agent): searches, compensation lookups, and tracker updates ("update my Stripe application, I got a phone screen").
+- **interview-prep** (agent): a prep pack for a specific interview, covering company process, focus areas and STAR stories from your real achievements. Live practice runs through `/mock-interview`.
 
-| Agent | Model | Description |
-|-------|-------|-------------|
-| **Career Director** | Opus | Hub orchestrator + career coach. Manages your career strategy, delegates to specialists, and provides coaching. |
-| **Job Search** | Sonnet | Job discovery and application tracking. Searches multiple platforms, tracks applications, and monitors new listings. |
-| **Interview Prep** | Sonnet | Mock interviews and coaching. Conducts practice sessions with real-time feedback and company-specific preparation. |
+Agents use whatever model your session runs.
 
-### Skill
+## Job-data server
 
-**Resume Updater** — Interactive interview-style skill that captures your professional experience and builds your `career-profile.json`. Uses progressive questioning with achievement quality gates (every accomplishment needs a quantified metric).
+The bundled `job-intelligence` MCP server has five tools:
 
-### Commands
+| Tool | Returns | Sources |
+|---|---|---|
+| `job_search_jobs` | Listings with location, posted salary and URL | Remotive, RemoteOK (remote only); Adzuna, USAJOBS (with keys); company Greenhouse/Lever boards; Indeed, TrueUp (opt-in) |
+| `job_get_salary_data` | Median total compensation per level, or role-wide percentiles (US) | Levels.fyi; Glassdoor base pay (opt-in) |
+| `job_get_company_info` | A company's open roles from its own job board | Greenhouse/Lever; Glassdoor ratings (opt-in) |
+| `job_get_interview_experiences` | Reported interview questions and process | Glassdoor (opt-in only) |
+| `job_search_trending_roles` | Roles with growing demand | TrueUp (opt-in only) |
 
-| Command | Description |
-|---------|-------------|
-| `/resume-generator [target] [--template <name>] [--output-dir <dir>]` | Generate a tailored resume from your career profile — Markdown by default, or rendered into one of the 6 LaTeX templates via `scripts/render-resume.py` |
-| `/cover-letter [job description, URL, or company/role]` | Generate a targeted cover letter (250-400 words) with company research |
-| `/job-hunt [role focus or 'from profile']` | Full pipeline: search jobs per target role, enrich the top ~10 with salary + company data, score by skill overlap, write ranked `job-search-results.md`, and seed `applications.json` |
-| `/ats-check [job description text/URL] [resume file]` | ATS keyword coverage check of a resume + profile against a job description, with a concrete rewrite suggestion per missing keyword |
-| `/mock-interview [company/role] [behavioral\|technical\|case]` | Mock interview with real reported questions, one at a time, with a session scorecard persisted to `interview-prep-notes.json` |
-| `/compare-offers [offer details or 'interactive']` | Compare offers on benchmarked 4-year total comp (assumptions stated) with cost-of-living adjustment and negotiation talking points |
-| `/validate-profile [path]` | Run `scripts/validate-profile.py` against `career-profile.json` and turn the completeness scorecard into fixes |
-| `/follow-ups` | Flag tracker entries stale >14 days or with due next-actions, and draft follow-up emails in your industry tone |
+Every response ends with a Sources footer (live, cached, skipped or failed). Results are cached for 6-24 hours. The server ships prebuilt (`mcp-servers/job-intelligence/dist/index.cjs`); to rebuild after changing its source: `cd mcp-servers/job-intelligence && npm ci && npm run build`.
 
-### Industry Styles
+## Industry styles
 
-Industry formatting references live in `skills/resume-updater/references/industry-styles/`. The commands and agents read the file matching `preferences.industry_style` in `career-profile.json`. Each file contains the full section order (with rationale), bullet writing rules with example bullets, an ATS keyword bank, tone/formatting rules, career ladder framing, and interview weighting for that industry:
+Resume format, tone, keywords and interview weighting follow an industry style: `software-engineering`, `ai-ml`, `sales` or `consulting` (stored as `preferences.industry_style`). To add your own, put `<name>.md` in an `industry-styles/` folder in your job-search folder (copy a bundled one from `skills/resume-updater/references/industry-styles/` as a starting point) and set `preferences.industry_style` to `<name>`. Don't edit files inside the installed plugin; updates replace them.
 
-| Style | Section Order |
-|-------|--------------|
-| **software-engineering** | Skills, Experience, Projects, Education |
-| **ai-ml** | Experience, Publications/Research, Projects, Skills, Education |
-| **sales** | Experience (revenue-first), Achievements, Skills, Education |
-| **consulting** | Experience (client-impact), Education, Skills, Leadership |
+## Hooks
 
-**Add your own:** Create a `.md` file in `skills/resume-updater/references/industry-styles/` named after the style (e.g., `product-management.md`) covering section order, example bullets with metrics, ATS keywords, tone rules, and interview weighting — then set `preferences.industry_style` in `career-profile.json` to the file name (without `.md`).
-
-### Negotiation Guide
-
-`skills/resume-updater/references/negotiation-guide.md` is a practical offer-negotiation playbook: anchoring with market data, BATNA framing, a component-by-component flexibility table (base, equity, sign-on, level, review timing), ready-to-use scripts, and a get-it-in-writing checklist. `/compare-offers` grounds its negotiation talking points in this file; it's also readable on its own.
-
-### MCP Server — Job Intelligence
-
-5 tools for job market data:
-
-| Tool | Sources | Description |
-|------|---------|-------------|
-| `job_search_jobs` | Indeed, LinkedIn, TrueUp | Aggregated job search with deduplication |
-| `job_get_company_info` | Glassdoor | Company profiles, ratings, culture scores |
-| `job_get_salary_data` | Glassdoor, Levels.fyi | Compensation comparison tables |
-| `job_get_interview_experiences` | Glassdoor | Interview reports with difficulty ratings |
-| `job_search_trending_roles` | TrueUp | Trending roles and market demand |
-
-Tools surface to Claude Code as `mcp__job-intelligence__<tool_name>` (e.g., `mcp__job-intelligence__job_get_company_info`).
-
-#### Optional job-source API keys
-
-The server reads these environment variables when present. All are optional — without them, keyless sources (Remotive, RemoteOK, Greenhouse/Lever job boards) still work.
-
-| Env var | Purpose |
-|---------|---------|
-| `ADZUNA_APP_ID` | Adzuna job-search API application ID |
-| `ADZUNA_APP_KEY` | Adzuna job-search API application key |
-| `USAJOBS_API_KEY` | USAJOBS (US federal jobs) API key |
-| `USAJOBS_EMAIL` | Contact email USAJOBS requires in the request User-Agent |
-
-### Hooks
-
-Two PostToolUse hooks fire on `Write`/`Edit`/`MultiEdit` (both are non-blocking):
-
-- **LaTeX Auto-Compile** (`hooks/compile-latex.sh`) — automatically compiles `.tex` or `.md` files written to `resumes/` into PDFs using xelatex or pandoc.
-- **Profile Validation** (`hooks/validate-profile.sh`) — whenever `career-profile.json` is written or edited, runs `scripts/validate-profile.py` and feeds any `WARN` lines back to Claude as additional context, so schema and quality issues surface immediately after every save.
-
-### Scripts
-
-Plain-Python utilities in `scripts/` (stdlib only, Python 3.8+):
-
-| Script | Purpose |
-|--------|---------|
-| `validate-profile.py [path]` | Advisory validator for `career-profile.json`: required fields, `YYYY-MM` dates, reverse-chronological experience, max 5 target roles, and a non-empty metric on every achievement. Prints a completeness scorecard + `WARN` lines; always exits 0. Used by `/validate-profile` and the validation hook. |
-| `render-resume.py --template <name> [--profile p] [--output-dir d] [--templates-dir t]` | Merges `career-profile.json` into one of the six LaTeX templates: substitutes contact macros, generates experience/education/skills/project blocks with LaTeX escaping, writes `<output-dir>/<name>-<template>.tex`. Limitations (no proficiency levels, no per-experience locations, no one-page fitting) are documented in the script docstring. Used by `/resume-generator --template`. |
-
-### LaTeX Templates
-
-6 resume templates in `templates/latex/`:
-
-| Template | Style |
-|----------|-------|
-| `modern-professional.tex` | Clean ATS-friendly single column |
-| `technical-clean.tex` | Two-column with skill sidebar |
-| `jakes-resume.tex` | Jake Gutierrez style, compact |
-| `deedy-resume.tex` | Deedy two-column |
-| `altacv.tex` | Colorful sidebar with photo |
-| `awesome-cv.tex` | Elegant with icon header |
-
-Render any template directly from your profile with `/resume-generator --template <name>` (e.g., `--template jakes-resume`); the generated `.tex` lands in `resumes/` and auto-compiles to PDF when a TeX Live installation with XeLaTeX is present.
-
-## Data Model
-
-All components share a single `career-profile.json` file at the project root. See `skills/resume-updater/references/career-profile-schema.md` for the full schema.
-
-### Claude in Chrome Integration
-
-For browser-based job application automation, install and enable Anthropic's official **Claude in Chrome** browser extension separately (see the Claude in Chrome section of Anthropic's documentation for setup and site permissions). When its browser tools are available, the Career Director and Job Search agents can use them for:
-- Auto-filling job applications
-- Saving job listings from the browser
-- LinkedIn profile data extraction
+- **PDF build:** when a `.md` or `.tex` file under `resumes/` is saved in a career-coach folder, a PDF is built next to it, and Claude is told whether it worked.
+- **Profile check:** saving `career-profile.json` runs `scripts/validate-profile.py` and gives Claude the findings as a to-do list.
 
 ## License
 

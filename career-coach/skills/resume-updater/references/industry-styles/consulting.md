@@ -25,7 +25,7 @@ candidate to its own clients.
 
 ## Bullet Writing Rules
 
-- Every bullet needs a quantified outcome. Metric families:
+- Every bullet needs a quantified outcome. Use the numbers the profile actually has; if a strong bullet has none, write it without one and list it for the user to supply a figure. Never estimate one. Metric families:
   - **Client value**: $ value created (revenue, savings, EBITDA lift), % improvement
   - **Scope**: engagement size, client size (Fortune 500, $2B retailer), geography, workstreams
   - **Team**: people led or coached, cross-functional stakeholders, client seniority engaged

@@ -37,7 +37,7 @@ List architectures the candidate has actually trained or fine-tuned, not just re
 
 ## Bullet Writing Rules
 
-- Every bullet needs a quantified metric. Prefer these metric families:
+- Every bullet needs a quantified metric. Use the numbers the profile actually has; if a strong bullet has none, write it without one and list it for the user to supply a figure. Never estimate one. Prefer these metric families:
   - **Model quality**: accuracy, F1, AUC, BLEU/ROUGE, perplexity, win-rate vs. baseline
   - **Training efficiency**: GPU-hours, cost per run, convergence speedup, throughput
   - **Data scale**: examples, tokens, TB processed, labeling throughput

@@ -24,7 +24,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/validate-profile.py" career-profile.json
 - Dates in `YYYY-MM` format (education graduation may be `YYYY`)
 - Experience in reverse-chronological order
 - Maximum 5 target roles
-- Every achievement has a non-empty `metric` (listed per role when missing)
+- Every achievement is quantified: a `metric`, or a number in the statement (listed per role when missing)
 
 ### 2. Interpret the results
 
@@ -37,5 +37,5 @@ Don't just paste the output. Summarize:
 ### 3. Offer fixes
 
 - For mechanical issues (date formats, ordering, trimming target roles), offer to fix `career-profile.json` directly with Edit — show the change before applying.
-- For missing metrics or empty sections, offer to run the resume-updater skill's interview flow to fill them properly rather than inventing numbers. **Never fabricate metrics.**
+- For missing numbers or empty sections, ask the user, or offer the resume-updater skill's flow to fill them. The numbers have to come from the user: an invented metric on a resume is a liability the moment an interviewer asks about it.
 - After any edits, re-run the validator to confirm the score improved. (Edits to `career-profile.json` also trigger the plugin's validation hook automatically, so warnings will resurface on save if anything regressed.)

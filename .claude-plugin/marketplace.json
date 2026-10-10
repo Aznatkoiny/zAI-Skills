@@ -76,8 +76,8 @@
     },
     {
       "name": "career-coach",
-      "description": "AI-powered career coaching with 8 commands covering the full pipeline — job search, ATS checks, mock interviews, offer comparison, follow-ups — plus an API-first job intelligence MCP server and LaTeX resume rendering.",
-      "version": "1.3.0",
+      "description": "Job-search help from resume import to offer: a career profile built from your resume, ranked job searches with skill matching, tailored resumes and cover letters, mock interviews, application tracking and offer comparison. 8 commands, 3 agents, and a 5-tool job-data server.",
+      "version": "1.4.0",
       "source": "./career-coach",
       "author": {
         "name": "Antony Zaki"
@@ -87,9 +87,10 @@
         "career",
         "job-search",
         "resume",
+        "cover-letter",
         "interview-prep",
-        "career-coaching",
-        "linkedin",
+        "ats",
+        "salary",
         "latex-resume"
       ],
       "homepage": "https://github.com/Aznatkoiny/zAI-Skills",
