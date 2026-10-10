@@ -6,6 +6,8 @@ You are a senior consultant at a top-tier strategy firm. The risk log is a livin
 
 Create/update a risk log for: $ARGUMENTS
 
+If nothing was given, ask for the problem in one sentence, e.g. `/risk-log ERP migration go-live`. Where the input leaves details open, make sensible assumptions and list them at the end rather than asking several questions first. Use role titles, not invented names, for owners.
+
 <methodology>
 1. IDENTIFY RISKS AND ISSUES — gather all potential items, then classify:
    - **Risk**: A future event that may or may not occur, with negative consequences if it does
@@ -26,12 +28,12 @@ Create/update a risk log for: $ARGUMENTS
 4. PRIORITIZE using the likelihood × impact matrix:
    - Critical (High likelihood × High impact): Requires immediate action and SteerCo visibility
    - Material (High×Medium, Medium×High): Requires active mitigation and regular monitoring
-   - Monitor (Medium×Medium, Low×High): Track but don't over-invest in mitigation
-   - Accept (Low×Low, Low×Medium): Acknowledge and move on
+   - Monitor (Medium×Medium, Low×High, High×Low): Track but don't over-invest in mitigation
+   - Accept (Low×Low, Low×Medium, Medium×Low): Acknowledge and move on
 
 5. FOR EACH MATERIAL+ ITEM, DEFINE:
    - A specific, actionable mitigation plan (not "monitor closely")
-   - A clear owner (a person, not a committee)
+   - A clear owner: one role, not a committee (use the person's name only if the user gave it)
    - A trigger or deadline for action
    - An escalation path if the mitigation fails
 </methodology>
@@ -41,8 +43,8 @@ Create/update a risk log for: $ARGUMENTS
 
 | ID | Type | Description | Category | Likelihood | Impact | Priority | Owner | Mitigation | Status | Date |
 |----|------|-------------|----------|-----------|--------|----------|-------|-----------|--------|------|
-| R-001 | Risk | [description] | Strategic | High | High | Critical | [name] | [specific action] | Open | [date] |
-| I-001 | Issue | [description] | Operational | — | High | Critical | [name] | [specific action] | Open | [date] |
+| R-001 | Risk | [description] | Strategic | High | High | Critical | [owner role] | [specific action] | Open | [date] |
+| I-001 | Issue | [description] | Operational | — | High | Critical | [owner role] | [specific action] | Open | [date] |
 
 **Heat map summary**:
 - Critical items: [count] — requiring immediate attention
@@ -55,7 +57,7 @@ Create/update a risk log for: $ARGUMENTS
 <quality_standards>
 - If a risk-log.md already exists in the working directory, read it and update rather than replace.
 - Keep descriptions to one sentence — the mitigation plan is where the detail goes.
-- Every Critical and Material item must have a named owner and a specific mitigation action.
+- Every Critical and Material item must have an owner and a specific mitigation action.
 - "Monitor" is not a mitigation plan. State what you're monitoring and what triggers escalation.
 - Limit the log to 15-20 items maximum. If you have more, you haven't prioritized enough.
 </quality_standards>

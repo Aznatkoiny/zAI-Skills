@@ -1,22 +1,21 @@
 ---
 name: consulting-frameworks
 description: >
-  Core consulting thinking frameworks and methodologies for structuring
-  business problems, communicating findings, analyzing strategy, building
-  financial models, and designing operations. Use when any agent or command
-  needs to apply MECE decomposition, pyramid principle, hypothesis-driven
-  analysis, issue trees, SCR communication, Porter's Five Forces,
-  TAM/SAM/SOM market sizing, value chain analysis, NPV/IRR decision
-  criteria, build/buy/partner evaluation, RACI matrices, synergy sizing,
-  valuation triangulation, price-volume-mix decomposition, discount
-  waterfalls, or any standard consulting framework. This skill provides
-  procedural guidance — not just framework names, but how to apply them
-  correctly.
+  How-to guidance for consulting frameworks: MECE problem structuring, issue
+  trees, hypothesis-driven analysis, the pyramid principle and SCR, action
+  titles, Porter's Five Forces, TAM/SAM/SOM, value chain, NPV/IRR and
+  build/buy/partner, RACI and operating models, synergy sizing and valuation
+  triangulation, price-volume-mix, Van Westendorp and discount waterfalls. Use
+  when the user asks how to apply or choose a framework ("how do I run a Van
+  Westendorp survey?", "what's a MECE way to cut our cost base?"), or wants a
+  framework-level check of their own work. To produce a finished deliverable,
+  the matching slash command (/issue-tree, /market-size, /storyline, ...) is
+  the faster path. Not for real-estate deal analysis (real-estate-investment).
 ---
 
 # Consulting Frameworks
 
-Select the reference file matching your task. Each contains procedural guidance, application steps, quality checks, and examples.
+Select the reference file matching the task. Each has procedural guidance, application steps, quality checks and examples. `references/quality-bar.md` is the sourcing and review standard every deliverable in this plugin is held to.
 
 ## Framework Selection Guide
 

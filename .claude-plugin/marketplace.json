@@ -33,8 +33,8 @@
     },
     {
       "name": "consulting-toolkit",
-      "description": "Multi-agent consulting system with an /engagement orchestration command, Engagement Manager quality gate, and Research, Finance, Deck, and Due Diligence agents. 17 consulting slash commands, deliverable templates, citation-lint hook, and an 8-tool financial intelligence MCP server.",
-      "version": "1.4.0",
+      "description": "Consulting deliverables with every number sourced: 17 commands (issue trees, market sizing, profiles, business cases, storylines, partner review), an /engagement orchestrator with 5 agents, and an 8-tool financial data server for SEC filings, FRED and stock prices.",
+      "version": "1.5.0",
       "source": "./consulting-toolkit",
       "author": {
         "name": "Antony Zaki"

@@ -3,12 +3,15 @@
 # When a consulting deliverable is written or edited with quantitative claim
 # lines that lack a bracketed [Source, ...] citation, emits ONE
 # hookSpecificOutput.additionalContext JSON on stdout summarizing up to 5
-# offending lines, so Claude flags the gap and suggests /partner-review.
+# offending lines, so Claude can add citations or assumption labels before the
+# file goes out.
 #
-# Deliverable detection: markdown files whose basename carries a memo/sizing/
-# profile segment (covers this plugin's naming conventions — dd-memo-*.md,
-# market-sizing-*.md, company-profile-*.md — as well as plain *-memo.md,
-# *-sizing.md, *-profile.md), plus anything under a deliverables/ directory.
+# Deliverable detection: markdown files named the way this plugin's commands
+# and agents name their outputs (dd-memo-*, market-sizing-*, company-profile-*,
+# competitive-landscape-*, benchmark-*, business-case-*, storyline-*,
+# steerco-update-*, exec-summary*, financial-model-*, size-the-prize*,
+# risk-log*), any basename with a memo/sizing/profile segment, and anything
+# under a deliverables/ directory.
 #
 # Matching is deliberately conservative: code fences are skipped, headers
 # (including dated headers) are skipped, table separator rows and TOC link
@@ -17,8 +20,9 @@
 # quantitative claims. Lines mentioning "assumption" are treated as explicitly
 # labeled and skipped, matching the agents' sourcing standard.
 #
-# Fires at most once per session (marker file), following the pattern of
-# real-estate-investment/hooks/tax-disclaimer.sh.
+# Each distinct set of uncited lines in a file is reported once per session
+# (marker files live in the temp directory, never in the user's project), so
+# a later deliverable or a new problem in the same file still gets flagged.
 
 # Read tool payload from stdin
 INPUT=$(cat)
@@ -40,8 +44,13 @@ if not isinstance(file_path, str) or not file_path.endswith('.md'):
     sys.exit(0)
 
 basename = file_path.rsplit('/', 1)[-1]
+PLUGIN_OUTPUTS = re.compile(
+    r'^(?:dd-memo|market-sizing|company-profile|competitive-landscape|benchmark|'
+    r'business-case|storyline|steerco-update|exec-summary|financial-model|'
+    r'size-the-prize|risk-log)', re.IGNORECASE)
 is_deliverable = (
-    re.search(r'(?:^|[-_])(?:memo|sizing|profile)(?:[-_.])', basename) is not None
+    PLUGIN_OUTPUTS.match(basename) is not None
+    or re.search(r'(?:^|[-_])(?:memo|sizing|profile)(?:[-_.])', basename) is not None
     or '/deliverables/' in file_path
     or file_path.startswith('deliverables/')
 )
@@ -111,9 +120,12 @@ n = len(offending)
 suffix = ' (first 5 shown)' if n >= 5 else ''
 quoted = ' | '.join('"' + l + '"' for l in offending)
 message = (
-    str(n) + ' quantitative line(s) lack [Source, Date] citations in '
-    + basename + ' — run /partner-review before sending' + suffix
-    + '. Offending lines: ' + quoted
+    '[consulting-toolkit citation check] ' + str(n) + ' line(s) in ' + basename
+    + ' contain figures with no [Source, Date] citation or [Assumption: ...] label'
+    + suffix + ': ' + quoted
+    + '. Add a citation or label to each before the file goes to anyone. If a figure '
+    'can\'t be sourced, mark it as an assumption or tell the user. /partner-review '
+    'gives a full quality check when the deliverable is finished.'
 )
 payload = {
     'hookSpecificOutput': {
@@ -121,7 +133,9 @@ payload = {
         'additionalContext': message,
     }
 }
-print(str(data.get('session_id', '')))
+import hashlib
+fingerprint = hashlib.sha1((file_path + '\n' + '\n'.join(offending)).encode()).hexdigest()[:16]
+print(str(data.get('session_id', '')) + '-' + fingerprint)
 print(json.dumps(payload))
 PYEOF
 )
@@ -132,14 +146,10 @@ if [[ -n "$RESULT" ]]; then
   SESSION_ID="${RESULT%%$'\n'*}"
   PAYLOAD="${RESULT#*$'\n'}"
 
-  # Once-per-session dedupe marker. Prefer the project's .claude dir; fall
-  # back to TMPDIR. Keyed by session id when one is available.
-  if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
-    MARKER_DIR="${CLAUDE_PROJECT_DIR}/.claude"
-  else
-    MARKER_DIR="${TMPDIR:-/tmp}"
-  fi
-  MARKER="$MARKER_DIR/.citation-lint-shown${SESSION_ID:+-$SESSION_ID}"
+  # Dedupe marker keyed by session + file + offending lines, kept in the temp
+  # directory so nothing is written into the user's project.
+  MARKER_DIR="${TMPDIR:-/tmp}/consulting-toolkit-citation-check"
+  MARKER="$MARKER_DIR/${SESSION_ID:-nosession}"
 
   if [[ -f "$MARKER" ]]; then
     exit 0

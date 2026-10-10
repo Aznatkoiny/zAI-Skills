@@ -8,7 +8,8 @@ const limiter = new RateLimiter(RATE_LIMITS.fred);
 
 function getApiKey(): string {
   const key = process.env.FRED_API_KEY;
-  if (!key) {
+  // An unexpanded "${FRED_API_KEY}" means the variable was unset in the MCP config.
+  if (!key || key.startsWith("${")) {
     throw new Error(
       "FRED_API_KEY environment variable is required. Get a free key at https://fred.stlouisfed.org/docs/api/api_key.html"
     );

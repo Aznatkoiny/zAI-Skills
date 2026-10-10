@@ -1,5 +1,7 @@
 # Pricing Frameworks
 
+> Figures described as "typically" or "often" in this file are rules of thumb for framing an estimate, not sourced facts. In a deliverable, replace them with a sourced figure or label them `[Assumption: rule of thumb]` (see `quality-bar.md`).
+
 ## Price-Volume-Mix Decomposition
 
 ### What It Is
@@ -7,9 +9,10 @@ The first analysis in any revenue or margin diagnostic: splitting a revenue chan
 
 ### How to Build
 1. Get revenue and units by product/segment for two periods.
-2. **Volume effect** = (units₁ − units₀) × price₀, summed by segment
-3. **Price effect** = (price₁ − price₀) × units₁, summed by segment
-4. **Mix effect** = the residual when segments are aggregated — revenue change caused by the shift of units between higher- and lower-priced segments, holding each segment's own price constant
+2. **Volume effect** = (total units₁ − total units₀) × average price₀, where average price₀ = revenue₀ ÷ total units₀
+3. **Mix effect** = Σ over segments (units₁ × that segment's price₀) − total units₁ × average price₀. This is the revenue change from units shifting between higher- and lower-priced segments.
+4. **Price effect** = Σ over segments (price₁ − price₀) × units₁
+   (Computing volume segment by segment instead would absorb the mix effect and leave it at zero.)
 5. Present as a waterfall: Revenue₀ → +volume → +price → +mix → Revenue₁
 
 ### Reading the Result
@@ -129,7 +132,7 @@ Estimating how demand responds to price from the client's own sales history — 
 ### Quality Check
 - Base-price elasticity and promo-lift reported as separate numbers
 - Confounder controls listed; the identification source of price variation stated explicitly
-- Estimates presented as ranges with the revenue-maximizing implication ("ε ≈ −1.4 → a 5% increase loses ~7% volume; margin-positive if contribution margin > ~55%")
+- Estimates presented as ranges with the revenue-maximizing implication ("ε ≈ −1.4 → a 5% increase loses ~7% volume; contribution rises only if contribution margin is below ~66%, since (m + 0.05) × 0.93 > m when m < 0.66")
 - Recommendation includes a test-and-learn validation step before full rollout
 
 ---

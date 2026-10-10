@@ -1,162 +1,95 @@
-# Consulting Toolkit
+# consulting-toolkit
 
-A multi-agent consulting system for Claude Code that replicates the structure and quality standards of a top-tier strategy consulting engagement.
+For consultants, strategy and corp-dev teams, and anyone who needs consulting-grade deliverables: issue trees, market sizings, company profiles, business cases, DD memos, storylines and executive summaries, with every number sourced. Seventeen slash commands for single deliverables, an `/engagement` command that runs a multi-workstream project with specialist agents, and a data server for SEC filings, FRED and stock prices.
 
-## What It Does
+## Install
 
-The **/engagement** command is the entry point for complex briefs. It orchestrates from the main conversation (Claude Code subagents cannot spawn other subagents): it decomposes the brief into MECE workstreams, delegates each to a specialist subagent, runs the **Engagement Manager** agent (opus) as the quality gate over every output, and synthesizes an answer-first recommendation. For quick-turn tasks, 16 further slash commands (17 total) provide direct access to consulting methodologies.
-
-## Components
-
-### Agents (5)
-
-| Agent | Model | Role |
-|-------|-------|------|
-| `engagement-manager` | opus | Quality gate, cross-workstream consistency, synthesis |
-| `research-analyst` | sonnet | Market research, competitive intelligence, company profiling |
-| `financial-modeler` | opus | Financial models, business cases, NPV/ROI, sensitivity analysis |
-| `deck-builder` | sonnet | Presentation storylines, pyramid principle, slide decks |
-| `due-diligence` | sonnet | Target screening, risk assessment, DD checklists |
-
-Models are deliberately tiered: quality-gate judgment (`engagement-manager`) and quantitative modeling (`financial-modeler`) run on opus; the research, deck, and DD specialists run on sonnet.
-
-### Slash Commands (17)
-
-**Orchestration**
-- `/engagement` — Full multi-workstream engagement: decompose, delegate to specialists, quality-gate, synthesize
-
-**Research**
-- `/market-size` — Structured market sizing (top-down + bottom-up)
-- `/competitive-landscape` — Competitive landscape mapping
-- `/company-profile` — One-page company profile from public sources
-
-**Structured Thinking**
-- `/issue-tree` — MECE issue tree decomposition
-- `/hypothesis` — Hypothesis generation and testing plan
-- `/so-what` — Extract strategic implications from analysis
-- `/size-the-prize` — Financial impact sizing
-
-**Deliverables**
-- `/storyline` — Pyramid-principle slide storyline
-- `/exec-summary` — SCR executive summary
-- `/steerco-update` — Steering committee status update
-
-**Quality Gate**
-- `/partner-review` — Grade a deliverable against the Engagement Manager's quality bars (answer-first, MECE, [Source, Date] citations, so-whats, action titles, risk ratings) with a pass/revise verdict and concrete rewrites
-
-**Engagement Management**
-- `/workplan` — Structured workplan with workstreams and timeline
-- `/business-case` — Full business case scaffold
-- `/raci` — RACI matrix generation
-- `/risk-log` — Risk and issue log
-- `/benchmark` — Benchmarking analysis
-
-### Skills (1)
-
-- **consulting-frameworks** — Core consulting thinking frameworks (MECE, Pyramid Principle, SCR, Porter's Five Forces, TAM/SAM/SOM, and more), organized as seven reference files: structuring, communication, strategy, financial, operational, plus two deal- and pricing-focused references:
-  - **ma-and-dd** — Synergy sizing and phasing (revenue vs. cost, realization curves), valuation triangulation (DCF vs. trading comps vs. precedent transactions), integration cost benchmarks, a red-flag taxonomy mapped to the DD agent's risk register, and deal-breaker vs. price-chip framing
-  - **pricing** — Price-volume-mix decomposition, Van Westendorp, conjoint basics, EDLP vs. Hi-Lo, price-elasticity estimation from transaction data, and the B2B discount waterfall
-
-### Deliverable Templates (`templates/`)
-
-Six skeletons the agents and commands start from, each prewiring the structure the quality gate checks for:
-
-| Template | Used by | Prewires |
-|----------|---------|----------|
-| `dd-memo.md` | due-diligence agent | Risk register with Critical/Material/Minor ratings, deal-breaker vs. price-chip classification |
-| `market-sizing.md` | `/market-size`, research-analyst | Top-down/bottom-up chains, TAM/SAM/SOM table, assumptions table with source column |
-| `storyline.md` | `/storyline`, deck-builder | Pyramid: governing thought, key line, support; title-only read-through |
-| `steerco-update.md` | `/steerco-update` | Progress / decisions-needed / risks / next-period |
-| `financial-model-narrative.md` | financial-modeler, `/business-case` | Assumptions, drivers, scenarios, sensitivities |
-| `competitive-landscape.md` | `/competitive-landscape`, research-analyst | 2x2 positioning map, capability table |
-
-`templates/engagement-state.schema.json` remains the schema for `/engagement`'s state file.
-
-### Hooks (1)
-
-- **Citation lint** (`hooks/check-citations.sh`, PostToolUse on Write/Edit/MultiEdit) — when a consulting deliverable (memo/sizing/profile files, or anything under `deliverables/`) is written with quantitative claim lines lacking a bracketed `[Source, Date]` citation, it surfaces up to 5 offending lines and suggests `/partner-review` before the deliverable goes out. Matching is conservative (code fences, headers, TOCs, and labeled assumptions are skipped) and it fires at most once per session.
-
-## Installation
-
-```bash
-# Add the marketplace
-/plugin marketplace add /path/to/zAI-Skills
-
-# Install the plugin
+```
+/plugin marketplace add Aznatkoiny/zAI-Skills
 /plugin install consulting-toolkit@zAI-Skills
 ```
 
-## Usage
+Restart Claude Code after installing.
 
-### Quick Tasks (Slash Commands)
+## Try it
+
+Start with one that needs no setup:
+
 ```
 /issue-tree Should we build or buy our data platform?
-/exec-summary Q3 earnings performance and strategic outlook
-/market-size European electric vehicle charging infrastructure
 ```
 
-### Complex Engagements (/engagement)
-For multi-workstream briefs, use the `/engagement` command:
+You get a MECE issue tree with the analysis each branch needs and the branches to tackle first. Then:
 
 ```
-/engagement Evaluate whether FedEx should acquire a cold chain logistics company in Europe. Build me a board-ready recommendation.
+/market-size European EV charging infrastructure        # top-down and bottom-up sizing, every figure cited
+/company-profile Datadog                                # one page from SEC filings and the web
+/exec-summary market-sizing-european-ev-charging.md     # turn an analysis file into an SCR summary
+/partner-review market-sizing-european-ev-charging.md   # pass/revise verdict with concrete fixes
 ```
 
-The command decomposes the brief into workstreams, tracks state in `engagement-state.json` (schema in `templates/engagement-state.schema.json`), delegates to the specialist subagents in dependency order, runs the Engagement Manager as the quality gate over each output, and synthesizes a cohesive deliverable package.
+Deliverable commands work best from existing analysis (a file or pasted findings). Given only a topic, they offer to research it first or to draft with marked `[TBD]` placeholders, rather than inventing numbers.
 
-## Architecture
+## What it needs
 
-```
-Consultant (You)
-    │
-    ├── Slash Commands ──→ Direct, quick-turn outputs
-    │
-    └── /engagement ──→ Main conversation orchestrates:
-            ├── Research Analyst (sonnet)
-            ├── Financial Modeler (opus)
-            ├── Due Diligence (sonnet)
-            ├── Deck Builder (sonnet, when a deck is requested)
-            └── Engagement Manager (opus) ── quality gate + synthesis
-```
+| | |
+|---|---|
+| **Required** | Nothing for the thinking and writing commands (`/issue-tree`, `/hypothesis`, `/raci`, `/workplan`, `/storyline`, ...). |
+| **For financial data** | Node.js 18+ (runs the bundled server; it's prebuilt, no install step). |
+| Optional: `EDGAR_USER_AGENT` | Your name and email, e.g. `Jane Doe jane@example.com`. The SEC asks every client to identify itself; without it a generic placeholder is sent. |
+| Optional: `FRED_API_KEY` | Free from https://fred.stlouisfed.org/docs/api/api_key.html. Needed only for `fin_get_macro_indicators` (GDP, CPI, rates). |
+| Optional: Python with openpyxl / python-pptx | Lets the financial-modeler and deck-builder agents produce `.xlsx` and `.pptx` files; without them they produce Markdown and CSV. Use a virtual environment rather than the system Python. |
+| Python 3 | Used by the citation-check hook; without it the hook does nothing. |
 
-## Financial Intelligence MCP Server
+Set variables in your shell profile (`export FRED_API_KEY=...`) or under `env` in `~/.claude/settings.json`, then restart Claude Code.
 
-A custom MCP server that gives agents direct access to financial data from SEC EDGAR, FRED (Federal Reserve), and Yahoo Finance.
+## Commands
 
-### Tools (8)
+| | Command | Does |
+|---|---|---|
+| Orchestration | `/engagement <brief>` | Plans workstreams and shows you the plan first, then runs the specialist agents, quality-gates each output, and synthesizes a recommendation. Tracks state in `engagement-state.json`. |
+| Research | `/market-size`, `/competitive-landscape`, `/company-profile`, `/benchmark` | Sourced research deliverables. |
+| Structured thinking | `/issue-tree`, `/hypothesis`, `/so-what`, `/size-the-prize` | Problem structuring, testable hypotheses, implications from analysis, value sizing. |
+| Deliverables | `/storyline`, `/exec-summary`, `/steerco-update`, `/business-case` | Pyramid-principle storylines, SCR summaries, status updates, business cases with a model outline. |
+| Engagement management | `/workplan`, `/raci`, `/risk-log` | Plans, accountability and risk registers. |
+| Quality | `/partner-review <file>` | Grades a deliverable against the plugin's quality bar, with exact fixes. |
 
-| Tool | Source | Description |
-|------|--------|-------------|
-| `fin_get_company_financials` | SEC EDGAR XBRL | Revenue, EBITDA, margins, growth rates for public companies |
-| `fin_get_filing_text` | SEC EDGAR | Full text from 10-K, 10-Q, 8-K filings |
-| `fin_get_filing_section` | SEC EDGAR | Extract a specific 10-K/10-Q section (risk_factors, mdna, business, legal_proceedings, financial_statements) with pagination |
-| `fin_get_stock_data` | Yahoo Finance | Price, daily change, 52-week range, volume, OHLCV history |
-| `fin_get_macro_indicators` | FRED | GDP, CPI, interest rates, unemployment, and thousands more |
-| `fin_get_earnings_transcript` | SEC EDGAR 8-K | Earnings-related 8-K filings (Item 2.02 proxy) |
-| `fin_compare_companies` | SEC EDGAR | Side-by-side comparison of 2-5 companies |
-| `fin_get_industry_benchmarks` | SEC EDGAR | Median/mean/quartile metrics by SIC code |
+## Agents
 
-### Environment Variables
+Claude delegates to these on its own when a request fits, and `/engagement` runs them as workstreams. They use whatever model your session runs.
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `FRED_API_KEY` | For FRED tools | Free key from https://fred.stlouisfed.org/docs/api/api_key.html |
-| `EDGAR_USER_AGENT` | Recommended | SEC requires email in User-Agent (e.g., "YourName your@email.com") |
+| Agent | Does |
+|---|---|
+| `research-analyst` | Sourced research memos: markets, companies, competitors, regulation. |
+| `financial-modeler` | Multi-scenario models (NPV/IRR, business cases) with a narrative; validates existing workbooks. |
+| `due-diligence` | Tests an investment thesis, rates every risk, and writes a DD memo with a risk register. |
+| `deck-builder` | Storyline plus slide deck from finished analysis. |
+| `engagement-manager` | Quality gate and synthesis inside `/engagement`, or pulls several analyses into one recommendation. |
 
-### Architecture
+## Skill
 
-```
-consulting-toolkit/
-├── .mcp.json                          ← MCP server configuration
-├── mcp-servers/
-│   └── financial-intelligence/
-│       ├── src/
-│       │   ├── index.ts               ← Entry point, 8 tool registrations
-│       │   ├── services/              ← API clients (EDGAR, FRED, Yahoo)
-│       │   ├── tools/                 ← Tool handler implementations
-│       │   └── schemas/               ← Zod input validation
-│       └── dist/                      ← Built output
-```
+**consulting-frameworks**: how to apply MECE, issue trees, hypotheses, the pyramid principle and SCR, Five Forces, TAM/SAM/SOM, NPV/IRR, build/buy/partner, RACI, synergy sizing, valuation triangulation and pricing frameworks. Its `quality-bar.md` is the sourcing and review standard every deliverable is held to: figures cited `[Source, Date]` or labeled `[Assumption: ...]`, citations only from sources actually read, and rules of thumb labeled as such.
+
+## Financial data server
+
+| Tool | Returns |
+|---|---|
+| `fin_get_company_financials` | Annual (fiscal-year) or quarterly (3-month) metrics from SEC XBRL, with year-over-year growth, margins and period-end dates. US-listed filers only. |
+| `fin_get_filing_section` | One section of a 10-K/10-Q (risk factors, MD&A, business, legal proceedings, financial statements), paginated. |
+| `fin_get_filing_text` | The first ~30,000 characters of a filing. |
+| `fin_get_earnings_transcript` | Earnings press releases (8-K Exhibit 99.1). Not call transcripts. |
+| `fin_compare_companies` | 2-5 companies side by side, with each one's fiscal period end. |
+| `fin_get_industry_benchmarks` | Median and quartiles across up to 15 companies sharing a SIC code (a rough sample, not a curated peer set). |
+| `fin_get_stock_data` | Price summary and the last 10 daily bars from Yahoo Finance's unofficial endpoint, plus market cap and P/E derived from SEC data. |
+| `fin_get_macro_indicators` | FRED series (needs `FRED_API_KEY`). |
+
+Responses are cached under `~/.cache/financial-intelligence`. To rebuild the server after changing its source: `cd mcp-servers/financial-intelligence && npm ci && npm run build`.
+
+## Templates and hook
+
+`templates/` holds the skeletons deliverables start from (DD memo, market sizing, storyline, SteerCo update, model narrative, competitive landscape) and the `/engagement` state schema.
+
+The **citation check** hook runs when a deliverable this plugin names (market-sizing-\*, dd-memo-\*, benchmark-\*, storyline-\*, ...) is saved. It points out lines with figures that have no citation or assumption label, once per distinct problem, and writes nothing into your project.
 
 ## License
 

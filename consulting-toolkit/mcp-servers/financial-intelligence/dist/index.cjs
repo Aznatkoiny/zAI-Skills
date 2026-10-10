@@ -32352,8 +32352,8 @@ var FRED_BASE_URL = "https://api.stlouisfed.org/fred";
 var RATE_LIMITS = {
   edgar: 10,
   // SEC official limit: 10 req/s
-  fred: 2,
-  // Conservative (undocumented, ~120/min practical)
+  fred: 1.5,
+  // FRED documents 120 req/min per key (HTTP 429 beyond); stay under it
   yahoo: 0.1
   // Very conservative (~6/min safe)
 };
@@ -36274,7 +36274,8 @@ async function cachedFetch(namespace, key, ttlMs, fetcher) {
 var limiter = new RateLimiter(RATE_LIMITS.edgar);
 var EDGAR_USER_AGENT_PLACEHOLDER = "FinancialIntelligenceMCP bot@example.com";
 function createClient() {
-  const userAgent = process.env.EDGAR_USER_AGENT || EDGAR_USER_AGENT_PLACEHOLDER;
+  const configured = process.env.EDGAR_USER_AGENT;
+  const userAgent = configured && !configured.startsWith("${") ? configured : EDGAR_USER_AGENT_PLACEHOLDER;
   return axios_default.create({
     baseURL: EDGAR_BASE_URL,
     headers: {
@@ -36400,41 +36401,48 @@ async function getCompanyFacts(cik) {
     }
   );
 }
+var DAY_MS = 864e5;
+function fitsPeriod(fact, period) {
+  if (!fact.start) return true;
+  const days = (Date.parse(fact.end) - Date.parse(fact.start)) / DAY_MS;
+  return period === "annual" ? days >= 340 && days <= 380 : days >= 80 && days <= 100;
+}
+function periodLabel(end, period) {
+  return period === "annual" ? `FY${end.slice(0, 4)}` : `Quarter ended ${end}`;
+}
 function extractMetricFromFacts(facts, metricName, period, limit) {
   const tags = XBRL_METRIC_TAGS[metricName];
   if (!tags || tags.length === 0) return [];
   const gaap = facts["us-gaap"] || {};
-  const formFilter = period === "annual" ? "10-K" : "10-Q";
-  let bestResult = [];
-  let bestLatestDate = "";
+  const forms = period === "annual" ? ["10-K", "10-K/A"] : ["10-Q", "10-Q/A", "10-K", "10-K/A"];
+  const byEnd = /* @__PURE__ */ new Map();
   for (const tag of tags) {
     const factData = gaap[tag];
     if (!factData) continue;
     const units = factData.units["USD"] || factData.units["USD/shares"] || factData.units["shares"] || factData.units["pure"];
     if (!units) continue;
-    const filtered = units.filter((f) => f.form === formFilter && f.end && f.val !== void 0).sort((a, b) => b.end.localeCompare(a.end));
-    const seen = /* @__PURE__ */ new Set();
-    const deduped = [];
-    for (const fact of filtered) {
-      if (!seen.has(fact.end)) {
-        seen.add(fact.end);
-        deduped.push(fact);
-      }
+    const latestForEnd = /* @__PURE__ */ new Map();
+    for (const fact of units) {
+      if (!forms.includes(fact.form) || !fact.end || fact.val === void 0) continue;
+      if (!fitsPeriod(fact, period)) continue;
+      const existing = latestForEnd.get(fact.end);
+      if (!existing || fact.filed > existing.filed) latestForEnd.set(fact.end, fact);
     }
-    if (deduped.length === 0) continue;
-    const latestDate = deduped[0].end;
-    if (latestDate > bestLatestDate) {
-      bestLatestDate = latestDate;
-      bestResult = deduped.slice(0, limit).map((fact) => ({
-        period: period === "annual" ? `FY${fact.fy}` : `${fact.fp} ${fact.fy}`,
-        endDate: fact.end,
-        value: fact.val,
-        form: fact.form,
-        filed: fact.filed
-      }));
+    for (const [end, fact] of latestForEnd) {
+      if (!byEnd.has(end)) byEnd.set(end, fact);
     }
   }
-  return bestResult;
+  return [...byEnd.values()].sort((a, b) => b.end.localeCompare(a.end)).slice(0, limit).map((fact) => ({
+    period: periodLabel(fact.end, period),
+    endDate: fact.end,
+    value: fact.val,
+    form: fact.form,
+    filed: fact.filed
+  }));
+}
+function findPriorYear(periods, end) {
+  const target = Date.parse(end) - 365 * DAY_MS;
+  return periods.find((p) => Math.abs(Date.parse(p.endDate) - target) <= 20 * DAY_MS);
 }
 async function getFinancialMetrics(tickerOrCik, metrics, period, limit) {
   const info = await getCompanyInfo(tickerOrCik);
@@ -36460,16 +36468,15 @@ async function getFinancialMetrics(tickerOrCik, metrics, period, limit) {
   }
   const revenueMetric = result.find((m) => m.metric === "revenue");
   if (revenueMetric && revenueMetric.periods.length >= 2) {
-    const growthPeriods = [];
-    for (let i = 0; i < revenueMetric.periods.length - 1; i++) {
-      const current = revenueMetric.periods[i].value;
-      const prior = revenueMetric.periods[i + 1].value;
-      growthPeriods.push({
-        period: revenueMetric.periods[i].period,
-        value: prior !== 0 ? (current - prior) / Math.abs(prior) * 100 : null
-      });
-    }
-    derived.push({ metric: "revenue_growth_pct", periods: growthPeriods });
+    const history = extractMetricFromFacts(facts.facts, "revenue", period, limit + (period === "annual" ? 1 : 4));
+    const growthPeriods = revenueMetric.periods.map((cur) => {
+      const prior = findPriorYear(history, cur.endDate);
+      return {
+        period: cur.period,
+        value: prior && prior.value !== 0 ? (cur.value - prior.value) / Math.abs(prior.value) * 100 : null
+      };
+    });
+    derived.push({ metric: "revenue_growth_yoy_pct", periods: growthPeriods });
   }
   const grossProfit = result.find((m) => m.metric === "gross_profit");
   if (grossProfit && revenueMetric) {
@@ -36527,7 +36534,7 @@ async function getFilingDocument(cik, accessionNumber, primaryDocument) {
   const numericCik = parseInt(cik, 10).toString();
   const url2 = `https://www.sec.gov/Archives/edgar/data/${numericCik}/${accessionPath}/${primaryDocument}`;
   return cachedFetch(
-    "filingDocument",
+    "filingDocument-v2",
     url2,
     CACHE_TTLS.filingDocument,
     async () => {
@@ -36539,8 +36546,18 @@ async function getFilingDocument(cik, accessionNumber, primaryDocument) {
     }
   );
 }
+async function findExhibitDocument(cik, accessionNumber, exhibit = /ex[-_]?99[-_.]?0?1(?!\d)/i) {
+  const accessionPath = accessionNumber.replace(/-/g, "");
+  const numericCik = parseInt(cik, 10).toString();
+  const url2 = `https://www.sec.gov/Archives/edgar/data/${numericCik}/${accessionPath}/index.json`;
+  const names = await cachedFetch("filingIndex", url2, CACHE_TTLS.filingDocument, async () => {
+    const { data } = await edgarGet(url2);
+    return (data?.directory?.item ?? []).map((i) => String(i.name ?? ""));
+  });
+  return names.find((n) => /\.(htm|html|txt)$/i.test(n) && exhibit.test(n)) ?? null;
+}
 function stripHtml(html) {
-  return html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "").replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#?\w+;/g, " ").replace(/\s+/g, " ").trim();
+  return html.replace(/<ix:header[\s\S]*?<\/ix:header>/gi, "").replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "").replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#?\w+;/g, " ").replace(/\s+/g, " ").trim();
 }
 var SIC_BROWSE_PAGE_SIZE = 40;
 var MAX_SIC_BROWSE_PAGES = 5;
@@ -36664,11 +36681,13 @@ async function getEquityFundamentals(ticker) {
 }
 
 // src/tools/company-financials.ts
-function formatValue(value) {
-  if (Math.abs(value) >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
-  if (Math.abs(value) >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
-  if (Math.abs(value) >= 1e3) return `$${(value / 1e3).toFixed(2)}K`;
-  return `$${value.toFixed(2)}`;
+function formatValue(value, metric = "") {
+  const unit = metric.includes("shares") ? "" : "$";
+  if (metric.includes("eps")) return `$${value.toFixed(2)}`;
+  if (Math.abs(value) >= 1e9) return `${unit}${(value / 1e9).toFixed(2)}B`;
+  if (Math.abs(value) >= 1e6) return `${unit}${(value / 1e6).toFixed(2)}M`;
+  if (Math.abs(value) >= 1e3) return `${unit}${(value / 1e3).toFixed(2)}K`;
+  return `${unit}${value.toFixed(2)}`;
 }
 async function handleCompanyFinancials(input) {
   const identifier = input.ticker || input.cik;
@@ -36702,10 +36721,18 @@ async function handleCompanyFinancials(input) {
       lines.push("");
       lines.push(`| Metric | ${periods.join(" | ")} |`);
       lines.push(`|--------|${periods.map(() => "-------").join("|")}|`);
+      const endFor = (label) => {
+        for (const m of metrics) {
+          const hit = m.periods.find((mp) => mp.period === label);
+          if (hit) return hit.endDate;
+        }
+        return "\u2014";
+      };
+      lines.push(`| period end | ${periods.map(endFor).join(" | ")} |`);
       for (const m of metrics) {
         const values = periods.map((p) => {
           const match = m.periods.find((mp) => mp.period === p);
-          return match ? formatValue(match.value) : "\u2014";
+          return match ? formatValue(match.value, m.metric) : "\u2014";
         });
         lines.push(`| ${m.metric} | ${values.join(" | ")} |`);
       }
@@ -36726,7 +36753,7 @@ async function handleCompanyFinancials(input) {
     lines.push("*No financial data found for the requested metrics. The company may use non-standard XBRL tags.*");
   }
   lines.push("");
-  lines.push(`*Data source: SEC EDGAR XBRL | ${input.period} data | Last ${input.limit} periods*`);
+  lines.push(`*Data source: SEC EDGAR XBRL (as reported in 10-K/10-Q filings) | ${input.period} periods: ${input.period === "annual" ? "12-month fiscal years" : "3-month quarters (year-to-date totals excluded)"} | last ${input.limit} periods. EBITDA, when shown, is computed as operating income + D&A, not company-reported.*`);
   return lines.join("\n");
 }
 
@@ -37231,7 +37258,7 @@ async function handleStockData(input) {
 var limiter3 = new RateLimiter(RATE_LIMITS.fred);
 function getApiKey() {
   const key = process.env.FRED_API_KEY;
-  if (!key) {
+  if (!key || key.startsWith("${")) {
     throw new Error(
       "FRED_API_KEY environment variable is required. Get a free key at https://fred.stlouisfed.org/docs/api/api_key.html"
     );
@@ -37394,16 +37421,18 @@ async function handleEarningsTranscript(input) {
       lines.push("");
       if (filing.primaryDocument) {
         try {
-          let text = await getFilingDocument(
-            company.cik,
-            filing.accessionNumber,
-            filing.primaryDocument
+          const exhibit = await findExhibitDocument(company.cik, filing.accessionNumber);
+          const document2 = exhibit ?? filing.primaryDocument;
+          lines.push(
+            exhibit ? `*Source document: Exhibit 99.1 press release (${exhibit})*` : `*Source document: 8-K form (${filing.primaryDocument}); no Exhibit 99.1 was found, so the results may be in another exhibit*`
           );
+          lines.push("");
+          let text = await getFilingDocument(company.cik, filing.accessionNumber, document2);
           const truncated = text.length > MAX_FILING_TEXT_LENGTH;
           if (truncated) {
             text = text.substring(0, MAX_FILING_TEXT_LENGTH);
           }
-          lines.push("#### Filing Text");
+          lines.push("#### Press release text");
           lines.push("");
           lines.push("```");
           lines.push(text);
@@ -37422,8 +37451,8 @@ async function handleEarningsTranscript(input) {
     }
   }
   lines.push("");
-  lines.push("*Data source: SEC EDGAR 8-K filings | Item 2.02 filter*");
-  lines.push("*Note: This is a best-effort proxy for earnings transcripts. True call transcripts require paid data providers.*");
+  lines.push("*Data source: SEC EDGAR 8-K filings (Item 2.02), Exhibit 99.1 press releases.*");
+  lines.push("*This is the company's written earnings release, not a transcript of the earnings call. Don't attribute quotes to the call unless they appear here; call transcripts require a paid data provider.*");
   return lines.join("\n");
 }
 
@@ -37475,6 +37504,7 @@ async function handleCompareCompanies(input) {
   lines.push(`|--------|${companyHeaders.map(() => "-------").join("|")}|`);
   lines.push(`| **Name** | ${companyData.map((c) => c.company.name).join(" | ")} |`);
   lines.push(`| **SIC** | ${companyData.map((c) => `${c.company.sic}`).join(" | ")} |`);
+  lines.push(`| **Period end** | ${companyData.map((c) => c.metrics.find((m) => m.periods[0])?.periods[0].endDate ?? "\u2014").join(" | ")} |`);
   for (const metricName of metrics) {
     const values = companyData.map((c) => {
       const metric = c.metrics.find((m) => m.metric === metricName);
@@ -37711,14 +37741,14 @@ function registerFinTool(name, description, shape, schema, handler) {
 }
 registerFinTool(
   "fin_get_company_financials",
-  "Retrieve financial metrics (revenue, EBITDA, margins, growth rates) for a public company from SEC EDGAR XBRL data. Supports annual and quarterly periods.",
+  "Financial metrics for a US-listed company from SEC EDGAR XBRL (10-K/10-Q filers using US GAAP; foreign 20-F/40-F filers usually return no data). Annual periods are 12-month fiscal years labeled by the year they end (FY2024); quarterly periods are 3-month quarters labeled by end date (fiscal Q4 is usually only in the annual report, so it is often missing). Returns the requested metrics plus derived year-over-year revenue growth and gross/net margin, with a period-end date row for citations. EBITDA is computed as operating income + D&A, not company-reported.",
   companyFinancialsShape,
   companyFinancialsSchema,
   handleCompanyFinancials
 );
 registerFinTool(
   "fin_get_filing_text",
-  "Retrieve the full text of SEC filings (10-K, 10-Q, 8-K) for qualitative analysis. Returns cleaned text from the primary filing document.",
+  "Return the first ~30,000 characters of cleaned text from a company's recent SEC filings (10-K, 10-Q, 8-K), from the primary document. Long 10-Ks are truncated well before the end, so for a specific part of a 10-K or 10-Q (risk factors, MD&A, business, legal proceedings, financial statements) use fin_get_filing_section instead.",
   filingTextShape,
   filingTextSchema,
   handleFilingText
@@ -37732,41 +37762,41 @@ registerFinTool(
 );
 registerFinTool(
   "fin_get_stock_data",
-  "Get stock price data from the Yahoo Finance chart endpoint (current price, daily change, 52-week range, average volume, OHLCV history) plus computed fundamentals from SEC EDGAR XBRL: market cap (EDGAR-reported shares outstanding \xD7 latest chart close) and last-fiscal-year EPS with a derived P/E \u2014 each labeled with its derivation and as-of dates.",
+  "Stock price summary from Yahoo Finance's public chart endpoint (current price, daily change, 52-week range, average volume, period high/low/return, and the last 10 daily bars, not the full history), plus computed fundamentals from SEC EDGAR XBRL: market cap (shares outstanding \xD7 latest close) and last-fiscal-year EPS with a derived P/E, each labeled with its derivation and dates. The Yahoo endpoint is unofficial and can change or block requests without notice.",
   stockDataShape,
   stockDataSchema,
   handleStockData
 );
 registerFinTool(
   "fin_get_macro_indicators",
-  "Fetch macroeconomic indicators from FRED (Federal Reserve). Supports GDP, CPI, interest rates, unemployment, and thousands of other series.",
+  "Fetch economic time series from FRED (St. Louis Fed): GDP, CPI, interest rates, unemployment, and thousands of other series by ID. Requires the user's free FRED_API_KEY; without it the tool returns a message explaining how to get one.",
   macroIndicatorsShape,
   macroIndicatorsSchema,
   handleMacroIndicators
 );
 registerFinTool(
   "fin_get_earnings_transcript",
-  "Extract earnings-related 8-K filings (Item 2.02) as a proxy for earnings call transcripts. Best-effort from public SEC data.",
+  "Return recent earnings press releases: the Exhibit 99.1 text from 8-K filings under Item 2.02 (first ~30,000 characters each). These are the company's written results announcements, not earnings-call transcripts; call transcripts aren't available from public SEC data.",
   earningsTranscriptShape,
   earningsTranscriptSchema,
   handleEarningsTranscript
 );
 registerFinTool(
   "fin_compare_companies",
-  "Side-by-side financial comparison of 2-5 public companies with rankings. Uses SEC EDGAR data.",
+  "Side-by-side comparison of 2-5 US-listed companies on their most recent annual or quarterly period from SEC EDGAR XBRL, with each company's period-end date (fiscal years differ between companies) and per-metric rankings.",
   compareCompaniesShape,
   compareCompaniesSchema,
   handleCompareCompanies
 );
 registerFinTool(
   "fin_get_industry_benchmarks",
-  "Compute industry benchmark statistics (median, mean, quartiles) by SIC code using SEC EDGAR data from peer companies.",
+  "Median, mean and quartiles of financial metrics across up to 15 companies that share a SIC code, from SEC EDGAR XBRL. The peers are the first companies EDGAR lists for that code, not a size-matched or curated set, so treat results as a rough sample; for a deliberate peer set, use fin_compare_companies.",
   industryBenchmarksShape,
   industryBenchmarksSchema,
   handleIndustryBenchmarks
 );
 async function main() {
-  if (!process.env.EDGAR_USER_AGENT) {
+  if (!process.env.EDGAR_USER_AGENT || process.env.EDGAR_USER_AGENT.startsWith("${")) {
     console.error(
       [
         "".padEnd(72, "="),

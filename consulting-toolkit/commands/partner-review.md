@@ -9,7 +9,7 @@ Review the deliverable at: $ARGUMENTS
 Read the full file before grading. If the path does not exist or the argument is ambiguous, list candidate deliverables in the working directory and ask which to review.
 
 <quality_bars>
-Grade against each bar explicitly. These are the same standards the engagement-manager agent enforces:
+Grade against each bar explicitly. They come from the plugin's shared standard, `${CLAUDE_PLUGIN_ROOT}/skills/consulting-frameworks/references/quality-bar.md` (read it for the sourcing rules); the engagement-manager agent uses the same file:
 
 1. **Answers the question first** — The executive summary or opening section states the answer as a complete, assertive sentence. A document that builds up to its conclusion fails. Test: can a reader stop after the first section and know the recommendation?
 2. **MECE structure** — Sections are mutually exclusive and collectively exhaustive. No overlapping categories, no gaps a partner would spot ("where is the competitive response?"). Flag both overlaps and holes.
@@ -40,7 +40,7 @@ For every **Fail**, provide:
 
 Close with:
 - **PASS**: one line on what makes the deliverable strong, plus any optional polish items (clearly marked as optional).
-- **REVISE**: the ordered fix list (most material first), and recommend running the **engagement-manager** agent for a full re-review once fixes are applied — it checks cross-workstream consistency and engagement context that this spot-check does not cover. If the deliverable deviates heavily from the expected structure, point the author at the matching skeleton in `${CLAUDE_PLUGIN_ROOT}/templates/` (dd-memo.md, market-sizing.md, storyline.md, steerco-update.md, financial-model-narrative.md, competitive-landscape.md).
+- **REVISE**: the ordered fix list (most material first), and suggest running `/partner-review` again once the fixes are in. If the deliverable deviates heavily from the expected structure, point the author at the matching skeleton in `${CLAUDE_PLUGIN_ROOT}/templates/` (dd-memo.md, market-sizing.md, storyline.md, steerco-update.md, financial-model-narrative.md, competitive-landscape.md).
 </output_format>
 
 <review_discipline>

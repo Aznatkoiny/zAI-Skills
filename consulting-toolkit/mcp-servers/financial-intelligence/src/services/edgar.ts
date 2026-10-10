@@ -28,7 +28,8 @@ const limiter = new RateLimiter(RATE_LIMITS.edgar);
 const EDGAR_USER_AGENT_PLACEHOLDER = "FinancialIntelligenceMCP bot@example.com";
 
 function createClient(): AxiosInstance {
-  const userAgent = process.env.EDGAR_USER_AGENT || EDGAR_USER_AGENT_PLACEHOLDER;
+  const configured = process.env.EDGAR_USER_AGENT;
+  const userAgent = configured && !configured.startsWith("${") ? configured : EDGAR_USER_AGENT_PLACEHOLDER;
   return axios.create({
     baseURL: EDGAR_BASE_URL,
     headers: {
@@ -223,6 +224,31 @@ export async function getCompanyFacts(cik: string): Promise<XBRLResponse> {
   );
 }
 
+const DAY_MS = 86_400_000;
+
+/**
+ * Does a fact cover the requested kind of period? Income-statement facts carry
+ * a start date: annual means a ~12-month span, quarterly a ~3-month span. This
+ * drops the 6- and 9-month year-to-date totals that 10-Qs also report, and the
+ * prior-year comparatives that would otherwise be mislabeled. Balance-sheet
+ * facts (no start) are point-in-time and always fit.
+ */
+function fitsPeriod(fact: EdgarXBRLFact, period: "annual" | "quarterly"): boolean {
+  if (!fact.start) return true;
+  const days = (Date.parse(fact.end) - Date.parse(fact.start)) / DAY_MS;
+  return period === "annual" ? days >= 340 && days <= 380 : days >= 80 && days <= 100;
+}
+
+/**
+ * Label a period from the fact's OWN end date. The filing-level `fy`/`fp`
+ * fields describe the filing, not the fact: a FY2025 10-K also reports FY2024
+ * and FY2023 comparatives, which would all be labeled "FY2025". Fiscal years
+ * are named for the calendar year they end in (Apple's FY2024 ends Sep 2024).
+ */
+function periodLabel(end: string, period: "annual" | "quarterly"): string {
+  return period === "annual" ? `FY${end.slice(0, 4)}` : `Quarter ended ${end}`;
+}
+
 function extractMetricFromFacts(
   facts: XBRLResponse["facts"],
   metricName: string,
@@ -233,50 +259,48 @@ function extractMetricFromFacts(
   if (!tags || tags.length === 0) return [];
 
   const gaap = facts["us-gaap"] || {};
-  const formFilter = period === "annual" ? "10-K" : "10-Q";
+  const forms = period === "annual" ? ["10-K", "10-K/A"] : ["10-Q", "10-Q/A", "10-K", "10-K/A"];
 
-  // Try all tags and pick the one with the most recent data
-  let bestResult: FinancialPeriod[] = [];
-  let bestLatestDate = "";
-
+  // Companies switch XBRL tags over time (e.g. Revenues -> RevenueFromContract...),
+  // so merge across the alternative tags: tags are listed in priority order, and
+  // the first tag that has a value for a period end wins that period.
+  const byEnd = new Map<string, EdgarXBRLFact>();
   for (const tag of tags) {
     const factData = gaap[tag];
     if (!factData) continue;
-
-    // Try USD first, then pure number
     const units = factData.units["USD"] || factData.units["USD/shares"] || factData.units["shares"] || factData.units["pure"];
     if (!units) continue;
 
-    const filtered = units
-      .filter((f) => f.form === formFilter && f.end && f.val !== undefined)
-      .sort((a, b) => b.end.localeCompare(a.end));
-
-    // Deduplicate by period end date (keep latest filing)
-    const seen = new Set<string>();
-    const deduped: EdgarXBRLFact[] = [];
-    for (const fact of filtered) {
-      if (!seen.has(fact.end)) {
-        seen.add(fact.end);
-        deduped.push(fact);
-      }
+    // Within one tag, keep the most recently filed value for each period end
+    // (later filings carry restatements).
+    const latestForEnd = new Map<string, EdgarXBRLFact>();
+    for (const fact of units) {
+      if (!forms.includes(fact.form) || !fact.end || fact.val === undefined) continue;
+      if (!fitsPeriod(fact, period)) continue;
+      const existing = latestForEnd.get(fact.end);
+      if (!existing || fact.filed > existing.filed) latestForEnd.set(fact.end, fact);
     }
-
-    if (deduped.length === 0) continue;
-
-    const latestDate = deduped[0].end;
-    if (latestDate > bestLatestDate) {
-      bestLatestDate = latestDate;
-      bestResult = deduped.slice(0, limit).map((fact) => ({
-        period: period === "annual" ? `FY${fact.fy}` : `${fact.fp} ${fact.fy}`,
-        endDate: fact.end,
-        value: fact.val,
-        form: fact.form,
-        filed: fact.filed,
-      }));
+    for (const [end, fact] of latestForEnd) {
+      if (!byEnd.has(end)) byEnd.set(end, fact);
     }
   }
 
-  return bestResult;
+  return [...byEnd.values()]
+    .sort((a, b) => b.end.localeCompare(a.end))
+    .slice(0, limit)
+    .map((fact) => ({
+      period: periodLabel(fact.end, period),
+      endDate: fact.end,
+      value: fact.val,
+      form: fact.form,
+      filed: fact.filed,
+    }));
+}
+
+/** The period ending about one year before `end` (±20 days), if present. */
+function findPriorYear(periods: FinancialPeriod[], end: string): FinancialPeriod | undefined {
+  const target = Date.parse(end) - 365 * DAY_MS;
+  return periods.find((p) => Math.abs(Date.parse(p.endDate) - target) <= 20 * DAY_MS);
 }
 
 export async function getFinancialMetrics(
@@ -312,19 +336,22 @@ export async function getFinancialMetrics(
     derived.push({ metric: "ebitda", periods: ebitdaPeriods });
   }
 
-  // Revenue growth (YoY)
+  // Revenue growth, year over year: each period against the same period one
+  // year earlier (for quarters, the same quarter last year), never against
+  // whatever happens to be next in the list.
   const revenueMetric = result.find((m) => m.metric === "revenue");
   if (revenueMetric && revenueMetric.periods.length >= 2) {
-    const growthPeriods = [];
-    for (let i = 0; i < revenueMetric.periods.length - 1; i++) {
-      const current = revenueMetric.periods[i].value;
-      const prior = revenueMetric.periods[i + 1].value;
-      growthPeriods.push({
-        period: revenueMetric.periods[i].period,
-        value: prior !== 0 ? ((current - prior) / Math.abs(prior)) * 100 : null,
-      });
-    }
-    derived.push({ metric: "revenue_growth_pct", periods: growthPeriods });
+    // Look up prior-year periods beyond the display limit so the oldest shown
+    // period still gets a growth figure when the data exists.
+    const history = extractMetricFromFacts(facts.facts, "revenue", period, limit + (period === "annual" ? 1 : 4));
+    const growthPeriods = revenueMetric.periods.map((cur) => {
+      const prior = findPriorYear(history, cur.endDate);
+      return {
+        period: cur.period,
+        value: prior && prior.value !== 0 ? ((cur.value - prior.value) / Math.abs(prior.value)) * 100 : null,
+      };
+    });
+    derived.push({ metric: "revenue_growth_yoy_pct", periods: growthPeriods });
   }
 
   // Gross margin
@@ -404,7 +431,7 @@ export async function getFilingDocument(
   const url = `https://www.sec.gov/Archives/edgar/data/${numericCik}/${accessionPath}/${primaryDocument}`;
   // Filed documents are immutable once published; cache the stripped text.
   return cachedFetch<string>(
-    "filingDocument",
+    "filingDocument-v2",
     url,
     CACHE_TTLS.filingDocument,
     async () => {
@@ -417,8 +444,32 @@ export async function getFilingDocument(
   );
 }
 
+/**
+ * Find an exhibit document in a filing (default: Exhibit 99.1, where companies
+ * put the earnings press release attached to an Item 2.02 8-K). Returns the
+ * file name, or null when the filing has no matching exhibit.
+ */
+export async function findExhibitDocument(
+  cik: string,
+  accessionNumber: string,
+  exhibit: RegExp = /ex[-_]?99[-_.]?0?1(?!\d)/i
+): Promise<string | null> {
+  const accessionPath = accessionNumber.replace(/-/g, "");
+  const numericCik = parseInt(cik, 10).toString();
+  const url = `https://www.sec.gov/Archives/edgar/data/${numericCik}/${accessionPath}/index.json`;
+  const names = await cachedFetch<string[]>("filingIndex", url, CACHE_TTLS.filingDocument, async () => {
+    const { data } = await edgarGet<{ directory?: { item?: Array<{ name?: string }> } }>(url);
+    return (data?.directory?.item ?? []).map((i) => String(i.name ?? ""));
+  });
+  return names.find((n) => /\.(htm|html|txt)$/i.test(n) && exhibit.test(n)) ?? null;
+}
+
 function stripHtml(html: string): string {
   return html
+    // Inline-XBRL filings start with a hidden <ix:header> block of machine-readable
+    // facts and taxonomy references (30k+ characters for large filers) that
+    // isn't part of the readable document.
+    .replace(/<ix:header[\s\S]*?<\/ix:header>/gi, "")
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
     .replace(/<[^>]+>/g, " ")

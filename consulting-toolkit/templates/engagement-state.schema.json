@@ -51,8 +51,11 @@
             "items": { "type": "string" }
           },
           "deliverable": {
-            "type": "string",
-            "description": "Path to this workstream's output file"
+            "oneOf": [
+              { "type": "string" },
+              { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+            ],
+            "description": "Path to this workstream's output file, or a list of paths when it produces several (e.g. a model plus its narrative, or a storyline plus a deck)"
           },
           "findings_summary": {
             "type": "string",

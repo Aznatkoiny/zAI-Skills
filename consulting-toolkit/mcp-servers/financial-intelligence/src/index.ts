@@ -76,7 +76,7 @@ function registerFinTool<Schema extends z.ZodTypeAny>(
 
 registerFinTool(
   "fin_get_company_financials",
-  "Retrieve financial metrics (revenue, EBITDA, margins, growth rates) for a public company from SEC EDGAR XBRL data. Supports annual and quarterly periods.",
+  "Financial metrics for a US-listed company from SEC EDGAR XBRL (10-K/10-Q filers using US GAAP; foreign 20-F/40-F filers usually return no data). Annual periods are 12-month fiscal years labeled by the year they end (FY2024); quarterly periods are 3-month quarters labeled by end date (fiscal Q4 is usually only in the annual report, so it is often missing). Returns the requested metrics plus derived year-over-year revenue growth and gross/net margin, with a period-end date row for citations. EBITDA is computed as operating income + D&A, not company-reported.",
   companyFinancialsShape,
   companyFinancialsSchema,
   handleCompanyFinancials
@@ -84,7 +84,7 @@ registerFinTool(
 
 registerFinTool(
   "fin_get_filing_text",
-  "Retrieve the full text of SEC filings (10-K, 10-Q, 8-K) for qualitative analysis. Returns cleaned text from the primary filing document.",
+  "Return the first ~30,000 characters of cleaned text from a company's recent SEC filings (10-K, 10-Q, 8-K), from the primary document. Long 10-Ks are truncated well before the end, so for a specific part of a 10-K or 10-Q (risk factors, MD&A, business, legal proceedings, financial statements) use fin_get_filing_section instead.",
   filingTextShape,
   filingTextSchema,
   handleFilingText
@@ -100,7 +100,7 @@ registerFinTool(
 
 registerFinTool(
   "fin_get_stock_data",
-  "Get stock price data from the Yahoo Finance chart endpoint (current price, daily change, 52-week range, average volume, OHLCV history) plus computed fundamentals from SEC EDGAR XBRL: market cap (EDGAR-reported shares outstanding × latest chart close) and last-fiscal-year EPS with a derived P/E — each labeled with its derivation and as-of dates.",
+  "Stock price summary from Yahoo Finance's public chart endpoint (current price, daily change, 52-week range, average volume, period high/low/return, and the last 10 daily bars, not the full history), plus computed fundamentals from SEC EDGAR XBRL: market cap (shares outstanding × latest close) and last-fiscal-year EPS with a derived P/E, each labeled with its derivation and dates. The Yahoo endpoint is unofficial and can change or block requests without notice.",
   stockDataShape,
   stockDataSchema,
   handleStockData
@@ -108,7 +108,7 @@ registerFinTool(
 
 registerFinTool(
   "fin_get_macro_indicators",
-  "Fetch macroeconomic indicators from FRED (Federal Reserve). Supports GDP, CPI, interest rates, unemployment, and thousands of other series.",
+  "Fetch economic time series from FRED (St. Louis Fed): GDP, CPI, interest rates, unemployment, and thousands of other series by ID. Requires the user's free FRED_API_KEY; without it the tool returns a message explaining how to get one.",
   macroIndicatorsShape,
   macroIndicatorsSchema,
   handleMacroIndicators
@@ -116,7 +116,7 @@ registerFinTool(
 
 registerFinTool(
   "fin_get_earnings_transcript",
-  "Extract earnings-related 8-K filings (Item 2.02) as a proxy for earnings call transcripts. Best-effort from public SEC data.",
+  "Return recent earnings press releases: the Exhibit 99.1 text from 8-K filings under Item 2.02 (first ~30,000 characters each). These are the company's written results announcements, not earnings-call transcripts; call transcripts aren't available from public SEC data.",
   earningsTranscriptShape,
   earningsTranscriptSchema,
   handleEarningsTranscript
@@ -124,7 +124,7 @@ registerFinTool(
 
 registerFinTool(
   "fin_compare_companies",
-  "Side-by-side financial comparison of 2-5 public companies with rankings. Uses SEC EDGAR data.",
+  "Side-by-side comparison of 2-5 US-listed companies on their most recent annual or quarterly period from SEC EDGAR XBRL, with each company's period-end date (fiscal years differ between companies) and per-metric rankings.",
   compareCompaniesShape,
   compareCompaniesSchema,
   handleCompareCompanies
@@ -132,7 +132,7 @@ registerFinTool(
 
 registerFinTool(
   "fin_get_industry_benchmarks",
-  "Compute industry benchmark statistics (median, mean, quartiles) by SIC code using SEC EDGAR data from peer companies.",
+  "Median, mean and quartiles of financial metrics across up to 15 companies that share a SIC code, from SEC EDGAR XBRL. The peers are the first companies EDGAR lists for that code, not a size-matched or curated set, so treat results as a rough sample; for a deliberate peer set, use fin_compare_companies.",
   industryBenchmarksShape,
   industryBenchmarksSchema,
   handleIndustryBenchmarks
@@ -141,7 +141,7 @@ registerFinTool(
 // ── Server Startup ──
 
 async function main(): Promise<void> {
-  if (!process.env.EDGAR_USER_AGENT) {
+  if (!process.env.EDGAR_USER_AGENT || process.env.EDGAR_USER_AGENT.startsWith("${")) {
     console.error(
       [
         "".padEnd(72, "="),

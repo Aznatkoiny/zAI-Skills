@@ -1,5 +1,7 @@
 # Strategy Frameworks
 
+> Figures described as "typically" or "often" in this file are rules of thumb for framing an estimate, not sourced facts. In a deliverable, replace them with a sourced figure or label them `[Assumption: rule of thumb]` (see `quality-bar.md`).
+
 ## Porter's Five Forces
 
 ### What It Is
@@ -50,7 +52,7 @@ A hierarchical market sizing framework that narrows from total opportunity to re
 ```
 TAM: Global market reports → total industry revenue
 SAM: TAM × (relevant segments) × (relevant geographies) × (relevant channels)
-SOM: SAM × (realistic share based on competitive position, typically 1-5% for new entrants, 10-20% for established players)
+SOM: SAM × (realistic share based on competitive position, rule of thumb: often 1-5% for new entrants, 10-20% for established players; label it as an assumption unless you have share data)
 ```
 
 **Bottom-Up Approach** (start from unit economics, build up):
@@ -60,7 +62,7 @@ SOM ÷ market share = SAM
 ```
 
 ### Best Practice
-- Always run both approaches and reconcile. If they're within 20%, confidence is reasonable. If they diverge >2x, investigate the assumptions driving the gap
+- Always run both approaches and reconcile. If they diverge by more than ~30%, investigate the assumptions driving the gap (scope definitions, stale top-down data, optimistic bottom-up inputs) before settling on a range.
 - Source each number: "[Statista, 2025]" or "[Analyst calculation: 500K customers × €2K ARPU × 15% penetration]"
 - State the year and currency for every figure
 - Use ranges when confidence is low: "SAM estimated at €8-12B"

@@ -11,7 +11,7 @@ export const FRED_BASE_URL = "https://api.stlouisfed.org/fred";
 // Rate limits (requests per second)
 export const RATE_LIMITS = {
   edgar: 10,    // SEC official limit: 10 req/s
-  fred: 2,      // Conservative (undocumented, ~120/min practical)
+  fred: 1.5,    // FRED documents 120 req/min per key (HTTP 429 beyond); stay under it
   yahoo: 0.1,   // Very conservative (~6/min safe)
 } as const;
 

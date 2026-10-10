@@ -143,6 +143,42 @@ and fast-moving technical content re-checked against upstream sources.
 
 ## consulting-toolkit
 
+### [1.5.0] - 2026-10-09
+
+#### Fixed
+- **Agents can use the financial tools again.** research-analyst, due-diligence and
+  financial-modeler listed tools under bare `mcp__financial-intelligence__…` names, which
+  match nothing for a plugin-bundled server; now plugin-scoped (verified live: 8/8 tools).
+- **`fin_get_company_financials` returned wrong numbers.** Periods were labeled with the
+  filing's fiscal year (three years of Alphabet revenue all showed as "FY2025"), quarterly
+  mode returned 6- and 9-month year-to-date totals, and "growth" compared adjacent rows.
+  Periods now come from each fact's own dates, only 12-month or 3-month spans are kept,
+  alternative XBRL tags are merged, and growth is year over year. Tables show period ends.
+- `fin_get_filing_text` returned inline-XBRL header noise instead of 10-K text; the hidden
+  header is now stripped. `fin_get_earnings_transcript` returns the Exhibit 99.1 press
+  release rather than the 8-K cover form, and says it isn't a call transcript.
+- `.mcp.json` passed unset keys as the literal `${FRED_API_KEY}`; now `${VAR:-}`, and the
+  server treats an unexpanded value as unset.
+- Price-volume-mix formula (mix was always zero) and the elasticity example's margin
+  threshold corrected.
+
+#### Changed
+- `/engagement` shows the workstream plan and expected agent runs before starting, checks
+  small outputs itself, caps revisions at two, and passes the prior output when revising.
+- The engagement manager makes a recommendation (and separates the client's decisions);
+  specialists no longer "ask the EM" mid-run and state assumptions instead; the deck
+  builder checks its own storyline and builds the deck in one run.
+- One shared standard, `references/quality-bar.md`, for sourcing and review: cite only
+  sources actually read, label rules of thumb as assumptions, use role titles instead of
+  invented names. Deliverable commands handle file, topic-only and empty input without
+  inventing figures.
+- Citation hook covers all of the plugin's deliverable names, reports each new problem
+  instead of once per session, and keeps its markers out of the user's project.
+- Tool descriptions state exactly what each tool returns (US filers only, computed EBITDA,
+  last 10 price bars, alphabetical SIC sample, FRED key required).
+- Agents inherit the session model; descriptions say what each is not for. README
+  rewritten around a no-setup first command and optional keys.
+
 ### [1.4.0] - 2026-07-26
 
 #### Added

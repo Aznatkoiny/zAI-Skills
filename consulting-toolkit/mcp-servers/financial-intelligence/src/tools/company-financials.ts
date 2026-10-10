@@ -4,11 +4,14 @@ import { getFinancialMetrics } from "../services/edgar.js";
 
 type FinancialsInput = z.infer<typeof companyFinancialsSchema>;
 
-function formatValue(value: number): string {
-  if (Math.abs(value) >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
-  if (Math.abs(value) >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
-  if (Math.abs(value) >= 1e3) return `$${(value / 1e3).toFixed(2)}K`;
-  return `$${value.toFixed(2)}`;
+function formatValue(value: number, metric = ""): string {
+  // Share counts aren't money; EPS is money per share and stays unscaled.
+  const unit = metric.includes("shares") ? "" : "$";
+  if (metric.includes("eps")) return `$${value.toFixed(2)}`;
+  if (Math.abs(value) >= 1e9) return `${unit}${(value / 1e9).toFixed(2)}B`;
+  if (Math.abs(value) >= 1e6) return `${unit}${(value / 1e6).toFixed(2)}M`;
+  if (Math.abs(value) >= 1e3) return `${unit}${(value / 1e3).toFixed(2)}K`;
+  return `${unit}${value.toFixed(2)}`;
 }
 
 export async function handleCompanyFinancials(input: FinancialsInput): Promise<string> {
@@ -49,11 +52,20 @@ export async function handleCompanyFinancials(input: FinancialsInput): Promise<s
       lines.push("");
       lines.push(`| Metric | ${periods.join(" | ")} |`);
       lines.push(`|--------|${periods.map(() => "-------").join("|")}|`);
+      // Period end dates, so each figure can be cited precisely.
+      const endFor = (label: string) => {
+        for (const m of metrics) {
+          const hit = m.periods.find((mp) => mp.period === label);
+          if (hit) return hit.endDate;
+        }
+        return "—";
+      };
+      lines.push(`| period end | ${periods.map(endFor).join(" | ")} |`);
 
       for (const m of metrics) {
         const values = periods.map((p) => {
           const match = m.periods.find((mp) => mp.period === p);
-          return match ? formatValue(match.value) : "—";
+          return match ? formatValue(match.value, m.metric) : "—";
         });
         lines.push(`| ${m.metric} | ${values.join(" | ")} |`);
       }
@@ -78,7 +90,7 @@ export async function handleCompanyFinancials(input: FinancialsInput): Promise<s
   }
 
   lines.push("");
-  lines.push(`*Data source: SEC EDGAR XBRL | ${input.period} data | Last ${input.limit} periods*`);
+  lines.push(`*Data source: SEC EDGAR XBRL (as reported in 10-K/10-Q filings) | ${input.period} periods: ${input.period === "annual" ? "12-month fiscal years" : "3-month quarters (year-to-date totals excluded)"} | last ${input.limit} periods. EBITDA, when shown, is computed as operating income + D&A, not company-reported.*`);
 
   return lines.join("\n");
 }

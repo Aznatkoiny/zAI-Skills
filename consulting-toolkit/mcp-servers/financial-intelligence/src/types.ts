@@ -10,6 +10,7 @@ export interface EdgarCompanyInfo {
 }
 
 export interface EdgarXBRLFact {
+  start?: string;     // Period start date for duration facts (absent for balance-sheet instants)
   end: string;        // Period end date (YYYY-MM-DD)
   val: number;
   accn: string;       // Accession number

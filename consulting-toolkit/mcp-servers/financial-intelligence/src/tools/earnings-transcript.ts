@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { earningsTranscriptSchema } from "../schemas/inputs.js";
-import { getFilings, getFilingDocument } from "../services/edgar.js";
+import { findExhibitDocument, getFilings, getFilingDocument } from "../services/edgar.js";
 import { MAX_FILING_TEXT_LENGTH } from "../constants.js";
 
 type EarningsInput = z.infer<typeof earningsTranscriptSchema>;
@@ -59,18 +59,24 @@ export async function handleEarningsTranscript(input: EarningsInput): Promise<st
 
       if (filing.primaryDocument) {
         try {
-          let text = await getFilingDocument(
-            company.cik,
-            filing.accessionNumber,
-            filing.primaryDocument
+          // The 8-K itself is a short cover form; the results and management's
+          // commentary are in the press release, filed as Exhibit 99.1.
+          const exhibit = await findExhibitDocument(company.cik, filing.accessionNumber);
+          const document = exhibit ?? filing.primaryDocument;
+          lines.push(
+            exhibit
+              ? `*Source document: Exhibit 99.1 press release (${exhibit})*`
+              : `*Source document: 8-K form (${filing.primaryDocument}); no Exhibit 99.1 was found, so the results may be in another exhibit*`
           );
+          lines.push("");
+          let text = await getFilingDocument(company.cik, filing.accessionNumber, document);
 
           const truncated = text.length > MAX_FILING_TEXT_LENGTH;
           if (truncated) {
             text = text.substring(0, MAX_FILING_TEXT_LENGTH);
           }
 
-          lines.push("#### Filing Text");
+          lines.push("#### Press release text");
           lines.push("");
           lines.push("```");
           lines.push(text);
@@ -92,8 +98,8 @@ export async function handleEarningsTranscript(input: EarningsInput): Promise<st
   }
 
   lines.push("");
-  lines.push("*Data source: SEC EDGAR 8-K filings | Item 2.02 filter*");
-  lines.push("*Note: This is a best-effort proxy for earnings transcripts. True call transcripts require paid data providers.*");
+  lines.push("*Data source: SEC EDGAR 8-K filings (Item 2.02), Exhibit 99.1 press releases.*");
+  lines.push("*This is the company's written earnings release, not a transcript of the earnings call. Don't attribute quotes to the call unless they appear here; call transcripts require a paid data provider.*");
 
   return lines.join("\n");
 }

@@ -1,5 +1,7 @@
 # Operational Frameworks
 
+> Figures described as "typically" or "often" in this file are rules of thumb for framing an estimate, not sourced facts. In a deliverable, replace them with a sourced figure or label them `[Assumption: rule of thumb]` (see `quality-bar.md`).
+
 ## RACI Matrix
 
 ### What It Is

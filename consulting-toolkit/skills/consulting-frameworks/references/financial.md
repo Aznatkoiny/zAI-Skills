@@ -1,5 +1,7 @@
 # Financial Frameworks
 
+> Figures described as "typically" or "often" in this file are rules of thumb for framing an estimate, not sourced facts. In a deliverable, replace them with a sourced figure or label them `[Assumption: rule of thumb]` (see `quality-bar.md`).
+
 ## NPV/IRR
 
 ### What It Is
@@ -24,7 +26,7 @@ Investment decision criteria for evaluating whether a project or acquisition cre
 
 ### Common Pitfalls
 - Using nominal cash flows with a real discount rate (or vice versa) — be consistent
-- Ignoring terminal value (often 50-70% of total NPV for growth businesses)
+- Ignoring terminal value (rule of thumb: often 50-80% of total NPV for growth businesses; state the actual share in your model)
 - False precision: Projecting to the dollar when assumptions have ±20% uncertainty
 - Forgetting to include integration costs, restructuring charges, or working capital changes in acquisition models
 

@@ -66,6 +66,8 @@ export async function handleCompareCompanies(input: CompareInput): Promise<strin
   // Company info rows
   lines.push(`| **Name** | ${companyData.map((c) => c.company.name).join(" | ")} |`);
   lines.push(`| **SIC** | ${companyData.map((c) => `${c.company.sic}`).join(" | ")} |`);
+  // Fiscal years end on different dates, so show which period each column is.
+  lines.push(`| **Period end** | ${companyData.map((c) => c.metrics.find((m) => m.periods[0])?.periods[0].endDate ?? "—").join(" | ")} |`);
 
   // Metric rows
   for (const metricName of metrics) {

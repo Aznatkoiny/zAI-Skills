@@ -1,5 +1,7 @@
 # M&A and Due Diligence Frameworks
 
+> Figures described as "typically" or "often" in this file are rules of thumb for framing an estimate, not sourced facts. In a deliverable, replace them with a sourced figure or label them `[Assumption: rule of thumb]` (see `quality-bar.md`).
+
 ## Synergy Sizing and Phasing
 
 ### What It Is
@@ -54,7 +56,7 @@ Cross-checking a valuation with three independent lenses — DCF, trading compar
 
 | Lens | What it measures | When it misleads |
 |------|------------------|------------------|
-| DCF | Intrinsic value of projected cash flows | Garbage-in: terminal value is often 60-80% of the total, so small changes in perpetuity growth or WACC swing the answer more than all the near-year forecasting combined. Misleads most when projections come from the seller. |
+| DCF | Intrinsic value of projected cash flows | Garbage-in: terminal value is often 50-80% of the total (rule of thumb), so small changes in perpetuity growth or WACC swing the answer more than all the near-year forecasting combined. Misleads most when projections come from the seller. |
 | Trading comps | What the market pays today for similar public companies | Misleads when the "comps" aren't comparable (different growth/margin/mix), when the sector is in a bubble or trough, and for illiquid or controlled companies. Reflects minority-stake value — no control premium. |
 | Precedent transactions | What acquirers actually paid for control of similar assets | Misleads when precedents are stale (different rate environment), scarce (n=3 is an anecdote, not a benchmark), or strategic outliers (a desperate buyer's multiple is not the market). Embeds historical control premiums and synergy expectations. |
 
