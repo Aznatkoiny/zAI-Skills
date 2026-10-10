@@ -1,6 +1,6 @@
 {
   "name": "zAI-Skills",
-  "description": "Development marketplace for AI-Toolkit, consulting-toolkit, real-estate-investment, career-coach, and plugin-forge plugins",
+  "description": "Claude Code plugins for prompt engineering and ML work (ai-toolkit), sourced consulting deliverables (consulting-toolkit), real estate investment analysis (real-estate-investment), job search (career-coach), and eval-first plugin building (plugin-forge)",
   "owner": {
     "name": "Antony Zaki",
     "email": "zaki.antony@gmail.com",

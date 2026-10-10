@@ -1,5 +1,0 @@
-# Re-include the committed single-file server bundle: the plugin's .mcp.json
-# launches dist/index.cjs directly, so it must ship in the repo even though
-# the parent consulting-toolkit/.gitignore hides dist/.
-!dist/
-!dist/**

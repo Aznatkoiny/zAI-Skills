@@ -1,6 +1,6 @@
 # consulting-toolkit
 
-For consultants, strategy and corp-dev teams, and anyone who needs consulting-grade deliverables: issue trees, market sizings, company profiles, business cases, DD memos, storylines and executive summaries, with every number sourced. Seventeen slash commands for single deliverables, an `/engagement` command that runs a multi-workstream project with specialist agents, and a data server for SEC filings, FRED and stock prices.
+For consultants, strategy and corp-dev teams, and anyone who needs consulting-grade deliverables: issue trees, market sizings, company profiles, business cases, DD memos, storylines and executive summaries, with every number sourced. Sixteen slash commands for single deliverables, an `/engagement` command that runs a multi-workstream project with specialist agents, and a data server for SEC filings, FRED and stock prices.
 
 ## Install
 

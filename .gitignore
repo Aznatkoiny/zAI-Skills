@@ -1,6 +1,8 @@
 # Build artifacts
 __pycache__/
 *.pyc
+.venv/
+*.tsbuildinfo
 *.keras
 output/
 node_modules/
@@ -15,4 +17,4 @@ dist/
 !consulting-toolkit/mcp-servers/financial-intelligence/dist/**
 
 # Local-only directories
-archieve/
+archive/

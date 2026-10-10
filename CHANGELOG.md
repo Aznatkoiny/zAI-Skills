@@ -4,10 +4,24 @@ Notable changes to the zAI-Skills marketplace and its plugins. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); each plugin is versioned
 independently, so entries are grouped per plugin.
 
-The Phase 1–3 overhaul landed as three consecutive commits on 2026-07-26; the interim
-versions they introduced (ai-toolkit 2.3.0; career-coach 1.1.0–1.2.0; consulting-toolkit
-1.2.0–1.3.0; real-estate-investment 1.1.0–1.2.0) were never published separately and are
-folded into the current entries below.
+Versions skipped in the sequence below (ai-toolkit 2.3.0; career-coach 1.1.0–1.2.0;
+consulting-toolkit 1.2.0–1.3.0; real-estate-investment 1.1.0–1.2.0) were never released
+on their own; their changes are in the next listed version.
+
+## Repository
+
+### 2026-10-09
+- The validator now catches the mistakes that had shipped: bare `mcp__<server>__<tool>`
+  names in agent tool lists (they grant nothing for plugin servers), `${VAR}` without a
+  default in `.mcp.json`, missing `$ARGUMENTS`, missing READMEs, count drift for agents
+  and skills, missing injection cautions, and retired model names in prompts. It no
+  longer crashes on external marketplace sources, which had failed CI since plugin-forge
+  was added.
+- plugin-forge pinned to its v0.2.0 tag; CI actions updated.
+- AGENTS.md now holds the repo conventions, and CLAUDE.md imports it, so Claude Code and
+  Codex follow the same rules. The root README opens with a "which plugin do I want?"
+  table; CONTRIBUTING covers plugin-scoped MCP names, `model: inherit`, external plugins
+  and the release checks.
 
 ## ai-toolkit
 
@@ -307,6 +321,11 @@ for the same deal, and the data server, scripts and tax content were brought up 
   exit 0 was invisible to Claude), with word-boundary matching and session dedupe.
 - Skill reference math: `numpy_financial` for IRR, corrected incremental waterfall tiers
   and dated IRRs, `expense_growth` implemented, Excel sign fix.
+
+## plugin-forge
+
+Maintained in [its own repo](https://github.com/Aznatkoiny/plugin-forge), which has its
+own changelog. Listed in this marketplace since 2026-08-02; pinned to v0.2.0.
 
 ## Earlier history
 
